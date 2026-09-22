@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="StealthDesk.web.client/StealthDesk.web.client.csproj" />
+  <Project Path="StealthDesk.web.server/StealthDesk.web.server.csproj" />
+</Solution>
