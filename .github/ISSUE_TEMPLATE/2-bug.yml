@@ -1,0 +1,99 @@
+name: Bug
+description: Something isn't working
+title: "[BUG] "
+labels: ["type: bug"]
+body:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this isn't a duplicate
+          required: true
+        - label: The steps below reproduce the bug every time (or I describe how often it happens)
+          required: true
+        - label: This is not a hosting problem (reverse proxy, firewall, DNS, TLS). Connection issues are often caused by something between the browser/agent and the server, not by the server itself.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug, with the exact error message if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: As detailed as possible. A bug that can't be reproduced can't be fixed or covered by a regression test.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Server / API
+        - Web client (browser)
+        - Agent
+        - Desktop client
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: client-info
+    attributes:
+      label: Client info
+      description: Fill in what applies.
+      value: |
+        Browser:
+        Browser language/locale:
+        Agent version:
+        Agent OS:
+        Agent OS language/locale:
+  - type: textarea
+    id: server-info
+    attributes:
+      label: Server info
+      value: |
+        Server OS:
+        Server OS language/locale:
+        How it runs (dotnet run / Docker image tag / service):
+        Commit or version:
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from the agent, desktop client, browser console, and server logs.
+      render: shell
+  - type: input
+    id: log-timestamps
+    attributes:
+      label: Log timestamp(s)
+      description: When the problem happened, so the lines can be matched across logs.
+      placeholder: "2026-09-23 14:05:12 -03:00"
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Paste or drag images here, if they help.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] A regression test reproduces the bug and passes after the fix

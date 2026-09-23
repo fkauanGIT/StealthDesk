@@ -1,0 +1,19 @@
+name: Docs
+description: Documentation only
+title: "[DOCS] "
+labels: ["type: docs"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      value: |
+        - [ ]
+    validations:
+      required: true

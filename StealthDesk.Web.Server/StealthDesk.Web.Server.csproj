@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\StealthDesk.Web.Client\StealthDesk.web.client.csproj" />
+    <ProjectReference Include="..\StealthDesk.Web.Client\StealthDesk.Web.Client.csproj" />
     <ProjectReference Include="..\StealthDesk.Web.ServiceDefaults\StealthDesk.Web.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Libraries\StealthDesk.Libraries.Api.Contracts\StealthDesk.Libraries.Api.Contracts.csproj" />
     <ProjectReference Include="..\Libraries\StealthDesk.Libraries.DataRedaction\StealthDesk.Libraries.DataRedaction.csproj" />
