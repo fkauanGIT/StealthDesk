@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MessagePack" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\StealthDesk.Libraries.Api.Contracts\StealthDesk.Libraries.Api.Contracts.csproj" />
+  </ItemGroup>
+</Project>

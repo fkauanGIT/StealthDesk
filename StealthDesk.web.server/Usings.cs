@@ -1,0 +1,10 @@
+global using StealthDesk.Libraries.Shared.Primitives;
+global using StealthDesk.Libraries.Api.Contracts.Constants;
+global using StealthDesk.Libraries.Api.Contracts.Dtos;
+global using StealthDesk.Libraries.Api.Contracts.Enums;
+global using StealthDesk.Libraries.Shared.Extensions;
+global using StealthDesk.Web.Server.Data;
+global using StealthDesk.Web.Server.Data.Entities;
+global using Microsoft.EntityFrameworkCore;
+global using V1Dtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.V1;
+global using StealthDesk.Web.ServiceDefaults;

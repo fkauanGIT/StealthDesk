@@ -1,0 +1,193 @@
+﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+
+namespace StealthDesk.Web.ServiceDefaults;
+public static class Extensions
+{
+  public static IHostApplicationBuilder AddDefaultHealthChecks(this IHostApplicationBuilder builder)
+  {
+    builder.Services
+      .AddHealthChecks()
+      // Add a default liveness check to ensure app is responsive
+      .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+    return builder;
+  }
+
+  public static IHostApplicationBuilder AddServiceDefaults(
+    this IHostApplicationBuilder builder,
+    string serviceName,
+    string? hostId = null,
+    bool useServiceDiscovery = false,
+    bool useResilience = false,
+    Action<OpenTelemetryLoggerOptions>? configureLogging = null,
+    Action<MeterProviderBuilder>? configureMetrics = null,
+    Action<TracerProviderBuilder>? configureTracing = null)
+  {
+    builder.ConfigureOpenTelemetry(
+      serviceName,
+      hostId,
+      configureLogging,
+      configureMetrics,
+      configureTracing);
+
+    builder.AddDefaultHealthChecks();
+
+    if (useServiceDiscovery)
+    {
+      builder.Services.AddServiceDiscovery();
+    }
+
+    builder.Services.ConfigureHttpClientDefaults(http =>
+    {
+      if (useResilience)
+      {
+        // Turn on resilience
+        http.AddStandardResilienceHandler();
+      }
+
+      if (useServiceDiscovery)
+      {
+        // Turn on service discovery
+        http.AddServiceDiscovery();
+      }
+    });
+
+    return builder;
+  }
+
+  public static IHostApplicationBuilder ConfigureOpenTelemetry(
+    this IHostApplicationBuilder builder,
+    string serviceName,
+    string? hostId = null,
+    Action<OpenTelemetryLoggerOptions>? configureLogging = null,
+    Action<MeterProviderBuilder>? configureMetrics = null,
+    Action<TracerProviderBuilder>? configureTracing = null)
+  {
+    builder.Logging.AddOpenTelemetry(logging =>
+    {
+      var resourceBuilder = ResourceBuilder.CreateDefault();
+      resourceBuilder.AddService(
+        serviceName: serviceName,
+        serviceNamespace: "stealthdesk");
+
+      if (hostId is not null)
+      {
+        resourceBuilder.AddAttributes([new KeyValuePair<string, object>("host.id", hostId)]);
+      }
+
+      logging.IncludeFormattedMessage = true;
+      logging.IncludeScopes = true;
+      logging.ParseStateValues = true;
+      logging.SetResourceBuilder(resourceBuilder);
+      configureLogging?.Invoke(logging);
+    });
+
+    builder.Services.AddOpenTelemetry()
+      .ConfigureResource(resourceBuilder =>
+      {
+        resourceBuilder.AddService(
+          serviceName: serviceName,
+          serviceNamespace: "stealthdesk");
+
+        if (hostId is not null)
+        {
+          resourceBuilder.AddAttributes([new KeyValuePair<string, object>("host.id", hostId)]);
+        }
+      })
+      .WithMetrics(metrics =>
+      {
+        metrics
+          .AddAspNetCoreInstrumentation()
+          .AddHttpClientInstrumentation()
+          .AddRuntimeInstrumentation();
+
+        configureMetrics?.Invoke(metrics);
+      })
+      .WithTracing(tracing =>
+      {
+        tracing
+          .AddAspNetCoreInstrumentation(options =>
+          {
+            options.Filter = httpContext =>
+            {
+              return httpContext.Request.Path.Value?.StartsWith("/health") != true;
+            };
+          })
+          .AddHttpClientInstrumentation(options =>
+          {
+            options.FilterHttpWebRequest = request =>
+            {
+              return !request.RequestUri.PathAndQuery.StartsWith("/health");
+            };
+          });
+
+        configureTracing?.Invoke(tracing);
+      });
+
+    builder.AddOpenTelemetryExporters();
+
+    return builder;
+  }
+
+  public static WebApplication MapDefaultEndpoints(this WebApplication app)
+  {
+    // All health checks must pass for app to be considered ready to accept traffic after starting
+    app
+      .MapHealthChecks("/health")
+      .WithRequestTimeout(TimeSpan.FromSeconds(5))
+      .CacheOutput(policy => { policy.Expire(TimeSpan.FromSeconds(5)); });
+
+    // Only health checks tagged with the "live" tag must pass for app to be considered alive
+    app
+      .MapHealthChecks("/alive", new HealthCheckOptions
+      {
+        Predicate = r => r.Tags.Contains("live")
+      })
+      .WithRequestTimeout(TimeSpan.FromSeconds(5))
+      .CacheOutput(policy => { policy.Expire(TimeSpan.FromSeconds(5)); });
+
+    return app;
+  }
+
+  private static IHostApplicationBuilder AddOpenTelemetryExporters(
+    this IHostApplicationBuilder builder)
+  {
+    // The orchestrator-provided endpoint wins. The Aspire AppHost sets OTEL_EXPORTER_OTLP_ENDPOINT
+    // to its managed dashboard, while OTLP_ENDPOINT_URL is the checked-in default for compose runs.
+    var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+
+    if (string.IsNullOrWhiteSpace(otlpEndpoint))
+    {
+      otlpEndpoint = builder.Configuration["OTLP_ENDPOINT_URL"];
+    }
+    var azureMonitorConnectionString = builder.Configuration["AzureMonitor:ConnectionString"];
+
+    if (Uri.TryCreate(otlpEndpoint, UriKind.Absolute, out var otlpUri))
+    {
+      builder.Services
+        .AddOpenTelemetry()
+        .UseOtlpExporter(OtlpExportProtocol.Grpc, otlpUri);
+    }
+
+    if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+    {
+      builder.Services
+        .AddOpenTelemetry()
+        .UseAzureMonitor(options => { options.ConnectionString = azureMonitorConnectionString; });
+    }
+
+    return builder;
+  }
+}

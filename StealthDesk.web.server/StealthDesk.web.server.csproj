@@ -1,11 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\StealthDesk.web.client\StealthDesk.web.client.csproj" />
+    <ProjectReference Include="..\StealthDesk.Web.Client\StealthDesk.web.client.csproj" />
+    <ProjectReference Include="..\StealthDesk.Web.ServiceDefaults\StealthDesk.Web.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Libraries\StealthDesk.Libraries.Api.Contracts\StealthDesk.Libraries.Api.Contracts.csproj" />
+    <ProjectReference Include="..\Libraries\StealthDesk.Libraries.DataRedaction\StealthDesk.Libraries.DataRedaction.csproj" />
+    <ProjectReference Include="..\Libraries\StealthDesk.Libraries.Shared\StealthDesk.Libraries.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <PropertyGroup>

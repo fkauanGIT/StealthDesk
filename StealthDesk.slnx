@@ -1,4 +1,14 @@
 <Solution>
+  <Folder Name="/Libraries/">
+    <Project Path="Libraries/StealthDesk.Libraries.Api.Contracts/StealthDesk.Libraries.Api.Contracts.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.DataRedaction/StealthDesk.Libraries.DataRedaction.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.Shared/StealthDesk.Libraries.Shared.csproj" />
+  </Folder>
+  <Folder Name="/StealthDesk.Web.Server/" />
+  <Folder Name="/Tests/">
+    <Project Path="Tests/StealthDesk.Web.Server.Tests/StealthDesk.Web.Server.Tests.csproj" />
+  </Folder>
   <Project Path="StealthDesk.web.client/StealthDesk.web.client.csproj" />
   <Project Path="StealthDesk.web.server/StealthDesk.web.server.csproj" />
+  <Project Path="StealthDesk.Web.ServiceDefaults/StealthDesk.Web.ServiceDefaults.csproj" />
 </Solution>
