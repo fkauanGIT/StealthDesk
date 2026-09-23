@@ -1,0 +1,40 @@
+name: Chore
+description: Tooling, dependencies, project structure — no behavior change
+title: "[CHORE] "
+labels: ["type: chore"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this is needed now.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] `dotnet build StealthDesk.slnx --verbosity quiet` succeeds
+        - [ ] Existing tests pass
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      placeholder: "Blocked by #N"

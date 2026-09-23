@@ -1,0 +1,32 @@
+name: Epic
+description: A milestone-sized goal tracked by child issues (no branch of its own)
+title: "[EPIC] "
+labels: ["type: epic"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What a user can do when the epic is done.
+    validations:
+      required: true
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture
+      description: Diagram or description of the moving parts.
+  - type: textarea
+    id: issues
+    attributes:
+      label: Issues
+      description: Child issues, in order.
+      value: |
+        - [ ] #
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+    validations:
+      required: true

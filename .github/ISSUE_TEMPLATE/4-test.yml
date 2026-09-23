@@ -1,0 +1,33 @@
+name: Test
+description: Add or improve automated tests
+title: "[TEST] "
+labels: ["type: test"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What behavior the tests prove.
+    validations:
+      required: true
+  - type: textarea
+    id: cases
+    attributes:
+      label: Test cases
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] `dotnet run --project <test project>` passes
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      placeholder: "Blocked by #N"
