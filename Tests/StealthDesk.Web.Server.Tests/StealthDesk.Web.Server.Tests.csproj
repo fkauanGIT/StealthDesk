@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\StealthDesk.Web.Server\StealthDesk.web.server.csproj" />
+    <ProjectReference Include="..\..\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
