@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace StealthDesk.web.server.Migrations
+namespace StealthDesk.Web.Server.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace StealthDesk.web.server.Api.Internal;
+namespace StealthDesk.Web.Server.Api.Internal;
 
 [Route("api/internal/version")]
 [ApiController]
