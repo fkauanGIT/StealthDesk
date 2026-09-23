@@ -3,9 +3,11 @@
     <Project Path="Libraries/StealthDesk.Libraries.Api.Contracts/StealthDesk.Libraries.Api.Contracts.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.DataRedaction/StealthDesk.Libraries.DataRedaction.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Shared/StealthDesk.Libraries.Shared.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.TestingUtilities/StealthDesk.Libraries.TestingUtilities.csproj" />
   </Folder>
   <Folder Name="/StealthDesk.Web.Server/" />
   <Folder Name="/Tests/">
+    <Project Path="Tests/StealthDesk.Libraries.Shared.Tests/StealthDesk.Libraries.Shared.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Web.Server.Tests/StealthDesk.Web.Server.Tests.csproj" />
   </Folder>
   <Project Path="StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
