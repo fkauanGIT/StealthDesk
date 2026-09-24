@@ -12,7 +12,6 @@ using StealthDesk.Libraries.Api.Contracts.Hubs;
 using StealthDesk.Libraries.Shared.Constants;
 using StealthDesk.Libraries.Shared.Services.Encryption;
 using StealthDesk.Web.Server.Data;
-using StealthDesk.Web.Server.Tests.Helpers;
 using InternalDtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.Internal;
 using V1Dtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.V1;
 
@@ -38,7 +37,6 @@ public class AgentHubTests
   public async Task UpdateDeviceSigned_WithValidSignature_StoresDeviceOnline()
   {
     using var factory = new TestAppFactory();
-    await factory.Services.CreateTestTenant();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());
@@ -57,7 +55,6 @@ public class AgentHubTests
   public async Task UpdateDeviceSigned_WhenSignatureDoesNotMatchEnvelopeKey_Fails()
   {
     using var factory = new TestAppFactory();
-    await factory.Services.CreateTestTenant();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var signingKeyPair = keyProvider.GenerateKeyPair();
     var envelopeKeyPair = keyProvider.GenerateKeyPair();
@@ -77,7 +74,6 @@ public class AgentHubTests
   public async Task UpdateDeviceSigned_WhenExistingDeviceUsesNewKey_Fails()
   {
     using var factory = new TestAppFactory();
-    await factory.Services.CreateTestTenant();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var originalKeyPair = keyProvider.GenerateKeyPair();
     var newKeyPair = keyProvider.GenerateKeyPair();
@@ -101,7 +97,6 @@ public class AgentHubTests
   public async Task UpdateDeviceSigned_WhenTimestampIsOutsideTolerance_Fails()
   {
     using var factory = new TestAppFactory();
-    await factory.Services.CreateTestTenant();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());
@@ -124,7 +119,6 @@ public class AgentHubTests
   public async Task Disconnect_MarksDeviceOffline()
   {
     using var factory = new TestAppFactory();
-    await factory.Services.CreateTestTenant();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());

@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace StealthDesk.Web.Server.Tests;
 
-public class TestAppFactory : WebApplicationFactory<Program>
+/// <param name="databaseName">
+/// In-memory database name. Pass the same name to two factories to simulate a server restart.
+/// </param>
+public class TestAppFactory(string? databaseName = null) : WebApplicationFactory<Program>
 {
-  private readonly string _databaseName = Guid.NewGuid().ToString("N");
+  private readonly string _databaseName = databaseName ?? Guid.NewGuid().ToString("N");
 
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {

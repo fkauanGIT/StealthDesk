@@ -8,6 +8,8 @@ builder.AddStealthDeskServer();
 
 var app = builder.Build();
 
+await app.SeedDefaultTenant();
+
 if (app.Environment.IsDevelopment())
 {
   app.UseWebAssemblyDebugging();
