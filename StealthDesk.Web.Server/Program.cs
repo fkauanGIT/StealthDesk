@@ -1,3 +1,5 @@
+using StealthDesk.Libraries.Shared.Constants;
+using StealthDesk.Web.Server.Hubs;
 using StealthDesk.Web.Server.Startup;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +19,7 @@ app.UseOutputCache();
 
 app.MapDefaultEndpoints();
 app.MapControllers();
+app.MapHub<AgentHub>(AppConstants.AgentHubPath);
 app.MapFallbackToFile("index.html");
 
 app.Run();
