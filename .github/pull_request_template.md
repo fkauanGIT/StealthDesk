@@ -6,6 +6,8 @@ Closes #
 
 ## How to test
 
+The CI check builds the solution and runs every test project on this PR. To run them locally:
+
 - [ ] `dotnet build StealthDesk.slnx --verbosity quiet`
 - [ ] `dotnet run --project Tests/StealthDesk.Web.Server.Tests`
 
