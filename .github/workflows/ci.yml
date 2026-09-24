@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# A new commit on the same branch makes the previous run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build StealthDesk.slnx --configuration Release
+
+      # xUnit v3 test projects are executables, so they run with `dotnet run` instead of `dotnet test`.
+      # Every *.Tests.csproj under Tests/ is picked up, so new test projects join CI without editing this file.
+      - name: Run tests
+        run: |
+          $testProjects = Get-ChildItem -Path "Tests" -Recurse -Filter "*.Tests.csproj" | Sort-Object FullName
+
+          if ($testProjects.Count -eq 0) {
+            throw "No test projects were found under Tests/."
+          }
+
+          foreach ($project in $testProjects) {
+            Write-Host "Running $($project.Name)..."
+            dotnet run --project $project.FullName --configuration Release --no-build
+            if ($LASTEXITCODE -ne 0) {
+              throw "Test execution failed for $($project.Name)."
+            }
+          }
