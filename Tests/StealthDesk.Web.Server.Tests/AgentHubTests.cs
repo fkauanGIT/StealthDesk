@@ -9,8 +9,11 @@ using StealthDesk.Libraries.Api.Contracts.Dtos;
 using StealthDesk.Libraries.Api.Contracts.Dtos.HubDtos;
 using StealthDesk.Libraries.Api.Contracts.Enums;
 using StealthDesk.Libraries.Api.Contracts.Hubs;
+using StealthDesk.Libraries.Api.Contracts.Hubs.Clients;
 using StealthDesk.Libraries.Shared.Constants;
 using StealthDesk.Libraries.Shared.Services.Encryption;
+using StealthDesk.Libraries.Signalr.Client;
+using StealthDesk.Libraries.Signalr.Client.Extensions;
 using StealthDesk.Web.Server.Data;
 using InternalDtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.Internal;
 using V1Dtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.V1;
@@ -134,22 +137,33 @@ public class AgentHubTests
     Assert.True(isOffline, "The device was not marked offline after the connection closed.");
   }
 
-  private static async Task<HubConnection> ConnectAgent(TestAppFactory factory)
+  private static async Task<IHubConnection<IAgentHub>> ConnectAgent(TestAppFactory factory)
   {
     var hubUrl = new Uri(factory.Server.BaseAddress, AppConstants.AgentHubPath);
 
-    var connection = new HubConnectionBuilder()
-      .WithUrl(hubUrl, options =>
+    var services = new ServiceCollection();
+    services.AddLogging();
+    // Registered before the library's default builder, so the connection speaks MessagePack.
+    services.AddTransient<IHubConnectionBuilder>(_ => new HubConnectionBuilder().AddMessagePackProtocol());
+    services.AddStronglyTypedSignalrClient<IAgentHub, IAgentHubClient, TestAgentHubClient>(ServiceLifetime.Transient);
+
+    var connection = services
+      .BuildServiceProvider()
+      .GetRequiredService<IHubConnection<IAgentHub>>();
+
+    var isConnected = await connection.Connect(
+      hubUrl,
+      autoRetry: false,
+      options =>
       {
         // The test server has no network listener, so requests go straight to its in-memory handler.
         // That handler can't upgrade to WebSockets, hence long polling.
         options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
         options.Transports = HttpTransportType.LongPolling;
-      })
-      .AddMessagePackProtocol()
-      .Build();
+      },
+      TestContext.Current.CancellationToken);
 
-    await connection.StartAsync(TestContext.Current.CancellationToken);
+    Assert.True(isConnected, "The agent could not connect to the hub.");
     return connection;
   }
 
@@ -199,13 +213,10 @@ public class AgentHubTests
   }
 
   private static Task<HubResult<InternalDtos.DeviceResponseDto>> SendHeartbeat(
-    HubConnection connection,
+    IHubConnection<IAgentHub> connection,
     SignedDto<DeviceUpdateRequestDto> signedDto)
   {
-    return connection.InvokeAsync<HubResult<InternalDtos.DeviceResponseDto>>(
-      nameof(IAgentHub.UpdateDeviceSigned),
-      signedDto,
-      TestContext.Current.CancellationToken);
+    return connection.Server.UpdateDeviceSigned(signedDto);
   }
 
   private static string ToBase64(byte[] bytes) => Convert.ToBase64String(bytes);
@@ -232,4 +243,6 @@ public class AgentHubTests
   {
     public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + offset;
   }
+
+  private sealed class TestAgentHubClient : IAgentHubClient;
 }

@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Libraries\StealthDesk.Libraries.Signalr.Client\StealthDesk.Libraries.Signalr.Client.csproj" />
     <ProjectReference Include="..\..\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
   </ItemGroup>
 
