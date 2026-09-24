@@ -8,3 +8,6 @@ global using StealthDesk.Web.Server.Data.Entities;
 global using Microsoft.EntityFrameworkCore;
 global using V1Dtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.V1;
 global using StealthDesk.Web.ServiceDefaults;
+global using InternalDtos = StealthDesk.Libraries.Api.Contracts.Dtos.ServerApi.Internal;
+global using StealthDesk.Web.Server.Options;
+global using Microsoft.Extensions.Options;
