@@ -24,6 +24,8 @@
 
   <PropertyGroup>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);SD0001;</WarningsNotAsErrors>
+    <!-- A ProjectReference to a path that doesn't exist (MSB9008) must fail the build, not just warn. -->
+    <MSBuildWarningsAsErrors>$(MSBuildWarningsAsErrors);MSB9008</MSBuildWarningsAsErrors>
   </PropertyGroup>
 
   <PropertyGroup
