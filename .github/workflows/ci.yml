@@ -64,3 +64,48 @@ jobs:
               throw "Test execution failed for $($project.Name)."
             }
           }
+
+  # Tests that call Windows APIs are skipped on Linux, so they run here.
+  windows-tests:
+    name: Windows tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Build Windows tests
+        run: |
+          $testProjects = @(
+            "Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
+          )
+
+          foreach ($project in $testProjects) {
+            Write-Host "Building $project..."
+            dotnet build $project --configuration Release
+            if ($LASTEXITCODE -ne 0) {
+              throw "Build failed for $project."
+            }
+          }
+
+      - name: Run Windows tests
+        run: |
+          $testProjects = @(
+            "Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
+          )
+
+          foreach ($project in $testProjects) {
+            Write-Host "Running $project on Windows..."
+            dotnet run --project $project --configuration Release --no-build
+            if ($LASTEXITCODE -ne 0) {
+              throw "Test execution failed for $project."
+            }
+          }

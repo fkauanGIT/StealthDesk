@@ -4,6 +4,7 @@
     <Project Path="Libraries/StealthDesk.Libraries.Branding/StealthDesk.Libraries.Branding.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.DataRedaction/StealthDesk.Libraries.DataRedaction.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Hosting/StealthDesk.Libraries.Hosting.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.NativeInterop.Windows/StealthDesk.Libraries.NativeInterop.Windows.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Serilog/StealthDesk.Libraries.Serilog.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Shared/StealthDesk.Libraries.Shared.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Signalr.Client/StealthDesk.Libraries.Signalr.Client.csproj" />
@@ -11,10 +12,12 @@
   </Folder>
   <Folder Name="/StealthDesk.Web.Server/" />
   <Folder Name="/Tests/">
+    <Project Path="Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Libraries.Branding.Tests/StealthDesk.Libraries.Branding.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Libraries.Shared.Tests/StealthDesk.Libraries.Shared.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Web.Server.Tests/StealthDesk.Web.Server.Tests.csproj" />
   </Folder>
+  <Project Path="StealthDesk.Agent.Shared/StealthDesk.Agent.Shared.csproj" />
   <Project Path="StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
   <Project Path="StealthDesk.Web.Server/StealthDesk.Web.Server.csproj" />
   <Project Path="StealthDesk.Web.ServiceDefaults/StealthDesk.Web.ServiceDefaults.csproj" />
