@@ -11,18 +11,16 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Moq" />
     <PackageReference Include="xunit.v3.runner.console">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\StealthDesk.Agent.Shared\StealthDesk.Agent.Shared.csproj" />
-    <ProjectReference Include="..\..\Libraries\StealthDesk.Libraries.TestingUtilities\StealthDesk.Libraries.TestingUtilities.csproj" />
+    <ProjectReference
+      Include="..\..\shared\StealthDesk.Libraries.Shared\StealthDesk.Libraries.Shared.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.TestingUtilities\StealthDesk.Libraries.TestingUtilities.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
