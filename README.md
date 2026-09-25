@@ -38,7 +38,8 @@ Next up: the agent itself (a console app that connects, reports device info, and
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL](https://www.postgresql.org/download/) (optional: the server can run with an in-memory database)
-- [dotnet-ef](https://learn.microsoft.com/en-us/ef/core/cli/dotnet) to apply migrations to PostgreSQL:
+- [Docker](https://www.docker.com/products/docker-desktop/) to run the server tests that use PostgreSQL
+- [dotnet-ef](https://learn.microsoft.com/en-us/ef/core/cli/dotnet), only to create new migrations:
   `dotnet tool install --global dotnet-ef`
 
 ## Quick Start
@@ -71,10 +72,9 @@ The connection is built from these settings, found in
 
 Change them to match your PostgreSQL instance, or override them without editing the file through
 environment variables (e.g. `POSTGRES_PASSWORD`) or command-line arguments (`--POSTGRES_PASSWORD=...`).
-Then create the database and start the server:
+Then start the server. It applies the pending migrations on startup, creating the database if needed:
 
 ```
-dotnet ef database update --project StealthDesk.Web.Server --context AppDb
 dotnet run --project StealthDesk.Web.Server --launch-profile http
 ```
 
@@ -98,7 +98,9 @@ dotnet run --project Tests/StealthDesk.Libraries.Shared.Tests
 dotnet run --project Tests/StealthDesk.Web.Server.Tests
 ```
 
-The tests use an in-memory database, so PostgreSQL is not required. CI runs every test project on each
+Most tests use an in-memory database. The device manager and agent heartbeat tests run against a real
+PostgreSQL started in a Docker container by [Testcontainers](https://dotnet.testcontainers.org/), so
+Docker must be running; a local PostgreSQL installation is not needed. CI runs every test project on each
 pull request and on every push to `main`.
 
 ## Repository Layout
