@@ -3,6 +3,8 @@
     <Project Path="Libraries/StealthDesk.Libraries.Api.Contracts/StealthDesk.Libraries.Api.Contracts.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Branding/StealthDesk.Libraries.Branding.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.DataRedaction/StealthDesk.Libraries.DataRedaction.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.Hosting/StealthDesk.Libraries.Hosting.csproj" />
+    <Project Path="Libraries/StealthDesk.Libraries.Serilog/StealthDesk.Libraries.Serilog.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Shared/StealthDesk.Libraries.Shared.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.Signalr.Client/StealthDesk.Libraries.Signalr.Client.csproj" />
     <Project Path="Libraries/StealthDesk.Libraries.TestingUtilities/StealthDesk.Libraries.TestingUtilities.csproj" />
