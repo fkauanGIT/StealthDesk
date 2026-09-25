@@ -39,7 +39,7 @@ public class AgentHubTests
   [Fact]
   public async Task UpdateDeviceSigned_WithValidSignature_StoresDeviceOnline()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());
@@ -57,7 +57,7 @@ public class AgentHubTests
   [Fact]
   public async Task UpdateDeviceSigned_WhenSignatureDoesNotMatchEnvelopeKey_Fails()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var signingKeyPair = keyProvider.GenerateKeyPair();
     var envelopeKeyPair = keyProvider.GenerateKeyPair();
@@ -76,7 +76,7 @@ public class AgentHubTests
   [Fact]
   public async Task UpdateDeviceSigned_WhenExistingDeviceUsesNewKey_Fails()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var originalKeyPair = keyProvider.GenerateKeyPair();
     var newKeyPair = keyProvider.GenerateKeyPair();
@@ -99,7 +99,7 @@ public class AgentHubTests
   [Fact]
   public async Task UpdateDeviceSigned_WhenTimestampIsOutsideTolerance_Fails()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());
@@ -121,7 +121,7 @@ public class AgentHubTests
   [Fact]
   public async Task Disconnect_MarksDeviceOffline()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     var keyProvider = factory.Services.GetRequiredService<IEd25519KeyProvider>();
     var keyPair = keyProvider.GenerateKeyPair();
     var deviceDto = CreateDeviceDto(Guid.NewGuid());

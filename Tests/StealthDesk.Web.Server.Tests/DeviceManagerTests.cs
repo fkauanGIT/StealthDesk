@@ -20,7 +20,7 @@ public class DeviceManagerTests
   public async Task DeviceManager_AddOrUpdate()
   {
     // Arrange
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     using var scope = factory.Services.CreateScope();
     var deviceManager = scope.ServiceProvider.GetRequiredService<IDeviceManager>();
 
@@ -109,7 +109,7 @@ public class DeviceManagerTests
   public async Task DeviceManager_UpdateDevice()
   {
     // Arrange
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     using var scope = factory.Services.CreateScope();
     var deviceManager = scope.ServiceProvider.GetRequiredService<IDeviceManager>();
     var db = scope.ServiceProvider.GetRequiredService<AppDb>();
@@ -193,7 +193,7 @@ public class DeviceManagerTests
   [Fact]
   public async Task DeviceManager_UpdateDevice_RejectsCrossTenantMove()
   {
-    using var factory = new TestAppFactory();
+    using var factory = await TestAppFactory.CreateWithPostgres();
     using var scope = factory.Services.CreateScope();
     var deviceManager = scope.ServiceProvider.GetRequiredService<IDeviceManager>();
     var db = scope.ServiceProvider.GetRequiredService<AppDb>();
