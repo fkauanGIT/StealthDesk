@@ -8,6 +8,15 @@ builder.AddStealthDeskServer();
 
 var app = builder.Build();
 
+if (app.Configuration.GetValue<bool>("UseInMemoryDatabase"))
+{
+  await app.EnsureDatabaseCreated();
+}
+else
+{
+  await app.ApplyMigrations();
+}
+
 await app.SeedDefaultTenant();
 
 if (app.Environment.IsDevelopment())
