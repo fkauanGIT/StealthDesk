@@ -7,5 +7,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\StealthDesk.Libraries.Api.Contracts\StealthDesk.Libraries.Api.Contracts.csproj" />
+    <ProjectReference Include="..\StealthDesk.Libraries.Branding\StealthDesk.Libraries.Branding.csproj" />
   </ItemGroup>
 </Project>
