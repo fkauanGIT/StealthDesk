@@ -48,13 +48,13 @@ jobs:
         run: dotnet build StealthDesk.slnx --configuration Release
 
       # xUnit v3 test projects are executables, so they run with `dotnet run` instead of `dotnet test`.
-      # Every *.Tests.csproj under Tests/ is picked up, so new test projects join CI without editing this file.
+      # Every *.Tests.csproj under tests/ is picked up, so new test projects join CI without editing this file.
       - name: Run tests
         run: |
-          $testProjects = Get-ChildItem -Path "Tests" -Recurse -Filter "*.Tests.csproj" | Sort-Object FullName
+          $testProjects = Get-ChildItem -Path "tests" -Recurse -Filter "*.Tests.csproj" | Sort-Object FullName
 
           if ($testProjects.Count -eq 0) {
-            throw "No test projects were found under Tests/."
+            throw "No test projects were found under tests/."
           }
 
           foreach ($project in $testProjects) {
@@ -85,7 +85,7 @@ jobs:
       - name: Build Windows tests
         run: |
           $testProjects = @(
-            "Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
+            "tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
           )
 
           foreach ($project in $testProjects) {
@@ -99,7 +99,7 @@ jobs:
       - name: Run Windows tests
         run: |
           $testProjects = @(
-            "Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
+            "tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
           )
 
           foreach ($project in $testProjects) {

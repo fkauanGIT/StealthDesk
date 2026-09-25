@@ -9,6 +9,6 @@
     <AdditionalFiles Include="NativeMethods.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\StealthDesk.Libraries.Shared\StealthDesk.Libraries.Shared.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Shared\StealthDesk.Libraries.Shared.csproj" />
   </ItemGroup>
 </Project>

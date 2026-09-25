@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StealthDesk.Libraries.NativeInterop.Windows\StealthDesk.Libraries.NativeInterop.Windows.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Shared\StealthDesk.Libraries.Shared.csproj" />
+  </ItemGroup>
+</Project>

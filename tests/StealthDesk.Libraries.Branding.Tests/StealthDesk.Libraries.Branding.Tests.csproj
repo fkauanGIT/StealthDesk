@@ -9,24 +9,16 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.v3.runner.console">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\Libraries\StealthDesk.Libraries.Branding\StealthDesk.Libraries.Branding.csproj" />
-    <ProjectReference Include="..\..\Libraries\StealthDesk.Libraries.Signalr.Client\StealthDesk.Libraries.Signalr.Client.csproj" />
-    <ProjectReference Include="..\..\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Branding\StealthDesk.Libraries.Branding.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
