@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/StealthDesk.Web.Server/" />
   <Folder Name="/Tests/">
+    <Project Path="Tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Libraries.Branding.Tests/StealthDesk.Libraries.Branding.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Libraries.Shared.Tests/StealthDesk.Libraries.Shared.Tests.csproj" />
     <Project Path="Tests/StealthDesk.Web.Server.Tests/StealthDesk.Web.Server.Tests.csproj" />
