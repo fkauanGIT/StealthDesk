@@ -91,7 +91,7 @@ Stage files by path. Never `git add .` / `git add -A`:
 
 ```powershell
 git status --short
-git add StealthDesk.slnx StealthDesk.Web.Server StealthDesk.Web.Client Tests
+git add StealthDesk.slnx backend/StealthDesk.Web.Server frontend/StealthDesk.Web.Client tests
 git commit -m "chore: rename web projects to PascalCase" -m "Refs #12"
 ```
 
@@ -101,7 +101,7 @@ Several small commits per branch are fine: they are squashed on merge.
 
 ```powershell
 dotnet build StealthDesk.slnx --verbosity quiet
-dotnet run --project Tests/StealthDesk.Web.Server.Tests
+dotnet run --project tests/StealthDesk.Web.Server.Tests
 ```
 
 Walk through the issue's **Acceptance criteria** and tick every box.

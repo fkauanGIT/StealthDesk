@@ -51,7 +51,7 @@ The fastest way to start the server. Data is lost when it stops.
 ```
 git clone https://github.com/fkauanGIT/StealthDesk.git
 cd StealthDesk
-dotnet run --project StealthDesk.Web.Server --launch-profile http -- --UseInMemoryDatabase=true
+dotnet run --project backend/StealthDesk.Web.Server --launch-profile http -- --UseInMemoryDatabase=true
 ```
 
 The server listens on `http://localhost:5099`. Running `curl http://localhost:5099/health` should
@@ -60,7 +60,7 @@ return `Healthy`.
 ### PostgreSQL
 
 The connection is built from these settings, found in
-[`appsettings.Development.json`](./StealthDesk.Web.Server/appsettings.Development.json):
+[`appsettings.Development.json`](./backend/StealthDesk.Web.Server/appsettings.Development.json):
 
 | Key | Default |
 |---|---|
@@ -75,7 +75,7 @@ environment variables (e.g. `POSTGRES_PASSWORD`) or command-line arguments (`--P
 Then start the server. It applies the pending migrations on startup, creating the database if needed:
 
 ```
-dotnet run --project StealthDesk.Web.Server --launch-profile http
+dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
 ```
 
 ## Endpoints
@@ -94,8 +94,8 @@ The test projects use [xUnit v3](https://xunit.net/docs/getting-started/v3/whats
 project as an executable. Run them with `dotnet run`, not `dotnet test`:
 
 ```
-dotnet run --project Tests/StealthDesk.Libraries.Shared.Tests
-dotnet run --project Tests/StealthDesk.Web.Server.Tests
+dotnet run --project tests/StealthDesk.Libraries.Shared.Tests
+dotnet run --project tests/StealthDesk.Web.Server.Tests
 ```
 
 Most tests use an in-memory database. The device manager and agent heartbeat tests run against a real
@@ -107,11 +107,11 @@ pull request and on every push to `main`.
 
 | Path | Contents |
 |---|---|
-| `StealthDesk.Web.Server` | ASP.NET Core server: agent hub, REST API, EF Core database |
-| `StealthDesk.Web.Client` | Blazor WebAssembly front end |
-| `StealthDesk.Web.ServiceDefaults` | Shared health checks, OpenTelemetry, and resilience defaults |
-| `Libraries/` | Code shared between server and agent: API contracts, signing, the typed SignalR client |
-| `Tests/` | One test project per project under test |
+| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end |
+| `backend/` | `StealthDesk.Web.Server` (ASP.NET Core server: agent hub, REST API, EF Core database) and `StealthDesk.Web.ServiceDefaults` (health checks, OpenTelemetry, resilience defaults) |
+| `agent/` | `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
+| `shared/` | Code used by both the server and the agent: API contracts, signing, branding, the typed SignalR client, hosting and logging |
+| `tests/` | One test project per project under test |
 
 ## Contributing
 
