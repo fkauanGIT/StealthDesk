@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\StealthDesk.Agent.Shared\StealthDesk.Agent.Shared.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Web.ServiceDefaults\StealthDesk.Web.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\StealthDesk.Libraries.NativeInterop.Windows\StealthDesk.Libraries.NativeInterop.Windows.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Serilog\StealthDesk.Libraries.Serilog.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Hosting\StealthDesk.Libraries.Hosting.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.DataRedaction\StealthDesk.Libraries.DataRedaction.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Signalr.Client\StealthDesk.Libraries.Signalr.Client.csproj" />
+  </ItemGroup>
+</Project>

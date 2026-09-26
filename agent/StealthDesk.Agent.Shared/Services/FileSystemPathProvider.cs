@@ -12,6 +12,14 @@ public interface IFileSystemPathProvider
   /// </summary>
   string GetAgentAppSettingsPath();
   /// <summary>
+  /// Returns the path to the agent's current log file.
+  /// </summary>
+  string GetAgentLogFilePath();
+  /// <summary>
+  /// Returns the directory where agent logs are stored. On Windows this is under CommonApplicationData; on Linux/macOS it is under /var/log/stealthdesk for elevated processes or ~/.stealthdesk/logs for user processes.
+  /// </summary>
+  string GetAgentLogsDirectoryPath();
+  /// <summary>
   /// Returns the instance ID, or the default instance ID when none is configured.
   /// </summary>
   string GetEffectiveInstanceId();
@@ -31,6 +39,38 @@ public class FileSystemPathProvider(
   {
     var dir = GetSettingsDirectory();
     return _fileSystem.JoinPaths(GetPathSeparator(), dir, "appsettings.json");
+  }
+
+  public string GetAgentLogFilePath()
+  {
+    return _fileSystem.JoinPaths(GetPathSeparator(), GetAgentLogsDirectoryPath(), "LogFile.log");
+  }
+
+  public string GetAgentLogsDirectoryPath()
+  {
+    if (_systemEnvironment.IsWindows())
+    {
+      var logsDir = _fileSystem.JoinPaths(GetPathSeparator(),
+        _systemEnvironment.GetCommonApplicationDataDirectory(),
+        BrandingConstants.WindowsLogDirectoryName);
+
+      logsDir = AppendSubDirectories(logsDir);
+      return _fileSystem.JoinPaths(GetPathSeparator(), logsDir, "Logs", BrandingConstants.AgentBaseName);
+    }
+
+    if (_systemEnvironment.IsLinux() || _systemEnvironment.IsMacOS())
+    {
+      var isElevated = _elevationChecker.IsElevated();
+      var rootDir = isElevated
+        ? $"/var/log/{BrandingConstants.UnixLogDirectoryName}"
+        : _fileSystem.JoinPaths(GetPathSeparator(), _systemEnvironment.GetProfileDirectory(), BrandingConstants.UnixHiddenDirectoryName);
+
+      rootDir = AppendSubDirectories(rootDir);
+      var logsDir = isElevated ? rootDir : _fileSystem.JoinPaths(GetPathSeparator(), rootDir, "logs");
+      return _fileSystem.JoinPaths(GetPathSeparator(), logsDir, BrandingConstants.AgentBaseName);
+    }
+
+    throw new PlatformNotSupportedException();
   }
 
   public string GetEffectiveInstanceId()

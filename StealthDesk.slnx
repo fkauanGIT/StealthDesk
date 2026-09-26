@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/agent/">
+    <Project Path="agent/StealthDesk.Agent.Common/StealthDesk.Agent.Common.csproj" />
     <Project Path="agent/StealthDesk.Agent.Shared/StealthDesk.Agent.Shared.csproj" />
     <Project Path="agent/StealthDesk.Libraries.NativeInterop.Windows/StealthDesk.Libraries.NativeInterop.Windows.csproj" />
   </Folder>
