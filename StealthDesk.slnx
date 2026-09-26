@@ -1,11 +1,11 @@
 <Solution>
   <Folder Name="/agent/">
+    <Project Path="agent/StealthDesk.Agent.Common/StealthDesk.Agent.Common.csproj" />
     <Project Path="agent/StealthDesk.Agent.Shared/StealthDesk.Agent.Shared.csproj" />
     <Project Path="agent/StealthDesk.Libraries.NativeInterop.Windows/StealthDesk.Libraries.NativeInterop.Windows.csproj" />
   </Folder>
   <Folder Name="/backend/">
     <Project Path="backend/StealthDesk.Web.Server/StealthDesk.Web.Server.csproj" />
-    <Project Path="backend/StealthDesk.Web.ServiceDefaults/StealthDesk.Web.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/frontend/">
     <Project Path="frontend/StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
@@ -19,8 +19,10 @@
     <Project Path="shared/StealthDesk.Libraries.Shared/StealthDesk.Libraries.Shared.csproj" />
     <Project Path="shared/StealthDesk.Libraries.Signalr.Client/StealthDesk.Libraries.Signalr.Client.csproj" />
     <Project Path="shared/StealthDesk.Libraries.TestingUtilities/StealthDesk.Libraries.TestingUtilities.csproj" />
+    <Project Path="shared/StealthDesk.Web.ServiceDefaults/StealthDesk.Web.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/StealthDesk.Agent.Common.Tests/StealthDesk.Agent.Common.Tests.csproj" />
     <Project Path="tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj" />
     <Project Path="tests/StealthDesk.Libraries.Branding.Tests/StealthDesk.Libraries.Branding.Tests.csproj" />
     <Project Path="tests/StealthDesk.Libraries.Shared.Tests/StealthDesk.Libraries.Shared.Tests.csproj" />

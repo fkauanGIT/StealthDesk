@@ -85,6 +85,7 @@ jobs:
       - name: Build Windows tests
         run: |
           $testProjects = @(
+            "tests/StealthDesk.Agent.Common.Tests/StealthDesk.Agent.Common.Tests.csproj",
             "tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
           )
 
@@ -99,6 +100,7 @@ jobs:
       - name: Run Windows tests
         run: |
           $testProjects = @(
+            "tests/StealthDesk.Agent.Common.Tests/StealthDesk.Agent.Common.Tests.csproj",
             "tests/StealthDesk.Agent.Shared.Tests/StealthDesk.Agent.Shared.Tests.csproj"
           )
 
