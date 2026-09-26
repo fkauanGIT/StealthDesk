@@ -108,9 +108,9 @@ pull request and on every push to `main`.
 | Path | Contents |
 |---|---|
 | `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end |
-| `backend/` | `StealthDesk.Web.Server` (ASP.NET Core server: agent hub, REST API, EF Core database) and `StealthDesk.Web.ServiceDefaults` (health checks, OpenTelemetry, resilience defaults) |
-| `agent/` | `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
-| `shared/` | Code used by both the server and the agent: API contracts, signing, branding, the typed SignalR client, hosting and logging |
+| `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent hub, REST API and EF Core database |
+| `agent/` | `StealthDesk.Agent.Common` (hub connection and heartbeat), `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
+| `shared/` | Code used by both the server and the agent: API contracts, signing, branding, the typed SignalR client, hosting, logging and `StealthDesk.Web.ServiceDefaults` (health checks, OpenTelemetry, resilience defaults) |
 | `tests/` | One test project per project under test |
 
 ## Contributing
