@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using StealthDesk.Agent.Common.Models;
 using StealthDesk.Agent.Common.Startup;
+using StealthDesk.Libraries.Branding;
 using StealthDesk.Libraries.Shared.DataValidation;
 using Microsoft.Extensions.Hosting;
 
@@ -13,7 +14,7 @@ internal static class CommandProvider
   {
     var instanceIdOption = CreateInstanceIdOption();
 
-    var runCommand = new Command("run", "Run the StealthDesk service.")
+    var runCommand = new Command("run", $"Run the {BrandingConstants.BrandName} service.")
     {
       instanceIdOption
     };
