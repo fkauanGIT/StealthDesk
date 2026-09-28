@@ -13,16 +13,18 @@ the server, which tracks every device and, in later versions, lets technicians r
 
 ## Project Status
 
-**v0.1 - Agent connectivity** ([#23](https://github.com/fkauanGIT/StealthDesk/issues/23)) is in progress.
-The server side is done:
+**v0.1 - Agent connectivity** ([#23](https://github.com/fkauanGIT/StealthDesk/issues/23)) is complete:
+a Windows machine running the agent shows up in the server's device list, online while connected.
 
-- Agents connect to the SignalR hub at `/hubs/agent` and send heartbeats signed with Ed25519
+- The agent collects device information (name, CPU, memory, drives, IP and MAC addresses, logged-in users)
+- On first run it creates an Ed25519 key pair and stores it with its settings; every heartbeat is signed with it
+- It connects to the SignalR hub at `/hubs/agent`, retries with backoff and jitter, and sends a heartbeat every
+  5 minutes (10 seconds in debug)
 - The server verifies each signature, rejects stale messages and key changes, and saves the device
-- Devices are marked offline when their agent disconnects
-- A default tenant is created on startup
+- Devices are marked offline when their agent disconnects, and a default tenant is created on startup
 - Devices can be listed through the REST API
 
-Next up: the agent itself (a console app that connects, reports device info, and sends periodic heartbeats).
+Next up: **v0.2**, a live device dashboard in the browser.
 
 ### Roadmap
 
@@ -78,6 +80,33 @@ Then start the server. It applies the pending migrations on startup, creating th
 dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
 ```
 
+## Running the Agent
+
+The agent runs on Windows. With the server running (see above), open a second terminal and start it:
+
+```
+dotnet run --project agent/StealthDesk.Agent -- run
+```
+
+In a few seconds the machine appears in the device list with `isOnline: true`:
+
+```
+curl http://localhost:5099/api/v1/devices
+```
+
+Stop the agent with `Ctrl+C` and the device is marked offline; start it again and the same device comes back
+online. Useful details:
+
+| What | Where |
+|---|---|
+| Server address | `ServerUri` in [`agent/StealthDesk.Agent/appsettings.json`](./agent/StealthDesk.Agent/appsettings.json) |
+| Device identity | `DeviceId` in `appsettings.Development.json`, a fixed id for development |
+| Generated key pair and saved settings | `C:\ProgramData\StealthDesk\Debug\default\appsettings.json` |
+| Agent logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\Logs\StealthDesk.Agent\` |
+
+Use `-i <name>` (`--instance-id`) to run more than one agent on the same machine, each with its own settings and
+logs under `...\<name>\` instead of `...\default\`.
+
 ## Endpoints
 
 | Path | Transport | Purpose |
@@ -109,7 +138,7 @@ pull request and on every push to `main`.
 |---|---|
 | `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end |
 | `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent hub, REST API and EF Core database |
-| `agent/` | `StealthDesk.Agent.Common` (hub connection and heartbeat), `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
+| `agent/` | `StealthDesk.Agent` (console executable with the `run` command), `StealthDesk.Agent.Common` (hub connection and heartbeat), `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
 | `shared/` | Code used by both the server and the agent: API contracts, signing, branding, the typed SignalR client, hosting, logging and `StealthDesk.Web.ServiceDefaults` (health checks, OpenTelemetry, resilience defaults) |
 | `tests/` | One test project per project under test |
 
