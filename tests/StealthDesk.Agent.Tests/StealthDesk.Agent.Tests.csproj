@@ -3,13 +3,8 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.v3.runner.console">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -17,9 +12,11 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\shared\StealthDesk.Libraries.Branding\StealthDesk.Libraries.Branding.csproj" />
+    <ProjectReference Include="..\..\agent\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
+    <ProjectReference Include="..\..\agent\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="StealthDesk.Contracts.Devices" />
   </ItemGroup>
 </Project>
