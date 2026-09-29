@@ -1,10 +1,3 @@
-using StealthDesk.Agent.Startup;
-using System.CommandLine;
+using StealthDesk.Agent;
 
-var rootCommand = new RootCommand("Open-source remote control agent.")
-{
-  CommandProvider.GetRunCommand(args),
-};
-
-var parseResult = rootCommand.Parse(args);
-return await parseResult.InvokeAsync();
+return await AgentCommandLine.Create(args).Parse(args).InvokeAsync();

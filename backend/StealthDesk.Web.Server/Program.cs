@@ -1,23 +1,10 @@
-using StealthDesk.Libraries.Shared.Constants;
-using StealthDesk.Web.Server.Hubs;
-using StealthDesk.Web.Server.Startup;
+using StealthDesk.Web.Server;
 
 var builder = WebApplication.CreateBuilder(args);
-
 builder.AddStealthDeskServer();
 
 var app = builder.Build();
-
-if (app.Configuration.GetValue<bool>("UseInMemoryDatabase"))
-{
-  await app.EnsureDatabaseCreated();
-}
-else
-{
-  await app.ApplyMigrations();
-}
-
-await app.SeedDefaultTenant();
+await app.PrepareDatabaseAsync();
 
 if (app.Environment.IsDevelopment())
 {
@@ -26,11 +13,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
-app.UseOutputCache();
+app.MapStealthDesk();
 
-app.MapDefaultEndpoints();
-app.MapControllers();
-app.MapHub<AgentHub>(AppConstants.AgentHubPath);
-app.MapFallbackToFile("index.html");
-
-app.Run();
+await app.RunAsync();

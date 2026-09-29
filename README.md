@@ -95,27 +95,29 @@ curl http://localhost:5099/api/v1/devices
 ```
 
 Stop the agent with `Ctrl+C` and the device is marked offline; start it again and the same device comes back
-online. Useful details:
+online.
+
+On its first run the agent creates its key pair, and the server assigns the device an id with the first
+accepted report. Both are saved and reused on every later run: that is the device's identity.
 
 | What | Where |
 |---|---|
-| Server address | `ServerUri` in [`agent/StealthDesk.Agent/appsettings.json`](./agent/StealthDesk.Agent/appsettings.json) |
-| Device identity | `DeviceId` in `appsettings.Development.json`, a fixed id for development |
-| Generated key pair and saved settings | `C:\ProgramData\StealthDesk\Debug\default\appsettings.json` |
-| Agent logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\Logs\StealthDesk.Agent\` |
+| Server address | `Agent:ServerUrl` in [`agent/StealthDesk.Agent/appsettings.json`](./agent/StealthDesk.Agent/appsettings.json), or `--server <url>` |
+| Identity (device id, tenant, private key) | `C:\ProgramData\StealthDesk\Debug\default\agent-settings.json` |
+| Logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\logs\` |
 
-Use `-i <name>` (`--instance-id`) to run more than one agent on the same machine, each with its own settings and
-logs under `...\<name>\` instead of `...\default\`.
+Debug builds use the `Debug` folder so development never touches an installed agent. Use `--instance <name>`
+(`-i`) to run more than one agent on the same machine, each with its own folder instead of `default`.
 
 ## Endpoints
 
 | Path | Transport | Purpose |
 |------|-----------|---------|
-| `/hubs/agent` | HTTP and WebSockets | SignalR connection used by agents. Carries device registration and heartbeats (MessagePack). |
+| `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports. |
 | `/api/v1/devices` | HTTP | Lists the devices known to the server. |
 | `/api/internal/version/server` | HTTP | Returns the server version. |
 | `/health` | HTTP | Readiness check: every registered health check must pass. |
-| `/alive` | HTTP | Liveness check: only checks tagged `live` must pass. |
+| `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |
 
 ## Running the Tests
 
@@ -123,24 +125,25 @@ The test projects use [xUnit v3](https://xunit.net/docs/getting-started/v3/whats
 project as an executable. Run them with `dotnet run`, not `dotnet test`:
 
 ```
-dotnet run --project tests/StealthDesk.Libraries.Shared.Tests
-dotnet run --project tests/StealthDesk.Web.Server.Tests
+dotnet run --project tests/StealthDesk.Shared.Tests
+dotnet run --project tests/StealthDesk.Server.Tests
+dotnet run --project tests/StealthDesk.Agent.Tests
 ```
 
-Most tests use an in-memory database. The device manager and agent heartbeat tests run against a real
-PostgreSQL started in a Docker container by [Testcontainers](https://dotnet.testcontainers.org/), so
-Docker must be running; a local PostgreSQL installation is not needed. CI runs every test project on each
-pull request and on every push to `main`.
+The gateway and device storage tests run against a real PostgreSQL started in a Docker container by
+[Testcontainers](https://dotnet.testcontainers.org/), so Docker must be running; a local PostgreSQL
+installation is not needed. Agent tests that call Windows APIs are skipped on other systems. CI runs every
+test project on each pull request and on every push to `main`, with a separate job for the Windows tests.
 
 ## Repository Layout
 
 | Path | Contents |
 |---|---|
 | `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end |
-| `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent hub, REST API and EF Core database |
-| `agent/` | `StealthDesk.Agent` (console executable with the `run` command), `StealthDesk.Agent.Common` (hub connection and heartbeat), `StealthDesk.Agent.Shared` (agent configuration and device information) and the Windows native interop library |
-| `shared/` | Code used by both the server and the agent: API contracts, signing, branding, the typed SignalR client, hosting, logging and `StealthDesk.Web.ServiceDefaults` (health checks, OpenTelemetry, resilience defaults) |
-| `tests/` | One test project per project under test |
+| `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent gateway, REST API and EF Core database |
+| `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
+| `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
+| `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests` |
 
 ## Contributing
 
