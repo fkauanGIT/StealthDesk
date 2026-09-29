@@ -101,7 +101,7 @@ Several small commits per branch are fine: they are squashed on merge.
 
 ```powershell
 dotnet build StealthDesk.slnx --verbosity quiet
-dotnet run --project tests/StealthDesk.Web.Server.Tests
+dotnet run --project tests/StealthDesk.Server.Tests
 ```
 
 Walk through the issue's **Acceptance criteria** and tick every box.
