@@ -2,21 +2,18 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using StealthDesk.Web.Server.Data;
+using StealthDesk.Web.Server.Persistence;
 
 #nullable disable
 
-namespace StealthDesk.Web.Server.Migrations
+namespace StealthDesk.Web.Server.Persistence.Migrations
 {
-    [DbContext(typeof(AppDb))]
-    [Migration("20260923012237_Initial")]
-    partial class Initial
+    [DbContext(typeof(StealthDeskDb))]
+    partial class StealthDeskDbModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -25,12 +22,11 @@ namespace StealthDesk.Web.Server.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("StealthDesk.Web.Server.Data.Entities.Device", b =>
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceRecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AgentVersion")
                         .IsRequired()
@@ -46,24 +42,21 @@ namespace StealthDesk.Web.Server.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<double>("CpuUtilization")
+                    b.Property<int>("CpuCores")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("CpuLoad")
                         .HasColumnType("double precision");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasColumnType("timestamp with time zone");
 
-                    b.PrimitiveCollection<string[]>("CurrentUsers")
-                        .IsRequired()
-                        .HasColumnType("text[]");
-
-                    b.Property<string>("DnsHostName")
+                    b.Property<string>("DnsName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<bool>("Is64Bit")
+                    b.Property<bool>("Is64BitOs")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsOnline")
@@ -79,31 +72,42 @@ namespace StealthDesk.Web.Server.Migrations
 
                     b.Property<string>("LocalIpV6")
                         .IsRequired()
-                        .HasMaxLength(39)
-                        .HasColumnType("character varying(39)");
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.PrimitiveCollection<string[]>("LoggedOnUsers")
+                        .IsRequired()
+                        .HasColumnType("text[]");
 
                     b.PrimitiveCollection<string[]>("MacAddresses")
                         .IsRequired()
                         .HasColumnType("text[]");
+
+                    b.Property<double>("MemoryTotalGb")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("MemoryUsedGb")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int>("OsArchitecture")
-                        .HasColumnType("integer");
+                    b.Property<string>("OsArchitecture")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("OsDescription")
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
-                    b.Property<int>("Platform")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProcessorCount")
-                        .HasColumnType("integer");
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PublicIpV4")
                         .IsRequired()
@@ -112,108 +116,95 @@ namespace StealthDesk.Web.Server.Migrations
 
                     b.Property<string>("PublicIpV6")
                         .IsRequired()
-                        .HasMaxLength(39)
-                        .HasColumnType("character varying(39)");
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
 
                     b.Property<string>("PublicKey")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<double>("StorageTotalGb")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("StorageUsedGb")
+                        .HasColumnType("double precision");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
-
-                    b.Property<double>("TotalMemory")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("TotalStorage")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("UsedMemory")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("UsedStorage")
-                        .HasColumnType("double precision");
 
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Devices");
+                    b.ToTable("devices", (string)null);
                 });
 
-            modelBuilder.Entity("StealthDesk.Web.Server.Data.Entities.Tenant", b =>
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantRecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tenants");
+                    b.ToTable("tenants", (string)null);
                 });
 
-            modelBuilder.Entity("StealthDesk.Web.Server.Data.Entities.Device", b =>
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceRecord", b =>
                 {
-                    b.HasOne("StealthDesk.Web.Server.Data.Entities.Tenant", "Tenant")
+                    b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
                         .WithMany("Devices")
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.OwnsMany("StealthDesk.Libraries.Api.Contracts.Dtos.Devices.Drive", "Drives", b1 =>
+                    b.OwnsMany("StealthDesk.Contracts.Devices.DiskInfo", "Disks", b1 =>
                         {
-                            b1.Property<Guid>("DeviceId");
+                            b1.Property<Guid>("DeviceRecordId");
 
                             b1.Property<int>("__synthesizedOrdinal")
                                 .ValueGeneratedOnAdd();
 
-                            b1.Property<string>("DriveFormat")
+                            b1.Property<string>("Format")
                                 .IsRequired();
 
-                            b1.Property<int>("DriveType");
+                            b1.Property<double>("FreeGb");
 
-                            b1.Property<double>("FreeSpace");
+                            b1.Property<string>("Label")
+                                .IsRequired();
 
                             b1.Property<string>("Name")
                                 .IsRequired();
 
-                            b1.Property<string>("RootDirectory")
-                                .IsRequired();
+                            b1.Property<double>("SizeGb");
 
-                            b1.Property<double>("TotalSize");
+                            b1.HasKey("DeviceRecordId", "__synthesizedOrdinal");
 
-                            b1.Property<string>("VolumeLabel")
-                                .IsRequired();
-
-                            b1.HasKey("DeviceId", "__synthesizedOrdinal");
-
-                            b1.ToTable("Devices");
+                            b1.ToTable("devices");
 
                             b1
-                                .ToJson("Drives")
+                                .ToJson("Disks")
                                 .HasColumnType("jsonb");
 
                             b1.WithOwner()
-                                .HasForeignKey("DeviceId");
+                                .HasForeignKey("DeviceRecordId");
                         });
 
-                    b.Navigation("Drives");
+                    b.Navigation("Disks");
 
                     b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("StealthDesk.Web.Server.Data.Entities.Tenant", b =>
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantRecord", b =>
                 {
                     b.Navigation("Devices");
                 });
