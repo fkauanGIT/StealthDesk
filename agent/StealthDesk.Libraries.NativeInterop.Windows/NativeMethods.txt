@@ -1,3 +1,0 @@
-GetComputerNameEx
-WTSGetActiveConsoleSessionId
-WTSQuerySessionInformation

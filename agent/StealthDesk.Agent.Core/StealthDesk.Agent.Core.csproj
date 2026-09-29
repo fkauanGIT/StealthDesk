@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\StealthDesk.Branding\StealthDesk.Branding.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Contracts\StealthDesk.Contracts.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Core\StealthDesk.Core.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Hosting\StealthDesk.Hosting.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Observability\StealthDesk.Observability.csproj" />
+    <ProjectReference Include="..\..\shared\StealthDesk.Realtime\StealthDesk.Realtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="StealthDesk.Agent.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+</Project>

@@ -1,26 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <!-- `dotnet run` must use the project folder as content root, so appsettings.*.json next to the project are read. -->
+    <!-- Run from the project folder so `dotnet run` finds the appsettings files next to it. -->
     <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="appsettings.Development.json" />
-    <None Remove="appsettings.json" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="appsettings.Development.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\StealthDesk.Agent.Common\StealthDesk.Agent.Common.csproj" />
+    <ProjectReference Include="..\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
+    <ProjectReference Include="..\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
   </ItemGroup>
 </Project>

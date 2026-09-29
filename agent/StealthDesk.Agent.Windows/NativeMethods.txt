@@ -1,0 +1,6 @@
+GetComputerNameEx
+GetSystemTimes
+GlobalMemoryStatusEx
+WTSEnumerateSessions
+WTSFreeMemory
+WTSQuerySessionInformation
