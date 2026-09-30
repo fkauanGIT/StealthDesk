@@ -1,4 +1,5 @@
 using StealthDesk.Core.Security;
+using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
 
 namespace StealthDesk.Web.Server.Gateway;
@@ -9,6 +10,7 @@ namespace StealthDesk.Web.Server.Gateway;
 /// </summary>
 public sealed class ReportProcessor(
   IDeviceRegistry registry,
+  IDeviceNotifier notifier,
   StealthDeskDb db,
   IMessageSigner signer,
   IOptionsSnapshot<GatewayOptions> options,
@@ -68,6 +70,7 @@ public sealed class ReportProcessor(
     }
 
     var device = saved.Value!;
+    await notifier.DeviceChangedAsync(device);
     return GatewayReply.Accept(new ReportReceipt(device.Id, device.TenantId, clock.GetUtcNow()));
   }
 

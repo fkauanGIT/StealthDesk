@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
 
 namespace StealthDesk.Web.Server.Gateway;
@@ -8,6 +9,7 @@ namespace StealthDesk.Web.Server.Gateway;
 public sealed class AgentGatewayHub(
   ReportProcessor processor,
   IDeviceRegistry registry,
+  IDeviceNotifier notifier,
   TimeProvider clock,
   ILogger<AgentGatewayHub> logger) : Hub<IAgentCallbacks>, IAgentGateway
 {
@@ -44,7 +46,11 @@ public sealed class AgentGatewayHub(
     {
       if (Context.Items.TryGetValue(DeviceIdItem, out var value) && value is Guid deviceId)
       {
-        await registry.MarkOfflineAsync(deviceId, Context.ConnectionId, clock.GetUtcNow());
+        var device = await registry.MarkOfflineAsync(deviceId, Context.ConnectionId, clock.GetUtcNow());
+        if (device is not null)
+        {
+          await notifier.DeviceChangedAsync(device);
+        }
       }
     }
     catch (Exception ex)
