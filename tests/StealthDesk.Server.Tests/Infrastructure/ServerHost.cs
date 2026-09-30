@@ -23,6 +23,9 @@ public sealed class ServerHost : WebApplicationFactory<Program>
   /// <summary>A server on its own, freshly migrated PostgreSQL database. Needs Docker.</summary>
   public static async Task<ServerHost> OnPostgresAsync() => new(await PostgresDatabases.CreateAsync());
 
+  /// <summary>Another server on this one's database, as if it had restarted.</summary>
+  public ServerHost Restarted() => new(_settings);
+
   public T WithDb<T>(Func<StealthDeskDb, T> action)
   {
     using var scope = Services.CreateScope();
