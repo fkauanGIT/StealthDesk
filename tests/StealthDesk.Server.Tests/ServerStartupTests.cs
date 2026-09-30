@@ -65,6 +65,18 @@ public class ServerStartupTests
   }
 
   [Fact]
+  public async Task VersionEndpoint_ReportsTheProductVersion()
+  {
+    using var server = ServerHost.InMemory();
+    using var client = server.CreateClient();
+
+    var version = await client.GetStringAsync(Routes.ServerVersion, TestContext.Current.CancellationToken);
+
+    // Update together with <Version> in Directory.Build.props when a release is cut.
+    Assert.Equal("0.1.0.0", version);
+  }
+
+  [Fact]
   public void ServerAssemblyName_MatchesTheRealAssembly()
   {
     Assert.Equal(Brand.ServerAssemblyName, typeof(Program).Assembly.GetName().Name);
