@@ -29,8 +29,8 @@ public static class DatabaseSetup
   }
 
   /// <summary>
-  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory)
-  /// and makes sure there is a tenant for agents to join.
+  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory),
+  /// makes sure there is a tenant for agents to join and marks every device offline.
   /// </summary>
   public static async Task PrepareDatabaseAsync(this WebApplication app)
   {
@@ -52,6 +52,37 @@ public static class DatabaseSetup
       await db.SaveChangesAsync();
       app.Logger.LogInformation("Created the '{Tenant}' tenant.", DefaultTenantName);
     }
+
+    var cleared = await MarkAllOfflineAsync(db);
+    if (cleared > 0)
+    {
+      app.Logger.LogInformation("Marked {Count} devices offline until their agents reconnect.", cleared);
+    }
+  }
+
+  // Connections don't survive a restart, and a server that stopped abruptly never saw them close.
+  // Agents still running reconnect and report themselves online again.
+  private static async Task<int> MarkAllOfflineAsync(StealthDeskDb db)
+  {
+    var online = db.Devices.Where(x => x.IsOnline || x.ConnectionId != string.Empty);
+
+    if (db.Database.IsRelational())
+    {
+      return await online.ExecuteUpdateAsync(set => set
+        .SetProperty(x => x.IsOnline, false)
+        .SetProperty(x => x.ConnectionId, string.Empty));
+    }
+
+    // The in-memory provider can't run a bulk update.
+    var devices = await online.ToListAsync();
+    foreach (var device in devices)
+    {
+      device.IsOnline = false;
+      device.ConnectionId = string.Empty;
+    }
+
+    await db.SaveChangesAsync();
+    return devices.Count;
   }
 
   internal static string PostgresConnectionString(IConfiguration configuration)
