@@ -20,6 +20,7 @@ public static class ServerSetup
     builder.Services.AddSingleton<IMessageSigner, MessageSigner>();
     builder.Services.AddScoped<IDeviceRegistry, DeviceRegistry>();
     builder.Services.AddScoped<ReportProcessor>();
+    builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 
     return builder;
   }

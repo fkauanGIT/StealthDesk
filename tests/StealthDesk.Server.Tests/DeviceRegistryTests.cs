@@ -88,8 +88,9 @@ public class DeviceRegistryTests
     var staleClosed = await Registry(server, registry => registry.MarkOfflineAsync(report.DeviceId, "old", DateTimeOffset.UtcNow));
     var currentClosed = await Registry(server, registry => registry.MarkOfflineAsync(report.DeviceId, "new", DateTimeOffset.UtcNow));
 
-    Assert.False(staleClosed);
-    Assert.True(currentClosed);
+    Assert.Null(staleClosed);
+    Assert.NotNull(currentClosed);
+    Assert.False(currentClosed.IsOnline);
     Assert.False(await server.WithDbAsync(db => db.Devices.Select(x => x.IsOnline).SingleAsync()));
   }
 

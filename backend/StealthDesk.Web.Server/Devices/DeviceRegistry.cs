@@ -25,8 +25,9 @@ public interface IDeviceRegistry
   /// <summary>
   /// Marks the device offline, but only if <paramref name="connectionId"/> is still its current connection:
   /// after a quick reconnect, the old connection closing must not hide the new one.
+  /// Returns the device marked offline, or null if nothing changed.
   /// </summary>
-  Task<bool> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default);
+  Task<DeviceRecord?> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default);
 }
 
 public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> logger) : IDeviceRegistry
@@ -85,7 +86,7 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
     return device;
   }
 
-  public async Task<bool> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default)
+  public async Task<DeviceRecord?> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default)
   {
     var device = await db.Devices.FirstOrDefaultAsync(
       x => x.Id == deviceId && x.ConnectionId == connectionId,
@@ -94,14 +95,14 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
     if (device is null)
     {
       logger.LogDebug("Device {DeviceId} already moved to a newer connection; leaving it online.", deviceId);
-      return false;
+      return null;
     }
 
     device.IsOnline = false;
     device.ConnectionId = string.Empty;
     device.LastSeen = lastSeen;
     await db.SaveChangesAsync(cancellationToken);
-    return true;
+    return device;
   }
 
   // Reports come from machines we don't control: oversized text is cut to fit instead of failing the save.
