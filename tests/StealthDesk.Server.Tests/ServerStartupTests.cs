@@ -32,6 +32,20 @@ public class ServerStartupTests
   }
 
   [Fact]
+  public async Task Restart_MarksDevicesStoredOnlineOffline_InMemory()
+  {
+    using var firstRun = ServerHost.InMemory();
+    await AssertRestartMarksDevicesOfflineAsync(firstRun);
+  }
+
+  [Fact]
+  public async Task Restart_MarksDevicesStoredOnlineOffline_OnPostgres()
+  {
+    using var firstRun = await ServerHost.OnPostgresAsync();
+    await AssertRestartMarksDevicesOfflineAsync(firstRun);
+  }
+
+  [Fact]
   public async Task Migrations_BuildTheSchemaOnAnEmptyPostgresDatabase()
   {
     using var server = await ServerHost.OnPostgresAsync();
@@ -80,5 +94,24 @@ public class ServerStartupTests
   public void ServerAssemblyName_MatchesTheRealAssembly()
   {
     Assert.Equal(Brand.ServerAssemblyName, typeof(Program).Assembly.GetName().Name);
+  }
+
+  // The first server stays up while the second starts, so its agents never get to close their connections:
+  // like a server that stopped abruptly.
+  private static async Task AssertRestartMarksDevicesOfflineAsync(ServerHost firstRun)
+  {
+    var deviceId = Guid.NewGuid();
+    await firstRun.WithDbAsync(async db =>
+    {
+      var tenantId = await db.Tenants.Select(x => x.Id).SingleAsync();
+      db.Devices.Add(new DeviceRecord { Id = deviceId, TenantId = tenantId, IsOnline = true, ConnectionId = "lost" });
+      return await db.SaveChangesAsync();
+    });
+
+    using var secondRun = firstRun.Restarted();
+
+    var device = await secondRun.WithDbAsync(db => db.Devices.SingleAsync(x => x.Id == deviceId));
+    Assert.False(device.IsOnline);
+    Assert.Empty(device.ConnectionId);
   }
 }
