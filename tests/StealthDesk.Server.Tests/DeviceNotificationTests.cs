@@ -6,13 +6,15 @@ using StealthDesk.Web.Server.Dashboard;
 
 namespace StealthDesk.Server.Tests;
 
-/// <summary>What the dashboards hear when agents report and disconnect.</summary>
+/// <summary>
+/// End to end: what the dashboards hear when agents report and disconnect, with the devices stored in PostgreSQL.
+/// </summary>
 public class DeviceNotificationTests
 {
   [Fact]
   public async Task AcceptedReport_ReachesDashboardsAsOnline()
   {
-    using var server = ServerHost.InMemory();
+    using var server = await ServerHost.OnPostgresAsync();
     await using var dashboard = await TestDashboard.ConnectAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
@@ -23,12 +25,17 @@ public class DeviceNotificationTests
     Assert.Equal(deviceId, device.Id);
     Assert.Equal("OFFICE-PC", device.Name);
     Assert.True(device.IsOnline);
+    Assert.Equal(["alice"], device.LoggedOnUsers);
+    Assert.Equal(["00155D012345"], device.MacAddresses);
+    var disk = Assert.Single(device.Disks);
+    Assert.Equal("NTFS", disk.Format);
+    Assert.Equal(302, disk.FreeGb);
   }
 
   [Fact]
   public async Task AgentDisconnecting_ReachesDashboardsAsOffline()
   {
-    using var server = ServerHost.InMemory();
+    using var server = await ServerHost.OnPostgresAsync();
     await using var dashboard = await TestDashboard.ConnectAsync(server);
     var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
@@ -45,7 +52,7 @@ public class DeviceNotificationTests
   [Fact]
   public async Task RefusedReport_IsNotSentToDashboards()
   {
-    using var server = ServerHost.InMemory();
+    using var server = await ServerHost.OnPostgresAsync();
     await using var dashboard = await TestDashboard.ConnectAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
     var envelope = agent.Signer.Sign(TestAgent.Report(Guid.NewGuid()), agent.Keys.PrivateKey);
