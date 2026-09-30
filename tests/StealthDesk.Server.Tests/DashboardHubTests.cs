@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.Realtime;
@@ -13,21 +12,16 @@ public class DashboardHubTests
   public async Task Dashboard_AcceptsBrowserConnections()
   {
     using var server = ServerHost.InMemory();
-    await using var dashboard = CreateDashboard(server);
+    await using var dashboard = await TestDashboard.ConnectAsync(server);
 
-    await dashboard.StartAsync(TestContext.Current.CancellationToken);
-
-    Assert.Equal(HubConnectionState.Connected, dashboard.State);
+    Assert.Equal(HubConnectionState.Connected, dashboard.Connection.State);
   }
 
   [Fact]
   public async Task DeviceChanged_SentByTheServer_ReachesConnectedDashboards()
   {
     using var server = ServerHost.InMemory();
-    await using var dashboard = CreateDashboard(server);
-    var received = new TaskCompletionSource<DeviceSummary>(TaskCreationOptions.RunContinuationsAsynchronously);
-    dashboard.On<DeviceSummary>(nameof(IDashboardCallbacks.DeviceChanged), received.SetResult);
-    await dashboard.StartAsync(TestContext.Current.CancellationToken);
+    await using var dashboard = await TestDashboard.ConnectAsync(server);
 
     var sent = new DeviceSummary
     {
@@ -40,20 +34,10 @@ public class DashboardHubTests
     var hub = server.Services.GetRequiredService<IHubContext<DashboardHub, IDashboardCallbacks>>();
     await hub.Clients.All.DeviceChanged(sent);
 
-    var device = await received.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    var device = await dashboard.NextChangeAsync();
     Assert.Equal(sent.Id, device.Id);
     Assert.Equal("FRONT-DESK", device.Name);
     Assert.True(device.IsOnline);
     Assert.Equal(256, Assert.Single(device.Disks).SizeGb);
   }
-
-  // JSON, as a browser would use. Long polling because the in-memory test server can't upgrade to WebSockets.
-  private static HubConnection CreateDashboard(ServerHost server) =>
-    new HubConnectionBuilder()
-      .WithUrl(new Uri(server.Server.BaseAddress, Routes.Dashboard), options =>
-      {
-        options.HttpMessageHandlerFactory = _ => server.Server.CreateHandler();
-        options.Transports = HttpTransportType.LongPolling;
-      })
-      .Build();
 }
