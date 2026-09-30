@@ -3,6 +3,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 
+    <!-- Product version for every project. Bumped when a milestone is released (tag vX.Y.Z). -->
+    <Version>0.1.0</Version>
+
     <Authors>StealthDesk</Authors>
     <Copyright>©️ $([System.DateTime]::Now.Year) StealthDesk</Copyright>
     <RepositoryUrl></RepositoryUrl>
