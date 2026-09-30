@@ -1,5 +1,6 @@
 using StealthDesk.Core.Security;
 using StealthDesk.Observability;
+using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
 
@@ -29,6 +30,7 @@ public static class ServerSetup
     app.MapDeviceEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
+    app.MapHub<DashboardHub>(Routes.Dashboard);
     app.MapFallbackToFile("index.html");
     return app;
   }
