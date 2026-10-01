@@ -1,7 +1,81 @@
-﻿@page "/"
+@page "/"
+@inject HttpClient Http
+@using System.Text.Json
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Devices</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Devices</h1>
 
-Welcome to your new app.
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (devices is null)
+{
+    <p>Loading devices...</p>
+}
+else if (devices.Count == 0)
+{
+    <p>No devices yet. Run the agent on a machine and it will show up here.</p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>OS</th>
+                <th>CPU</th>
+                <th>Memory</th>
+                <th>Storage</th>
+                <th>Users</th>
+                <th>Status</th>
+                <th>Last seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var device in devices)
+            {
+                <tr>
+                    <td>@device.Name</td>
+                    <td>@device.OsDescription</td>
+                    <td>@device.CpuLoad.ToString("P0")</td>
+                    <td>@Usage(device.MemoryUsedGb, device.MemoryTotalGb)</td>
+                    <td>@Usage(device.StorageUsedGb, device.StorageTotalGb)</td>
+                    <td>@string.Join(", ", device.LoggedOnUsers)</td>
+                    <td>
+                        @if (device.IsOnline)
+                        {
+                            <span class="badge text-bg-success">Online</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Offline</span>
+                        }
+                    </td>
+                    <td>@device.LastSeen.ToLocalTime().ToString("g")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<DeviceSummary>? devices;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            devices = await Http.GetFromJsonAsync<List<DeviceSummary>>(Routes.Devices);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            error = "Could not load the devices. Check that the server is running.";
+        }
+    }
+
+    private static string Usage(double usedGb, double totalGb) =>
+        totalGb > 0 ? $"{usedGb:0.#} / {totalGb:0.#} GB ({usedGb / totalGb:P0})" : "-";
+}

@@ -22,5 +22,6 @@
     <Project Path="tests/StealthDesk.Agent.Tests/StealthDesk.Agent.Tests.csproj" />
     <Project Path="tests/StealthDesk.Server.Tests/StealthDesk.Server.Tests.csproj" />
     <Project Path="tests/StealthDesk.Shared.Tests/StealthDesk.Shared.Tests.csproj" />
+    <Project Path="tests/StealthDesk.Web.Client.Tests/StealthDesk.Web.Client.Tests.csproj" />
   </Folder>
 </Solution>
