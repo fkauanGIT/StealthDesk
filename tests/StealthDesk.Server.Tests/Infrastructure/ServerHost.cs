@@ -23,6 +23,16 @@ public sealed class ServerHost : WebApplicationFactory<Program>
   /// <summary>A server on its own, freshly migrated PostgreSQL database. Needs Docker.</summary>
   public static async Task<ServerHost> OnPostgresAsync() => new(await PostgresDatabases.CreateAsync());
 
+  /// <summary>
+  /// Overrides a setting, e.g. <c>With("Gateway:AllowSelfRegistration", "false")</c>. Only before the server starts,
+  /// which happens on first use.
+  /// </summary>
+  public ServerHost With(string key, string? value)
+  {
+    _settings[key] = value;
+    return this;
+  }
+
   /// <summary>Another server on this one's database, as if it had restarted.</summary>
   public ServerHost Restarted() => new(_settings);
 
