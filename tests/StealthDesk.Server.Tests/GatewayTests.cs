@@ -116,6 +116,36 @@ public class GatewayTests
   }
 
   [Fact]
+  public async Task Report_FromADeviceTheServerForgot_RegistersItAgain()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server);
+    var deviceId = Guid.NewGuid();
+    var defaultTenant = await server.WithDbAsync(db => db.Tenants.Select(x => x.Id).SingleAsync());
+
+    // The ids an agent saved from a server whose database was later reset.
+    var reply = await agent.ReportAsync(TestAgent.Report(deviceId) with { TenantId = Guid.NewGuid() });
+
+    Assert.True(reply.Accepted, reply.Error);
+    Assert.Equal(deviceId, reply.Value!.DeviceId);
+    Assert.Equal(defaultTenant, reply.Value.TenantId);
+    var device = await server.WithDbAsync(db => db.Devices.SingleAsync(x => x.Id == deviceId));
+    Assert.Equal(agent.Keys.PublicKey, device.PublicKey);
+  }
+
+  [Fact]
+  public async Task Report_FromADeviceTheServerForgot_IsRefusedWithoutSelfRegistration()
+  {
+    using var server = (await ServerHost.OnPostgresAsync()).With("Gateway:AllowSelfRegistration", "false");
+    await using var agent = await TestAgent.ConnectAsync(server);
+
+    var reply = await agent.ReportAsync(TestAgent.Report(Guid.NewGuid()) with { TenantId = Guid.NewGuid() });
+
+    Assert.False(reply.Accepted);
+    Assert.False(await server.WithDbAsync(db => db.Devices.AnyAsync()));
+  }
+
+  [Fact]
   public async Task ClosingTheConnection_MarksTheDeviceOffline()
   {
     using var server = await ServerHost.OnPostgresAsync();
