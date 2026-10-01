@@ -32,6 +32,10 @@ public static class ServerSetup
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);
+
+    // Any other path is a page of the web app, but an unknown API or hub path is an error, not a page.
+    app.MapFallback("/api/{**path}", () => Results.NotFound());
+    app.MapFallback("/hubs/{**path}", () => Results.NotFound());
     app.MapFallbackToFile("index.html");
     return app;
   }
