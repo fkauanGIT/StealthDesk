@@ -80,6 +80,16 @@ public sealed class ReportProcessor(
   {
     var tenantId = report.TenantId;
 
+    // A server that lost its data (a reset or restored database) no longer has the tenant the agent saved.
+    // A device it doesn't know either joins again like a new one.
+    if (tenantId != Guid.Empty
+      && rules.AllowSelfRegistration
+      && !await db.Tenants.AnyAsync(x => x.Id == tenantId, cancellationToken)
+      && (report.DeviceId == Guid.Empty || await registry.FindTenantAsync(report.DeviceId, cancellationToken) is null))
+    {
+      tenantId = Guid.Empty;
+    }
+
     if (tenantId == Guid.Empty && report.DeviceId != Guid.Empty)
     {
       tenantId = await registry.FindTenantAsync(report.DeviceId, cancellationToken) ?? Guid.Empty;
