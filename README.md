@@ -129,22 +129,24 @@ project as an executable. Run them with `dotnet run`, not `dotnet test`:
 dotnet run --project tests/StealthDesk.Shared.Tests
 dotnet run --project tests/StealthDesk.Server.Tests
 dotnet run --project tests/StealthDesk.Agent.Tests
+dotnet run --project tests/StealthDesk.Web.Client.Tests
 ```
 
 The gateway and device storage tests run against a real PostgreSQL started in a Docker container by
 [Testcontainers](https://dotnet.testcontainers.org/), so Docker must be running; a local PostgreSQL
-installation is not needed. Agent tests that call Windows APIs are skipped on other systems. CI runs every
+installation is not needed. Agent tests that call Windows APIs are skipped on other systems. Web client pages are
+tested with [bUnit](https://bunit.dev/), which renders them without a browser. CI runs every
 test project on each pull request and on every push to `main`, with a separate job for the Windows tests.
 
 ## Repository Layout
 
 | Path | Contents |
 |---|---|
-| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end |
+| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end with the device list |
 | `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent gateway, REST API and EF Core database |
 | `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
-| `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests` |
+| `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests` |
 
 ## Contributing
 
