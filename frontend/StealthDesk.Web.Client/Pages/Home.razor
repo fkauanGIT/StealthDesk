@@ -1,20 +1,39 @@
 @page "/"
-@inject HttpClient Http
-@using System.Text.Json
+@implements IDisposable
+@inject DeviceStore Store
+@inject ILiveUpdates Live
 
 <PageTitle>Devices</PageTitle>
 
-<h1>Devices</h1>
+<div class="d-flex align-items-center gap-3 mb-3">
+    <h1 class="mb-0">Devices</h1>
+    @switch (Live.State)
+    {
+        case LiveState.Live:
+            <span class="badge text-bg-success live-indicator">Live</span>
+            break;
+        case LiveState.Reconnecting:
+            <span class="badge text-bg-warning live-indicator">Reconnecting...</span>
+            break;
+        default:
+            <span class="badge text-bg-secondary live-indicator">Connecting...</span>
+            break;
+    }
+</div>
 
-@if (error is not null)
+@if (Store.Error is not null)
 {
-    <div class="alert alert-danger">@error</div>
+    <div class="alert alert-danger">@Store.Error</div>
 }
-else if (devices is null)
+
+@if (Store.Devices is null)
 {
-    <p>Loading devices...</p>
+    @if (Store.Error is null)
+    {
+        <p>Loading devices...</p>
+    }
 }
-else if (devices.Count == 0)
+else if (Store.Devices.Count == 0)
 {
     <p>No devices yet. Run the agent on a machine and it will show up here.</p>
 }
@@ -34,9 +53,9 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var device in devices)
+            @foreach (var device in Store.Devices)
             {
-                <tr>
+                <tr @key="device.Id">
                     <td>@device.Name</td>
                     <td>@device.OsDescription</td>
                     <td>@device.CpuLoad.ToString("P0")</td>
@@ -61,20 +80,24 @@ else
 }
 
 @code {
-    private List<DeviceSummary>? devices;
-    private string? error;
-
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            devices = await Http.GetFromJsonAsync<List<DeviceSummary>>(Routes.Devices);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException)
-        {
-            error = "Could not load the devices. Check that the server is running.";
-        }
+        Store.Changed += Refresh;
+        Live.StateChanged += Refresh;
+
+        // Listening starts before loading, so no change can fall between the two.
+        _ = Live.StartAsync();
+        await Store.LoadAsync();
     }
+
+    public void Dispose()
+    {
+        Store.Changed -= Refresh;
+        Live.StateChanged -= Refresh;
+    }
+
+    // Changes arrive outside the page's own events, so the page is told to render again.
+    private void Refresh() => InvokeAsync(StateHasChanged);
 
     private static string Usage(double usedGb, double totalGb) =>
         totalGb > 0 ? $"{usedGb:0.#} / {totalGb:0.#} GB ({usedGb / totalGb:P0})" : "-";
