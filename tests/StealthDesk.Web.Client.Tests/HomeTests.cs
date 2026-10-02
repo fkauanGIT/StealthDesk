@@ -56,6 +56,17 @@ public class HomeTests : BunitContext
   }
 
   [Fact]
+  public void DeviceName_LinksToItsDetails()
+  {
+    var device = SampleDevices.Sample("FRONT-DESK");
+    _api.RespondWith(new[] { device });
+
+    var page = Render<Home>();
+
+    page.WaitForAssertion(() => Assert.Equal($"devices/{device.Id}", page.Find("tbody a").GetAttribute("href")));
+  }
+
+  [Fact]
   public void Status_IsShownWithTextNotOnlyColor()
   {
     _api.RespondWith(new[] { SampleDevices.Sample("A-ONLINE", isOnline: true), SampleDevices.Sample("B-OFFLINE", isOnline: false) });
