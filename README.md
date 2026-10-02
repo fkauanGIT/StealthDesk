@@ -24,7 +24,16 @@ a Windows machine running the agent shows up in the server's device list, online
 - Devices are marked offline when their agent disconnects, and a default tenant is created on startup
 - Devices can be listed through the REST API
 
-Next up: **v0.2**, a live device dashboard in the browser.
+**v0.2 - Live device dashboard** ([#24](https://github.com/fkauanGIT/StealthDesk/issues/24)) is complete: the
+browser shows every device and keeps it current without refreshing.
+
+- The device list shows name, OS, CPU, memory and storage use, logged-on users, status and last seen
+- A device turns online or offline on the page within seconds, through a SignalR hub for browsers at `/hubs/dashboard`
+- Clicking a device opens its details: disks, IP and MAC addresses, agent version and more, also updated live
+- The page shows whether it is live or reconnecting, and reloads the list after reconnecting
+- Devices are marked offline when the server starts, and agents the server forgot register again on their own
+
+Next up: **v0.3**, user authentication.
 
 ### Roadmap
 
