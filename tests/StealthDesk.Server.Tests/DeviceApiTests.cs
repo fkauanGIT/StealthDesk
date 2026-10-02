@@ -44,4 +44,36 @@ public class DeviceApiTests
     Assert.True(device.IsOnline);
     Assert.Equal(256, Assert.Single(device.Disks).SizeGb);
   }
+
+  [Fact]
+  public async Task Device_ReturnsTheAgentsLastReport()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server);
+    var deviceId = Guid.NewGuid();
+    await agent.ReportAsync(TestAgent.Report(deviceId));
+    using var client = server.CreateClient();
+
+    var device = await client.GetFromJsonAsync<DeviceSummary>(Routes.Device(deviceId), TestContext.Current.CancellationToken);
+
+    var report = TestAgent.Report(deviceId);
+    Assert.Equal(report.MachineName, device!.Name);
+    Assert.Equal(report.DnsName, device.DnsName);
+    Assert.Equal(report.AgentVersion, device.AgentVersion);
+    Assert.Equal(report.LocalIpV4, device.LocalIpV4);
+    Assert.Equal(report.MacAddresses, device.MacAddresses);
+    Assert.Equal(report.Disks, device.Disks);
+    Assert.True(device.IsOnline);
+  }
+
+  [Fact]
+  public async Task Device_UnknownId_IsNotFound()
+  {
+    using var server = ServerHost.InMemory();
+    using var client = server.CreateClient();
+
+    var response = await client.GetAsync(Routes.Device(Guid.NewGuid()), TestContext.Current.CancellationToken);
+
+    Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+  }
 }

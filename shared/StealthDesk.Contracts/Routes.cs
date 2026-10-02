@@ -6,5 +6,6 @@ public static class Routes
   public const string AgentGateway = "/hubs/agent";
   public const string Dashboard = "/hubs/dashboard";
   public const string Devices = "/api/v1/devices";
+  public static string Device(Guid id) => $"{Devices}/{id}";
   public const string ServerVersion = "/api/internal/version/server";
 }
