@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using StealthDesk.Contracts;
@@ -57,6 +58,46 @@ public sealed class DeviceStore(HttpClient http)
 
     Publish();
   }
+
+  /// <summary>One device, for a page opened directly. Unknown devices are never added to the list.</summary>
+  public async Task<DeviceLookup> FindAsync(Guid id)
+  {
+    if (_devices.TryGetValue(id, out var known))
+    {
+      return DeviceLookup.Found(known);
+    }
+
+    try
+    {
+      using var response = await http.GetAsync(Routes.Device(id));
+      if (response.StatusCode == HttpStatusCode.NotFound)
+      {
+        return DeviceLookup.NotFound;
+      }
+
+      response.EnsureSuccessStatusCode();
+      var device = await response.Content.ReadFromJsonAsync<DeviceSummary>();
+      if (device is null)
+      {
+        return DeviceLookup.NotFound;
+      }
+
+      // A push that arrived while asking is newer than the answer.
+      if (_devices.TryGetValue(id, out var pushed))
+      {
+        return DeviceLookup.Found(pushed);
+      }
+
+      _devices[id] = device;
+      return DeviceLookup.Found(device);
+    }
+    catch (Exception ex) when (ex is HttpRequestException or JsonException)
+    {
+      return DeviceLookup.Failed;
+    }
+  }
+
+  public DeviceSummary? Get(Guid id) => _devices.GetValueOrDefault(id);
 
   /// <summary>A change pushed by the server: replaces the device, or adds it if it's new.</summary>
   public void Apply(DeviceSummary device)

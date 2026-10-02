@@ -1,0 +1,127 @@
+@page "/devices/{Id:guid}"
+@implements IDisposable
+@inject DeviceStore Store
+@inject ILiveUpdates Live
+
+<PageTitle>@(device?.Name ?? "Device")</PageTitle>
+
+<p><a href="">&larr; All devices</a></p>
+
+@if (lookup is null)
+{
+    <p>Loading device...</p>
+}
+else if (lookup.IsNotFound)
+{
+    <div class="alert alert-warning">Device not found. It may have been removed, or the link is wrong.</div>
+}
+else if (device is null)
+{
+    <div class="alert alert-danger">Could not load the device. Check that the server is running.</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <h1 class="mb-0">@device.Name</h1>
+        @if (device.IsOnline)
+        {
+            <span class="badge text-bg-success device-status">Online</span>
+        }
+        else
+        {
+            <span class="badge text-bg-secondary device-status">Offline</span>
+        }
+    </div>
+
+    <dl class="row">
+        <dt class="col-sm-3">DNS name</dt>
+        <dd class="col-sm-9">@Show(device.DnsName)</dd>
+        <dt class="col-sm-3">Operating system</dt>
+        <dd class="col-sm-9">@device.OsDescription (@device.OsArchitecture)</dd>
+        <dt class="col-sm-3">Agent version</dt>
+        <dd class="col-sm-9">@Show(device.AgentVersion)</dd>
+        <dt class="col-sm-3">CPU</dt>
+        <dd class="col-sm-9">@device.CpuCores cores, @device.CpuLoad.ToString("P0") load</dd>
+        <dt class="col-sm-3">Memory</dt>
+        <dd class="col-sm-9">@device.MemoryUsedGb.ToString("0.#") / @device.MemoryTotalGb.ToString("0.#") GB</dd>
+        <dt class="col-sm-3">Logged-on users</dt>
+        <dd class="col-sm-9">@Show(string.Join(", ", device.LoggedOnUsers))</dd>
+        <dt class="col-sm-3">Local IP</dt>
+        <dd class="col-sm-9">@Show(string.Join(", ", new[] { device.LocalIpV4, device.LocalIpV6 }.Where(x => x.Length > 0)))</dd>
+        <dt class="col-sm-3">Public IP</dt>
+        <dd class="col-sm-9">@Show(string.Join(", ", new[] { device.PublicIpV4, device.PublicIpV6 }.Where(x => x.Length > 0)))</dd>
+        <dt class="col-sm-3">MAC addresses</dt>
+        <dd class="col-sm-9">@Show(string.Join(", ", device.MacAddresses))</dd>
+        <dt class="col-sm-3">Last seen</dt>
+        <dd class="col-sm-9">@device.LastSeen.ToLocalTime().ToString("g")</dd>
+    </dl>
+
+    <h2 class="h4">Disks</h2>
+    @if (device.Disks.Count == 0)
+    {
+        <p>No disks reported.</p>
+    }
+    else
+    {
+        <table class="table align-middle disks">
+            <thead>
+                <tr>
+                    <th>Disk</th>
+                    <th>Label</th>
+                    <th>Format</th>
+                    <th>Used</th>
+                    <th>Free</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var disk in device.Disks)
+                {
+                    <tr>
+                        <td>@disk.Name</td>
+                        <td>@disk.Label</td>
+                        <td>@disk.Format</td>
+                        <td>@((disk.SizeGb - disk.FreeGb).ToString("0.#")) / @disk.SizeGb.ToString("0.#") GB</td>
+                        <td>@disk.FreeGb.ToString("0.#") GB</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private DeviceLookup? lookup;
+    private DeviceSummary? device;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Store.Changed += OnStoreChanged;
+        _ = Live.StartAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        lookup = null;
+        lookup = await Store.FindAsync(Id);
+        device = lookup.Device;
+    }
+
+    public void Dispose() => Store.Changed -= OnStoreChanged;
+
+    // The same live updates as the list: a pushed change for this device replaces what is shown.
+    private void OnStoreChanged() => InvokeAsync(() =>
+    {
+        if (Store.Get(Id) is { } current)
+        {
+            device = current;
+            lookup = DeviceLookup.Found(current);
+        }
+
+        StateHasChanged();
+    });
+
+    private static string Show(string value) => value.Length > 0 ? value : "-";
+}

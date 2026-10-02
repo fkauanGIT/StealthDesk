@@ -56,7 +56,7 @@ else
             @foreach (var device in Store.Devices)
             {
                 <tr @key="device.Id">
-                    <td>@device.Name</td>
+                    <td><a href="devices/@device.Id">@device.Name</a></td>
                     <td>@device.OsDescription</td>
                     <td>@device.CpuLoad.ToString("P0")</td>
                     <td>@Usage(device.MemoryUsedGb, device.MemoryTotalGb)</td>
