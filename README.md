@@ -116,6 +116,7 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports. |
 | `/hubs/dashboard` | WebSockets | SignalR hub browsers connect to for live device updates. |
 | `/api/v1/devices` | HTTP | Lists the devices known to the server. |
+| `/api/v1/devices/{id}` | HTTP | Returns one device, or 404 if the server doesn't know it. |
 | `/api/internal/version/server` | HTTP | Returns the server version. |
 | `/health` | HTTP | Readiness check: every registered health check must pass. |
 | `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |

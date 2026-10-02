@@ -14,6 +14,12 @@ public static class DeviceEndpoints
       return devices.Select(ToSummary);
     });
 
+    endpoints.MapGet($"{Routes.Devices}/{{id:guid}}", async (Guid id, StealthDeskDb db, CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      return device is null ? Results.NotFound() : Results.Ok(ToSummary(device));
+    });
+
     return endpoints;
   }
 
