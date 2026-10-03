@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Design;
 using Npgsql;
+using StealthDesk.Web.Server.Accounts;
 
 namespace StealthDesk.Web.Server.Persistence;
 
@@ -107,8 +109,13 @@ public static class DatabaseSetup
   {
     public StealthDeskDb CreateDbContext(string[] args)
     {
+      var appServices = new ServiceCollection()
+        .Configure<IdentityOptions>(AccountSetup.ConfigureStores)
+        .BuildServiceProvider();
+
       var options = new DbContextOptionsBuilder<StealthDeskDb>()
         .UseNpgsql("Host=localhost;Database=stealthdesk_design")
+        .UseApplicationServiceProvider(appServices)
         .Options;
       return new StealthDeskDb(options);
     }
