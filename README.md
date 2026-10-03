@@ -33,7 +33,7 @@ browser shows every device and keeps it current without refreshing.
 - The page shows whether it is live or reconnecting, and reloads the list after reconnecting
 - Devices are marked offline when the server starts, and agents the server forgot register again on their own
 
-Next up: **v0.3**, user authentication.
+Next up: **v0.3**, user accounts.
 
 ### Roadmap
 
@@ -41,9 +41,10 @@ Next up: **v0.3**, user authentication.
 |---|---|---|
 | v0.1 | Agent connectivity | [#23](https://github.com/fkauanGIT/StealthDesk/issues/23) |
 | v0.2 | Live device dashboard | [#24](https://github.com/fkauanGIT/StealthDesk/issues/24) |
-| v0.3 | User authentication | [#25](https://github.com/fkauanGIT/StealthDesk/issues/25) |
-| v0.4 | Remote terminal | [#26](https://github.com/fkauanGIT/StealthDesk/issues/26) |
-| v0.5 | Remote desktop (MVP) | [#27](https://github.com/fkauanGIT/StealthDesk/issues/27) |
+| v0.3 | User accounts | [#25](https://github.com/fkauanGIT/StealthDesk/issues/25) |
+| v0.4 | Permissions and access | [#100](https://github.com/fkauanGIT/StealthDesk/issues/100) |
+| v0.5 | Remote terminal | [#26](https://github.com/fkauanGIT/StealthDesk/issues/26) |
+| v0.6 | Remote desktop (MVP) | [#27](https://github.com/fkauanGIT/StealthDesk/issues/27) |
 
 ## Prerequisites
 
@@ -152,7 +153,7 @@ test project on each pull request and on every push to `main`, with a separate j
 
 | Path | Contents |
 |---|---|
-| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end with the device list |
+| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end. `Ui/` holds the design system components and `wwwroot/css/tokens.css` its colors, type and spacing |
 | `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent gateway, REST API and EF Core database |
 | `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |

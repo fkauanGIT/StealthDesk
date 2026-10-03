@@ -3,90 +3,118 @@
 @inject DeviceStore Store
 @inject ILiveUpdates Live
 
-<PageTitle>@(device?.Name ?? "Device")</PageTitle>
+<PageTitle>@(device?.Name ?? "Device") · StealthDesk</PageTitle>
 
-<p><a href="">&larr; All devices</a></p>
+<a class="sd-back" href="">
+    <SdIcon Name="IconName.Back" Size="16" />
+    All devices
+</a>
 
 @if (lookup is null)
 {
-    <p>Loading device...</p>
+    <SdLoading Text="Loading device..." />
 }
 else if (lookup.IsNotFound)
 {
-    <div class="alert alert-warning">Device not found. It may have been removed, or the link is wrong.</div>
+    <SdEmptyState Title="Device not found">It may have been removed, or the link is wrong.</SdEmptyState>
 }
 else if (device is null)
 {
-    <div class="alert alert-danger">Could not load the device. Check that the server is running.</div>
+    <SdAlert>Could not load the device. Check that the server is running.</SdAlert>
 }
 else
 {
-    <div class="d-flex align-items-center gap-3 mb-3">
-        <h1 class="mb-0">@device.Name</h1>
-        @if (device.IsOnline)
+    <header class="sd-page-header">
+        <div class="sd-device-icon"><SdIcon Name="IconName.Device" Size="26" /></div>
+        <div>
+            <h1 class="sd-page-title">@device.Name</h1>
+            <p class="sd-muted">@Subtitle(device)</p>
+        </div>
+        <DeviceStatus IsOnline="device.IsOnline" />
+    </header>
+
+    <div class="sd-grid">
+        <div class="sd-stat">
+            <span class="sd-stat-label">CPU · @device.CpuCores cores</span>
+            <span class="sd-stat-value">@DeviceFormat.Percent(device.CpuLoad)</span>
+            <SdMeter Label="CPU" Value="device.CpuLoad" Large="true" />
+        </div>
+        <div class="sd-stat">
+            <span class="sd-stat-label">Memory · @DeviceFormat.Usage(device.MemoryUsedGb, device.MemoryTotalGb)</span>
+            <span class="sd-stat-value">@DeviceFormat.Percent(DeviceFormat.Share(device.MemoryUsedGb, device.MemoryTotalGb))</span>
+            <SdMeter Label="Memory" Value="DeviceFormat.Share(device.MemoryUsedGb, device.MemoryTotalGb)" Large="true" />
+        </div>
+        <div class="sd-stat">
+            <span class="sd-stat-label">Storage · @DeviceFormat.Usage(device.StorageUsedGb, device.StorageTotalGb)</span>
+            <span class="sd-stat-value">@DeviceFormat.Percent(DeviceFormat.Share(device.StorageUsedGb, device.StorageTotalGb))</span>
+            <SdMeter Label="Storage" Value="DeviceFormat.Share(device.StorageUsedGb, device.StorageTotalGb)" Large="true" />
+        </div>
+    </div>
+
+    <div class="sd-grid" style="--sd-grid-min: 320px">
+        <SdCard Title="System">
+            <dl class="sd-details">
+                <dt>Agent version</dt>
+                <dd>@DeviceFormat.OrMissing(device.AgentVersion)</dd>
+                <dt>Architecture</dt>
+                <dd>@DeviceFormat.Architecture(device.OsArchitecture)</dd>
+                <dt>Logged-on users</dt>
+                <dd>@DeviceFormat.OrMissing(string.Join(", ", device.LoggedOnUsers))</dd>
+                <dt>Last seen</dt>
+                <dd>@DeviceFormat.LastSeen(device.LastSeen)</dd>
+            </dl>
+        </SdCard>
+        <SdCard Title="Network">
+            <dl class="sd-details">
+                <dt>DNS name</dt>
+                <dd>@DeviceFormat.OrMissing(device.DnsName)</dd>
+                <dt>Local IP</dt>
+                <dd class="sd-mono">@DeviceFormat.OrMissing(Join(device.LocalIpV4, device.LocalIpV6))</dd>
+                <dt>Public IP</dt>
+                <dd class="sd-mono">@DeviceFormat.OrMissing(Join(device.PublicIpV4, device.PublicIpV6))</dd>
+                <dt>MAC addresses</dt>
+                <dd class="sd-mono">@DeviceFormat.OrMissing(string.Join(", ", device.MacAddresses))</dd>
+            </dl>
+        </SdCard>
+    </div>
+
+    <SdCard Title="Disks">
+        @if (device.Disks.Count == 0)
         {
-            <span class="badge text-bg-success device-status">Online</span>
+            <p class="sd-muted">No disks reported.</p>
         }
         else
         {
-            <span class="badge text-bg-secondary device-status">Offline</span>
+            <div style="overflow-x: auto">
+                <table class="sd-table sd-table--plain disks" style="min-width: 560px">
+                    <thead>
+                        <tr>
+                            <th>Disk</th>
+                            <th>Label</th>
+                            <th>Format</th>
+                            <th>Used</th>
+                            <th>Free</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var disk in device.Disks)
+                        {
+                            <tr>
+                                <td class="sd-mono">@disk.Name</td>
+                                <td>@disk.Label</td>
+                                <td>@disk.Format</td>
+                                <td style="min-width: 200px">
+                                    <SdMeter Label="@($"{disk.Name} used")" Value="DeviceFormat.Share(disk.SizeGb - disk.FreeGb, disk.SizeGb)"
+                                             Text="@DeviceFormat.Usage(disk.SizeGb - disk.FreeGb, disk.SizeGb)" />
+                                </td>
+                                <td>@DeviceFormat.Gigabytes(disk.FreeGb) GB</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </div>
-
-    <dl class="row">
-        <dt class="col-sm-3">DNS name</dt>
-        <dd class="col-sm-9">@Show(device.DnsName)</dd>
-        <dt class="col-sm-3">Operating system</dt>
-        <dd class="col-sm-9">@device.OsDescription (@device.OsArchitecture)</dd>
-        <dt class="col-sm-3">Agent version</dt>
-        <dd class="col-sm-9">@Show(device.AgentVersion)</dd>
-        <dt class="col-sm-3">CPU</dt>
-        <dd class="col-sm-9">@device.CpuCores cores, @device.CpuLoad.ToString("P0") load</dd>
-        <dt class="col-sm-3">Memory</dt>
-        <dd class="col-sm-9">@device.MemoryUsedGb.ToString("0.#") / @device.MemoryTotalGb.ToString("0.#") GB</dd>
-        <dt class="col-sm-3">Logged-on users</dt>
-        <dd class="col-sm-9">@Show(string.Join(", ", device.LoggedOnUsers))</dd>
-        <dt class="col-sm-3">Local IP</dt>
-        <dd class="col-sm-9">@Show(string.Join(", ", new[] { device.LocalIpV4, device.LocalIpV6 }.Where(x => x.Length > 0)))</dd>
-        <dt class="col-sm-3">Public IP</dt>
-        <dd class="col-sm-9">@Show(string.Join(", ", new[] { device.PublicIpV4, device.PublicIpV6 }.Where(x => x.Length > 0)))</dd>
-        <dt class="col-sm-3">MAC addresses</dt>
-        <dd class="col-sm-9">@Show(string.Join(", ", device.MacAddresses))</dd>
-        <dt class="col-sm-3">Last seen</dt>
-        <dd class="col-sm-9">@device.LastSeen.ToLocalTime().ToString("g")</dd>
-    </dl>
-
-    <h2 class="h4">Disks</h2>
-    @if (device.Disks.Count == 0)
-    {
-        <p>No disks reported.</p>
-    }
-    else
-    {
-        <table class="table align-middle disks">
-            <thead>
-                <tr>
-                    <th>Disk</th>
-                    <th>Label</th>
-                    <th>Format</th>
-                    <th>Used</th>
-                    <th>Free</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var disk in device.Disks)
-                {
-                    <tr>
-                        <td>@disk.Name</td>
-                        <td>@disk.Label</td>
-                        <td>@disk.Format</td>
-                        <td>@((disk.SizeGb - disk.FreeGb).ToString("0.#")) / @disk.SizeGb.ToString("0.#") GB</td>
-                        <td>@disk.FreeGb.ToString("0.#") GB</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    </SdCard>
 }
 
 @code {
@@ -123,5 +151,8 @@ else
         StateHasChanged();
     });
 
-    private static string Show(string value) => value.Length > 0 ? value : "-";
+    private static string Join(params string[] values) => string.Join(", ", values.Where(x => x.Length > 0));
+
+    private static string Subtitle(DeviceSummary device) =>
+        string.Join(" · ", new[] { device.DnsName, device.OsDescription }.Where(x => x.Length > 0));
 }

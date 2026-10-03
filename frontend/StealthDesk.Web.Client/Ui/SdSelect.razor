@@ -1,0 +1,30 @@
+<div class="sd-field">
+    <label class="sd-label" for="@_id">@Label</label>
+    <select id="@_id" class="sd-select" value="@Value" disabled="@Disabled" @onchange="Changed">
+        @foreach (var option in Options)
+        {
+            <option value="@option.Value">@option.Text</option>
+        }
+    </select>
+</div>
+
+@code {
+    private readonly string _id = $"select-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<SelectOption> Options { get; set; } = [];
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private Task Changed(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString());
+}

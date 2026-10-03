@@ -1,0 +1,62 @@
+<div class="sd-field">
+    <label class="sd-label" for="@Id">@Label</label>
+    <input id="@Id" class="sd-input" type="@Type" value="@Value" placeholder="@Placeholder" autocomplete="@Autocomplete"
+           disabled="@Disabled" aria-invalid="@(Error is null ? null : "true")" aria-describedby="@DescribedBy"
+           @onchange="Changed" @attributes="AdditionalAttributes" />
+    @if (Error is not null)
+    {
+        <span id="@ErrorId" class="sd-field-error">@Error</span>
+    }
+    else if (Hint is not null)
+    {
+        <span id="@HintId" class="sd-field-hint">@Hint</span>
+    }
+</div>
+
+@code {
+    private readonly string _generatedId = $"field-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Type { get; set; } = "text";
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    [Parameter]
+    public string? Autocomplete { get; set; }
+
+    [Parameter]
+    public string? Hint { get; set; }
+
+    /// <summary>Shown under the field and announced with it; marks the field invalid.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    protected override void OnParametersSet() => Id ??= _generatedId;
+
+    private string ErrorId => $"{Id}-error";
+
+    private string HintId => $"{Id}-hint";
+
+    private string? DescribedBy => Error is not null ? ErrorId : Hint is not null ? HintId : null;
+
+    private Task Changed(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString());
+}

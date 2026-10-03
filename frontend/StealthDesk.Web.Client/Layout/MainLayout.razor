@@ -1,16 +1,20 @@
-﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inherits LayoutComponentBase
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<div class="sd-shell">
+    <nav class="sd-sidebar" aria-label="Main">
+        <a class="sd-brand" href="">
+            <SdLogo />
+            StealthDesk
+        </a>
+        <div class="sd-nav">
+            <NavLink class="sd-nav-link" href="" Match="NavLinkMatch.All">
+                <SdIcon Name="IconName.Device" />
+                Devices
+            </NavLink>
         </div>
+    </nav>
 
-        <article class="content px-4">
-            @Body
-        </article>
+    <main class="sd-content">
+        @Body
     </main>
 </div>

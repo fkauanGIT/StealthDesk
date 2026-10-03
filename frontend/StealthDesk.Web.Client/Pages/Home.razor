@@ -3,83 +3,127 @@
 @inject DeviceStore Store
 @inject ILiveUpdates Live
 
-<PageTitle>Devices</PageTitle>
+<PageTitle>Devices · StealthDesk</PageTitle>
 
-<div class="d-flex align-items-center gap-3 mb-3">
-    <h1 class="mb-0">Devices</h1>
-    @switch (Live.State)
-    {
-        case LiveState.Live:
-            <span class="badge text-bg-success live-indicator">Live</span>
-            break;
-        case LiveState.Reconnecting:
-            <span class="badge text-bg-warning live-indicator">Reconnecting...</span>
-            break;
-        default:
-            <span class="badge text-bg-secondary live-indicator">Connecting...</span>
-            break;
-    }
-</div>
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Devices</h1>
+    <LiveIndicator State="Live.State" />
+    <div class="sd-search sd-push">
+        <SdIcon Name="IconName.Search" Size="16" />
+        <label for="device-search" class="sd-visually-hidden">Search devices</label>
+        <input id="device-search" type="search" placeholder="Search by name, user or IP" value="@search"
+               @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+    </div>
+</header>
 
 @if (Store.Error is not null)
 {
-    <div class="alert alert-danger">@Store.Error</div>
+    <SdAlert>@Store.Error</SdAlert>
 }
 
 @if (Store.Devices is null)
 {
     @if (Store.Error is null)
     {
-        <p>Loading devices...</p>
+        <SdLoading Text="Loading devices..." />
     }
 }
 else if (Store.Devices.Count == 0)
 {
-    <p>No devices yet. Run the agent on a machine and it will show up here.</p>
+    <SdEmptyState Title="No devices yet">Run the agent on a machine and it will show up here.</SdEmptyState>
 }
 else
 {
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>OS</th>
-                <th>CPU</th>
-                <th>Memory</th>
-                <th>Storage</th>
-                <th>Users</th>
-                <th>Status</th>
-                <th>Last seen</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var device in Store.Devices)
-            {
-                <tr @key="device.Id">
-                    <td><a href="devices/@device.Id">@device.Name</a></td>
-                    <td>@device.OsDescription</td>
-                    <td>@device.CpuLoad.ToString("P0")</td>
-                    <td>@Usage(device.MemoryUsedGb, device.MemoryTotalGb)</td>
-                    <td>@Usage(device.StorageUsedGb, device.StorageTotalGb)</td>
-                    <td>@string.Join(", ", device.LoggedOnUsers)</td>
-                    <td>
-                        @if (device.IsOnline)
-                        {
-                            <span class="badge text-bg-success">Online</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-secondary">Offline</span>
-                        }
-                    </td>
-                    <td>@device.LastSeen.ToLocalTime().ToString("g")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    var online = Store.Devices.Count(x => x.IsOnline);
+    var shown = Visible(Store.Devices).ToList();
+
+    <div class="sd-stats">
+        <div class="sd-stat"><span class="sd-stat-label">Devices</span><span class="sd-stat-value" data-stat="total">@Store.Devices.Count</span></div>
+        <div class="sd-stat"><span class="sd-stat-label">Online</span><span class="sd-stat-value" data-stat="online">@online</span></div>
+        <div class="sd-stat"><span class="sd-stat-label">Offline</span><span class="sd-stat-value" data-stat="offline">@(Store.Devices.Count - online)</span></div>
+    </div>
+
+    <SdSegmented TValue="StatusFilter" Label="Show devices" Options="Filters" @bind-Value="filter" />
+
+    @if (shown.Count == 0)
+    {
+        <SdEmptyState Title="No devices match">Try another search or filter.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 880px">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>CPU</th>
+                        <th>Memory</th>
+                        <th>Storage</th>
+                        <th>Users</th>
+                        <th>Last seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var device in shown)
+                    {
+                        <tr @key="device.Id">
+                            <td>
+                                <div class="sd-cell-title">
+                                    <a href="devices/@device.Id">@device.Name</a>
+                                    <span class="sd-cell-sub">@device.OsDescription</span>
+                                </div>
+                            </td>
+                            <td><DeviceStatus IsOnline="device.IsOnline" /></td>
+                            <td style="min-width: 110px">
+                                @if (device.IsOnline)
+                                {
+                                    <SdMeter Label="CPU" Value="device.CpuLoad" Text="@DeviceFormat.Percent(device.CpuLoad)" />
+                                }
+                                else
+                                {
+                                    <span class="sd-muted">@DeviceFormat.Missing</span>
+                                }
+                            </td>
+                            <td style="min-width: 130px">
+                                @if (device.IsOnline)
+                                {
+                                    <SdMeter Label="Memory" Value="DeviceFormat.Share(device.MemoryUsedGb, device.MemoryTotalGb)"
+                                             Text="@DeviceFormat.Usage(device.MemoryUsedGb, device.MemoryTotalGb)" />
+                                }
+                                else
+                                {
+                                    <span class="sd-muted">@DeviceFormat.Missing</span>
+                                }
+                            </td>
+                            <td style="min-width: 140px">
+                                <SdMeter Label="Storage" Value="DeviceFormat.Share(device.StorageUsedGb, device.StorageTotalGb)"
+                                         Text="@DeviceFormat.Usage(device.StorageUsedGb, device.StorageTotalGb)" />
+                            </td>
+                            <td>@DeviceFormat.OrMissing(string.Join(", ", device.LoggedOnUsers))</td>
+                            <td class="sd-muted" style="white-space: nowrap">@DeviceFormat.LastSeen(device.LastSeen)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @code {
+    private static readonly IReadOnlyList<(StatusFilter, string)> Filters =
+        [(StatusFilter.All, "All"), (StatusFilter.Online, "Online"), (StatusFilter.Offline, "Offline")];
+
+    private string search = string.Empty;
+    private StatusFilter filter = StatusFilter.All;
+
+    private enum StatusFilter
+    {
+        All,
+        Online,
+        Offline,
+    }
+
     protected override async Task OnInitializedAsync()
     {
         Store.Changed += Refresh;
@@ -99,6 +143,16 @@ else
     // Changes arrive outside the page's own events, so the page is told to render again.
     private void Refresh() => InvokeAsync(StateHasChanged);
 
-    private static string Usage(double usedGb, double totalGb) =>
-        totalGb > 0 ? $"{usedGb:0.#} / {totalGb:0.#} GB ({usedGb / totalGb:P0})" : "-";
+    private IEnumerable<DeviceSummary> Visible(IEnumerable<DeviceSummary> devices)
+    {
+        var term = search.Trim();
+        return devices.Where(x =>
+            (filter == StatusFilter.All || x.IsOnline == (filter == StatusFilter.Online))
+            && (term.Length == 0 || Matches(x, term)));
+    }
+
+    private static bool Matches(DeviceSummary device, string term) =>
+        new[] { device.Name, device.Alias, device.DnsName, device.OsDescription, device.LocalIpV4, device.LocalIpV6, device.PublicIpV4 }
+            .Concat(device.LoggedOnUsers)
+            .Any(x => x.Contains(term, StringComparison.OrdinalIgnoreCase));
 }

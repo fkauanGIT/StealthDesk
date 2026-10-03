@@ -1,0 +1,9 @@
+<div class="sd-loading" role="status">
+    <span class="sd-spinner" aria-hidden="true"></span>
+    @Text
+</div>
+
+@code {
+    [Parameter]
+    public string Text { get; set; } = "Loading...";
+}
