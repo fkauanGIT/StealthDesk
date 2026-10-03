@@ -90,6 +90,20 @@ Then start the server. It applies the pending migrations on startup, creating th
 dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
 ```
 
+### Accounts
+
+Account rules come from the `Accounts` section of `appsettings.json`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `EnableBearerLogin` | `false` | Lets scripts sign in for bearer tokens. Browsers always use a cookie. |
+| `BearerTokenLifetime` | `01:00:00` | How long a bearer token lasts. |
+| `RefreshTokenLifetime` | `30.00:00:00` | How long a refresh token lasts. |
+| `RequireUniqueEmail` | `true` | When false, several accounts may share an email. |
+
+Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
+passwords in a row lock the account for five minutes.
+
 ## Running the Agent
 
 The agent runs on Windows. With the server running (see above), open a second terminal and start it:
@@ -127,6 +141,10 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/dashboard` | WebSockets | SignalR hub browsers connect to for live device updates. |
 | `/api/v1/devices` | HTTP | Lists the devices known to the server. |
 | `/api/v1/devices/{id}` | HTTP | Returns one device, or 404 if the server doesn't know it. |
+| `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
+| `/api/auth/me` | HTTP | The signed-in user and tenant, or 401. |
+| `/api/auth/sign-out` | HTTP | Ends the cookie session. |
+| `/api/auth/*` | HTTP | The other ASP.NET Core Identity endpoints: refresh, confirm email, forgot and reset password, manage info. |
 | `/api/internal/version/server` | HTTP | Returns the server version. |
 | `/health` | HTTP | Readiness check: every registered health check must pass. |
 | `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |

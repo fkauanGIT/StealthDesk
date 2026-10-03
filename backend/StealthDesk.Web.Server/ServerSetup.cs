@@ -30,6 +30,7 @@ public static class ServerSetup
   public static WebApplication MapStealthDesk(this WebApplication app)
   {
     app.MapHealthEndpoints();
+    app.MapAccountEndpoints();
     app.MapDeviceEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
