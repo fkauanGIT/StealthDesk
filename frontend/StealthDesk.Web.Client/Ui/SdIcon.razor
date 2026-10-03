@@ -1,0 +1,52 @@
+@* Stroke icons drawn in the current text color. Decorative unless the parent labels them. *@
+<svg width="@Size" height="@Size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="@Class">
+    @switch (Name)
+    {
+        case IconName.Device:
+            <rect x="3" y="4" width="18" height="12" rx="2"></rect>
+            <path d="M8 20h8"></path>
+            <path d="M12 16v4"></path>
+            break;
+        case IconName.Account:
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"></path>
+            break;
+        case IconName.Search:
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M20 20l-3.5-3.5"></path>
+            break;
+        case IconName.Refresh:
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+            <path d="M21 3v6h-6"></path>
+            break;
+        case IconName.SignOut:
+            <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"></path>
+            <path d="M10 17l-5-5 5-5"></path>
+            <path d="M5 12h11"></path>
+            break;
+        case IconName.Back:
+            <path d="M15 18l-6-6 6-6"></path>
+            break;
+        case IconName.Alert:
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 8v5"></path>
+            <path d="M12 16h.01"></path>
+            break;
+        case IconName.Close:
+            <path d="M6 6l12 12"></path>
+            <path d="M18 6L6 18"></path>
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired]
+    public IconName Name { get; set; }
+
+    [Parameter]
+    public int Size { get; set; } = 18;
+
+    [Parameter]
+    public string? Class { get; set; }
+}

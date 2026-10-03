@@ -1,0 +1,13 @@
+@if (IsOnline)
+{
+    <SdStatus Tone="Tone.Online" Text="Online" Class="device-status" />
+}
+else
+{
+    <SdStatus Tone="Tone.Offline" Text="Offline" Class="device-status" />
+}
+
+@code {
+    [Parameter]
+    public bool IsOnline { get; set; }
+}

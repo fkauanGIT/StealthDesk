@@ -1,0 +1,12 @@
+<div class="sd-alert sd-alert--@Tone.ToString().ToLowerInvariant()" role="@(Tone is Tone.Info ? "status" : "alert")">
+    <SdIcon Name="IconName.Alert" />
+    <div>@ChildContent</div>
+</div>
+
+@code {
+    [Parameter]
+    public Tone Tone { get; set; } = Tone.Danger;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

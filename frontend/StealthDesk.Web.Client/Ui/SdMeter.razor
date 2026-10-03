@@ -1,0 +1,32 @@
+@* A usage bar: amber from 75 %, red from 90 %, so a nearly full device stands out. *@
+<div class="sd-meter @LevelClass @(Large ? "sd-meter--large" : null)">
+    @if (Text is not null)
+    {
+        <span class="sd-meter-text">@Text</span>
+    }
+    <span class="sd-meter-track" role="meter" aria-label="@Label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent">
+        <span class="sd-meter-fill" style="width: @(Percent)%"></span>
+    </span>
+</div>
+
+@code {
+    public const double WarningAt = 0.75;
+    public const double DangerAt = 0.9;
+
+    /// <summary>Share used, from 0 to 1.</summary>
+    [Parameter]
+    public double Value { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Text { get; set; }
+
+    [Parameter]
+    public bool Large { get; set; }
+
+    private int Percent => (int)Math.Round(Math.Clamp(double.IsNaN(Value) ? 0 : Value, 0, 1) * 100);
+
+    private string? LevelClass => Value >= DangerAt ? "sd-meter--danger" : Value >= WarningAt ? "sd-meter--warning" : null;
+}

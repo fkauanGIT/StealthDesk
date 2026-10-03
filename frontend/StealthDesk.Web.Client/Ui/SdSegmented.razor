@@ -1,0 +1,24 @@
+@typeparam TValue
+<div class="sd-segmented" role="group" aria-label="@Label">
+    @foreach (var option in Options)
+    {
+        var selected = EqualityComparer<TValue>.Default.Equals(option.Value, Value);
+        <button type="button" aria-pressed="@(selected ? "true" : "false")" @onclick="() => Pick(option.Value)">@option.Text</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<(TValue Value, string Text)> Options { get; set; } = [];
+
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue> ValueChanged { get; set; }
+
+    private Task Pick(TValue value) => ValueChanged.InvokeAsync(value);
+}

@@ -68,7 +68,7 @@ public class DeviceDetailsTests : BunitContext
 
     var page = Render<DeviceDetails>(x => x.Add(p => p.Id, Guid.NewGuid()));
 
-    page.WaitForAssertion(() => Assert.Single(page.FindAll(".alert-danger")));
+    page.WaitForAssertion(() => Assert.Single(page.FindAll(".sd-alert--danger")));
     Assert.DoesNotContain("Device not found", page.Markup);
   }
 

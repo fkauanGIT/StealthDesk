@@ -1,0 +1,18 @@
+<section class="sd-card" @attributes="AdditionalAttributes">
+    @if (Title is not null)
+    {
+        <h2 class="sd-card-title">@Title</h2>
+    }
+    @ChildContent
+</section>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

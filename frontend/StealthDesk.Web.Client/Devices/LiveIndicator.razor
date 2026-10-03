@@ -1,0 +1,17 @@
+@switch (State)
+{
+    case LiveState.Live:
+        <SdStatus Tone="Tone.Live" Text="Live" Class="live-indicator" />
+        break;
+    case LiveState.Reconnecting:
+        <SdStatus Tone="Tone.Warning" Text="Reconnecting..." Class="live-indicator" />
+        break;
+    default:
+        <SdStatus Tone="Tone.Neutral" Text="Connecting..." Class="live-indicator" />
+        break;
+}
+
+@code {
+    [Parameter]
+    public LiveState State { get; set; }
+}

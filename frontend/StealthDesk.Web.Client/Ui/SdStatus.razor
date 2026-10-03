@@ -1,0 +1,12 @@
+<span class="sd-status sd-status--@Tone.ToString().ToLowerInvariant() @Class">@Text</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public Tone Tone { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Class { get; set; }
+}

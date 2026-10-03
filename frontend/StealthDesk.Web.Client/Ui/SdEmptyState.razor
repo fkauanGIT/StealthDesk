@@ -1,0 +1,15 @@
+<div class="sd-empty">
+    <span class="sd-empty-title">@Title</span>
+    @if (ChildContent is not null)
+    {
+        <span class="sd-empty-body">@ChildContent</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
