@@ -21,13 +21,18 @@ public sealed class TestDashboard : IAsyncDisposable
 
   public HubConnection Connection { get; }
 
-  public static async Task<TestDashboard> ConnectAsync(ServerHost server)
+  /// <param name="cookie">A session cookie from <see cref="TestAccounts.SignInForCookieAsync"/>, to connect as that user.</param>
+  public static async Task<TestDashboard> ConnectAsync(ServerHost server, string? cookie = null)
   {
     var connection = new HubConnectionBuilder()
       .WithUrl(new Uri(server.Server.BaseAddress, Routes.Dashboard), options =>
       {
         options.HttpMessageHandlerFactory = _ => server.Server.CreateHandler();
         options.Transports = HttpTransportType.LongPolling;
+        if (cookie is not null)
+        {
+          options.Headers["Cookie"] = cookie;
+        }
       })
       .Build();
 
