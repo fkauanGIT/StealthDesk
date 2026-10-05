@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using StealthDesk.Contracts.Accounts;
@@ -60,6 +61,13 @@ public static class AccountEndpoints
       return await RegisterAsync(context);
     }
 
+    // People open this from an email: answer with the web client's page instead of Identity's plain text.
+    if (path.EndsWith("/confirmEmail", StringComparison.OrdinalIgnoreCase))
+    {
+      var confirmed = Unwrap(await next(context)) is not (IStatusCodeHttpResult { StatusCode: >= 400 } or UnauthorizedHttpResult);
+      return Results.Redirect(confirmed ? "/account/email-confirmed" : "/account/email-confirmed?failed=true");
+    }
+
     var accounts = context.HttpContext.RequestServices.GetRequiredService<IOptions<AccountOptions>>().Value;
     var wantsCookie = IsTrue(request.Query["useCookies"]) || IsTrue(request.Query["useSessionCookies"]);
     var asksForTokens = (path.EndsWith("/login", StringComparison.OrdinalIgnoreCase) && !wantsCookie)
@@ -101,4 +109,7 @@ public static class AccountEndpoints
   }
 
   private static bool IsTrue(string? value) => bool.TryParse(value, out var result) && result;
+
+  // Identity's endpoints answer with Results<A, B>, which wraps the result that actually ran.
+  private static object? Unwrap(object? result) => result is INestedHttpResult nested ? Unwrap(nested.Result) : result;
 }
