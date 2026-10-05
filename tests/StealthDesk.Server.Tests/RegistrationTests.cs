@@ -45,7 +45,8 @@ public class RegistrationTests
   [Fact]
   public async Task PublicRegistration_GivesEachUserTheirOwnTenant()
   {
-    using var server = ServerHost.InMemory().With("Accounts:EnablePublicRegistration", "true");
+    // With email sending on, the second user waits for the confirmation link.
+    using var server = ServerHost.InMemory().With("Accounts:EnablePublicRegistration", "true").WithCapturedEmails(new CapturedEmails());
     using var client = TestAccounts.Client(server);
     await RegisterAsync(client, "first@example.com");
 
