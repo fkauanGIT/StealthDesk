@@ -1,4 +1,11 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject DeviceStore Store
+@inject ILiveUpdates Live
+@inject SessionGuard Session
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
 
 <div class="sd-shell">
     <nav class="sd-sidebar" aria-label="Main">
@@ -12,9 +19,50 @@
                 Devices
             </NavLink>
         </div>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="sd-user">
+                    <span class="sd-avatar" aria-hidden="true">@Initials(context.User.Identity?.Name)</span>
+                    <span class="sd-user-text">
+                        <span class="sd-user-name">@context.User.Identity?.Name</span>
+                        <span class="sd-user-role">@Role(context.User)</span>
+                    </span>
+                    <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.SignOut" AriaLabel="Sign out" OnClick="SignOutAsync" />
+                </div>
+            </Authorized>
+        </AuthorizeView>
     </nav>
 
     <main class="sd-content">
         @Body
     </main>
 </div>
+
+@code {
+    protected override void OnInitialized() => Store.SessionExpired += OnSessionExpired;
+
+    public void Dispose() => Store.SessionExpired -= OnSessionExpired;
+
+    private void OnSessionExpired() => InvokeAsync(async () =>
+    {
+        await Live.StopAsync();
+        Session.Expired();
+    });
+
+    private async Task SignOutAsync()
+    {
+        await Live.StopAsync();
+        await Accounts.SignOutAsync();
+        AuthState.MarkSignedOut();
+        Navigation.NavigateTo("account/sign-in");
+    }
+
+    private static string Initials(string? email) =>
+        string.IsNullOrEmpty(email) ? "?" : email[..1].ToUpperInvariant();
+
+    private static string Role(System.Security.Claims.ClaimsPrincipal user) =>
+        user.HasClaim(ServerAuthenticationState.ServerAdministratorClaim, "true") ? "Server administrator"
+        : user.HasClaim(ServerAuthenticationState.TenantAdministratorClaim, "true") ? "Administrator"
+        : "Member";
+}

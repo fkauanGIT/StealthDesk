@@ -17,6 +17,15 @@ internal sealed class FakeLiveUpdates : ILiveUpdates
     return Task.CompletedTask;
   }
 
+  public bool Stopped { get; private set; }
+
+  public Task StopAsync()
+  {
+    Stopped = true;
+    Started = false;
+    return Task.CompletedTask;
+  }
+
   public void Become(LiveState state)
   {
     State = state;

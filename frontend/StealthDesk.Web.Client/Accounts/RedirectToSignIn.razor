@@ -1,0 +1,6 @@
+@inject NavigationManager Navigation
+
+@code {
+    // Shown instead of a page that needs a session: off to sign in, remembering where the user was going.
+    protected override void OnInitialized() => Navigation.NavigateTo(SessionGuard.SignInPath(Navigation), replace: true);
+}

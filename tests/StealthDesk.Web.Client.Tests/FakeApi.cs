@@ -15,6 +15,14 @@ internal sealed class FakeApi : HttpMessageHandler
 
   public void Respond(HttpStatusCode status) => Send(new HttpResponseMessage(status));
 
+  public void Respond<T>(HttpStatusCode status, T body) =>
+    Send(new HttpResponseMessage(status) { Content = JsonContent.Create(body) });
+
+  /// <summary>Requests the fake received, in order, as "METHOD path?query".</summary>
+  public IReadOnlyList<string> Requests => [.. _requests];
+
+  private readonly System.Collections.Concurrent.ConcurrentQueue<string> _requests = new();
+
   public void RespondWith<T>(T body) =>
     Send(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
 
@@ -28,6 +36,7 @@ internal sealed class FakeApi : HttpMessageHandler
 
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
   {
+    _requests.Enqueue($"{request.Method} {request.RequestUri!.PathAndQuery}");
     lock (_gate)
     {
       if (_ready.TryDequeue(out var response))

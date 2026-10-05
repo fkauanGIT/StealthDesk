@@ -39,9 +39,10 @@ public sealed class EmailTransport(
     {
       if (environment.IsDevelopment())
       {
+        // The links as a browser would open them: copied from the HTML they would keep "&amp;" and break.
         logger.LogInformation(
-          "Email sending is disabled; this message was not sent.\nTo: {To}\nSubject: {Subject}\n{Body}",
-          message.To, message.Subject, message.HtmlBody);
+          "Email sending is disabled; this message was not sent.\nTo: {To}\nSubject: {Subject}\nLinks:\n{Links}",
+          message.To, message.Subject, string.Join("\n", EmailLinks.In(message.HtmlBody)));
       }
       else
       {

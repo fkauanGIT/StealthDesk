@@ -1,0 +1,96 @@
+@page "/account/sign-in"
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">Sign in to StealthDesk</h1>
+    <p class="sd-auth-subtitle">Intelligent remote device management</p>
+</header>
+
+@if (error is not null)
+{
+    <SdAlert>
+        @error
+        @if (needsConfirmation)
+        {
+            <a href="account/resend-confirmation?email=@Uri.EscapeDataString(email ?? string.Empty)"> Send the link again</a>
+        }
+    </SdAlert>
+}
+
+<form class="sd-form" @onsubmit="SubmitAsync">
+    <SdTextField Label="Email" Type="email" Autocomplete="username" @bind-Value="email" />
+    <div class="sd-field">
+        <div class="sd-form-row">
+            <label class="sd-label" for="password">Password</label>
+            <a href="account/forgot-password" class="sd-label">Forgot password?</a>
+        </div>
+        <input id="password" class="sd-input" type="password" autocomplete="current-password" value="@password"
+               @onchange="e => password = e.Value?.ToString()" />
+    </div>
+    <SdCheckbox Label="Remember me" @bind-Checked="remember" />
+    <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Signing in..." : "Sign in")</SdButton>
+</form>
+
+@if (registrationOpen)
+{
+    <p class="sd-auth-footer">New here? <a href="account/register">Create an account</a></p>
+}
+
+@code {
+    private string? email;
+    private string? password;
+    private bool remember = true;
+    private bool busy;
+    private string? error;
+    private bool needsConfirmation;
+    private bool registrationOpen;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            registrationOpen = (await Accounts.GetSettingsAsync()).RegistrationOpen;
+        }
+        catch (HttpRequestException)
+        {
+            registrationOpen = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrEmpty(password))
+        {
+            error = "Enter your email and password.";
+            return;
+        }
+
+        busy = true;
+        error = null;
+        var result = await Accounts.SignInAsync(email.Trim(), password, remember);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            AuthState.Refresh();
+            Navigation.NavigateTo(LocalUrl.Or(ReturnUrl));
+            return;
+        }
+
+        if (result.IsLockedOut)
+        {
+            Navigation.NavigateTo("account/locked-out");
+            return;
+        }
+
+        needsConfirmation = result.IsNotAllowed;
+        error = result.Error;
+    }
+}
