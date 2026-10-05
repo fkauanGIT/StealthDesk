@@ -108,7 +108,7 @@ public static class DatabaseSetup
         .UseNpgsql("Host=localhost;Database=stealthdesk_design")
         .UseApplicationServiceProvider(appServices)
         .Options;
-      return new StealthDeskDb(options);
+      return new StealthDeskDb(options, UnscopedTenant.Instance);
     }
   }
 }
