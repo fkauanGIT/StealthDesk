@@ -19,7 +19,7 @@ public static class TestAccounts
     {
       UserName = email,
       Email = email,
-      TenantId = tenantId ?? await db.Tenants.Select(x => x.Id).FirstAsync(),
+      TenantId = tenantId ?? await TestTenants.EnsureAsync(server),
     };
     var result = await users.CreateAsync(user, Password);
     Assert.True(result.Succeeded, string.Join(", ", result.Errors.Select(x => x.Description)));

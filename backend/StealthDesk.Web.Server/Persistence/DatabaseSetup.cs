@@ -7,8 +7,6 @@ namespace StealthDesk.Web.Server.Persistence;
 
 public static class DatabaseSetup
 {
-  public const string DefaultTenantName = "Default";
-
   /// <summary>
   /// PostgreSQL built from the <c>POSTGRES_*</c> settings, or an in-memory database when
   /// <c>UseInMemoryDatabase</c> is true (optionally named by <c>InMemoryDatabaseName</c>).
@@ -31,8 +29,8 @@ public static class DatabaseSetup
   }
 
   /// <summary>
-  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory),
-  /// makes sure there is a tenant for agents to join and marks every device offline.
+  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory) and marks every device
+  /// offline. Tenants are created by registration, starting with the first user's.
   /// </summary>
   public static async Task PrepareDatabaseAsync(this WebApplication app)
   {
@@ -46,13 +44,6 @@ public static class DatabaseSetup
     else
     {
       await db.Database.EnsureCreatedAsync();
-    }
-
-    if (!await db.Tenants.AnyAsync())
-    {
-      db.Tenants.Add(new TenantRecord { Name = DefaultTenantName });
-      await db.SaveChangesAsync();
-      app.Logger.LogInformation("Created the '{Tenant}' tenant.", DefaultTenantName);
     }
 
     var cleared = await MarkAllOfflineAsync(db);

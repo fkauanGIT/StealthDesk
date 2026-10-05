@@ -121,7 +121,7 @@ public class GatewayTests
     using var server = await ServerHost.OnPostgresAsync();
     await using var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
-    var defaultTenant = await server.WithDbAsync(db => db.Tenants.Select(x => x.Id).SingleAsync());
+    var defaultTenant = await TestTenants.EnsureAsync(server);
 
     // The ids an agent saved from a server whose database was later reset.
     var reply = await agent.ReportAsync(TestAgent.Report(deviceId) with { TenantId = Guid.NewGuid() });

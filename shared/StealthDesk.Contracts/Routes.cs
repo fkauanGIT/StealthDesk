@@ -13,4 +13,5 @@ public static class Routes
   public const string Auth = "/api/auth";
   public const string CurrentUser = "/api/auth/me";
   public const string SignOut = "/api/auth/sign-out";
+  public const string AuthSettings = "/api/auth/settings";
 }

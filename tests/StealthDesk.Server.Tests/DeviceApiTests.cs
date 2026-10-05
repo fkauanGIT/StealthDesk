@@ -23,11 +23,11 @@ public class DeviceApiTests
     using var client = server.CreateClient();
     await server.WithDbAsync(async db =>
     {
-      var tenant = await db.Tenants.SingleAsync();
+      var tenant = new TenantRecord { Name = TestTenants.Name };
       db.Devices.Add(new DeviceRecord
       {
         Id = Guid.NewGuid(),
-        TenantId = tenant.Id,
+        Tenant = tenant,
         Name = "FRONT-DESK",
         Platform = DevicePlatform.Windows,
         IsOnline = true,

@@ -29,6 +29,9 @@ public sealed class TestAgent : IAsyncDisposable
 
   public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null)
   {
+    // Self-registration needs a tenant to join, as a server has once its first user registered.
+    await TestTenants.EnsureAsync(server);
+
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
       .AddTransient<IHubConnectionBuilder>(_ => new HubConnectionBuilder().AddMessagePackProtocol())

@@ -64,6 +64,8 @@ public static class AccountSetup
     });
 
     builder.Services.AddAuthorization();
+    builder.Services.AddSingleton<RegistrationGate>();
+    builder.Services.AddScoped<IRegistration, Registration>();
 
     // Keys in the database instead of the machine: cookies stay valid after a restart and across servers.
     builder.Services

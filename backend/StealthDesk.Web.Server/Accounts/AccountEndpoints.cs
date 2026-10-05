@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.Data;
 using StealthDesk.Contracts.Accounts;
 
 namespace StealthDesk.Web.Server.Accounts;
@@ -9,7 +10,10 @@ public static class AccountEndpoints
   {
     var auth = endpoints.MapGroup(Routes.Auth);
 
-    auth.MapIdentityApi<UserRecord>().AddEndpointFilter(RefuseWhatIsNotEnabled);
+    auth.MapIdentityApi<UserRecord>().AddEndpointFilter(ApplyServerRules);
+
+    auth.MapGet("/settings", async (IRegistration registration, CancellationToken cancellationToken) =>
+      new AccountSettings { RegistrationOpen = await registration.IsOpenAsync(cancellationToken) });
 
     auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db) =>
     {
@@ -20,6 +24,7 @@ public static class AccountEndpoints
       }
 
       var tenantName = await db.Tenants.Where(x => x.Id == user.TenantId).Select(x => x.Name).FirstOrDefaultAsync();
+      var claims = await users.GetClaimsAsync(user);
       return Results.Ok(new CurrentUser
       {
         Id = user.Id,
@@ -29,6 +34,8 @@ public static class AccountEndpoints
         EmailConfirmed = user.EmailConfirmed,
         TwoFactorEnabled = user.TwoFactorEnabled,
         MustChangePassword = user.MustChangePassword,
+        IsServerAdministrator = claims.Any(x => x.Type == StealthDeskClaims.ServerAdministrator),
+        IsTenantAdministrator = claims.Any(x => x.Type == StealthDeskClaims.TenantAdministrator),
       });
     }).RequireAuthorization();
 
@@ -42,18 +49,18 @@ public static class AccountEndpoints
     return endpoints;
   }
 
-  // Bearer tokens only when the server allows them; registration rules arrive with the first-user work (#77).
-  private static async ValueTask<object?> RefuseWhatIsNotEnabled(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+  // Identity's endpoints don't know StealthDesk's rules: who may register, and whether bearer tokens are allowed.
+  private static async ValueTask<object?> ApplyServerRules(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
   {
     var request = context.HttpContext.Request;
     var path = request.Path.Value ?? string.Empty;
-    var accounts = context.HttpContext.RequestServices.GetRequiredService<IOptions<AccountOptions>>().Value;
 
     if (path.EndsWith("/register", StringComparison.OrdinalIgnoreCase))
     {
-      return Results.Problem("Registration is not open.", statusCode: StatusCodes.Status403Forbidden);
+      return await RegisterAsync(context);
     }
 
+    var accounts = context.HttpContext.RequestServices.GetRequiredService<IOptions<AccountOptions>>().Value;
     var wantsCookie = IsTrue(request.Query["useCookies"]) || IsTrue(request.Query["useSessionCookies"]);
     var asksForTokens = (path.EndsWith("/login", StringComparison.OrdinalIgnoreCase) && !wantsCookie)
       || path.EndsWith("/refresh", StringComparison.OrdinalIgnoreCase);
@@ -64,6 +71,33 @@ public static class AccountEndpoints
     }
 
     return await next(context);
+  }
+
+  // Replaces Identity's register, which would create a user without a tenant.
+  private static async Task<IResult> RegisterAsync(EndpointFilterInvocationContext context)
+  {
+    if (context.Arguments.OfType<RegisterRequest>().FirstOrDefault() is not { } request)
+    {
+      return Results.Problem("Invalid registration request.", statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var registration = context.HttpContext.RequestServices.GetRequiredService<IRegistration>();
+    var result = await registration.RegisterAsync(request.Email, request.Password, context.HttpContext.RequestAborted);
+
+    if (result.WasClosed)
+    {
+      // Closed looks like missing: nothing to learn about the server from trying.
+      return Results.NotFound();
+    }
+
+    if (!result.Succeeded)
+    {
+      return Results.ValidationProblem(result.Identity.Errors
+        .GroupBy(x => string.IsNullOrWhiteSpace(x.Code) ? nameof(IdentityError) : x.Code)
+        .ToDictionary(x => x.Key, x => x.Select(error => error.Description).ToArray()));
+    }
+
+    return Results.Ok();
   }
 
   private static bool IsTrue(string? value) => bool.TryParse(value, out var result) && result;

@@ -95,7 +95,7 @@ public class DeviceRegistryTests
   }
 
   private static Task<Guid> DefaultTenant(ServerHost server) =>
-    server.WithDbAsync(db => db.Tenants.Select(x => x.Id).SingleAsync());
+    TestTenants.EnsureAsync(server);
 
   private static Task<StealthDesk.Core.Outcome<DeviceRecord>> Save(
     ServerHost server,

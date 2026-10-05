@@ -9,22 +9,21 @@ namespace StealthDesk.Server.Tests;
 public class ServerStartupTests
 {
   [Fact]
-  public async Task EmptyDatabase_GetsTheDefaultTenant()
+  public async Task NewServer_StartsWithoutTenantsOrUsers()
   {
     using var server = ServerHost.InMemory();
 
-    var tenants = await server.WithDbAsync(db => db.Tenants.ToListAsync());
-
-    Assert.Equal(DatabaseSetup.DefaultTenantName, Assert.Single(tenants).Name);
+    Assert.False(await server.WithDbAsync(db => db.Tenants.AnyAsync()));
+    Assert.False(await server.WithDbAsync(db => db.Users.AnyAsync()));
   }
 
   [Fact]
-  public async Task Restart_DoesNotAddASecondTenant()
+  public async Task Restart_KeepsTheTenantsThereAre()
   {
     var database = Guid.NewGuid().ToString("N");
     using (var firstRun = ServerHost.InMemory(database))
     {
-      Assert.Single(await firstRun.WithDbAsync(db => db.Tenants.ToListAsync()));
+      await TestTenants.CreateAsync(firstRun);
     }
 
     using var secondRun = ServerHost.InMemory(database);
@@ -53,7 +52,7 @@ public class ServerStartupTests
     var pending = await server.WithDbAsync(db => db.Database.GetPendingMigrationsAsync());
 
     Assert.Empty(pending);
-    Assert.Single(await server.WithDbAsync(db => db.Tenants.ToListAsync()));
+    Assert.False(await server.WithDbAsync(db => db.Tenants.AnyAsync()));
   }
 
   [Fact]
@@ -103,8 +102,8 @@ public class ServerStartupTests
     var deviceId = Guid.NewGuid();
     await firstRun.WithDbAsync(async db =>
     {
-      var tenantId = await db.Tenants.Select(x => x.Id).SingleAsync();
-      db.Devices.Add(new DeviceRecord { Id = deviceId, TenantId = tenantId, IsOnline = true, ConnectionId = "lost" });
+      var tenant = new TenantRecord { Name = TestTenants.Name };
+      db.Devices.Add(new DeviceRecord { Id = deviceId, Tenant = tenant, IsOnline = true, ConnectionId = "lost" });
       return await db.SaveChangesAsync();
     });
 

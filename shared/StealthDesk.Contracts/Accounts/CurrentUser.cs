@@ -10,4 +10,6 @@ public sealed record CurrentUser
   public bool EmailConfirmed { get; init; }
   public bool TwoFactorEnabled { get; init; }
   public bool MustChangePassword { get; init; }
+  public bool IsServerAdministrator { get; init; }
+  public bool IsTenantAdministrator { get; init; }
 }

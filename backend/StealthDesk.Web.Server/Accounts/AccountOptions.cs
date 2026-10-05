@@ -14,4 +14,13 @@ public sealed class AccountOptions
 
   /// <summary>When false, several accounts may share an email address, or have none.</summary>
   public bool RequireUniqueEmail { get; set; } = true;
+
+  /// <summary>Anyone can register at any time; each registration creates its own tenant.</summary>
+  public bool EnablePublicRegistration { get; set; }
+
+  /// <summary>
+  /// Closes the one-time registration a server allows while it has no users, which makes the first user its
+  /// administrator. Independent of <see cref="EnablePublicRegistration"/>.
+  /// </summary>
+  public bool DisableFirstUserSelfRegistration { get; set; }
 }
