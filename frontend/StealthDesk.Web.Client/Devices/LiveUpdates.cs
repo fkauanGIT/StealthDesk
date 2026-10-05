@@ -21,6 +21,9 @@ public interface ILiveUpdates
 
   /// <summary>Connects and keeps trying until it does; calling it again does nothing.</summary>
   Task StartAsync();
+
+  /// <summary>Closes the connection, e.g. on sign-out, so the next start connects as whoever signs in.</summary>
+  Task StopAsync();
 }
 
 public sealed class LiveUpdates(
@@ -32,7 +35,7 @@ public sealed class LiveUpdates(
   private static readonly TimeSpan[] _retryDelays =
     [TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10)];
 
-  private readonly CancellationTokenSource _stopping = new();
+  private CancellationTokenSource _stopping = new();
   private HubConnection? _connection;
 
   public event Action? StateChanged;
@@ -74,6 +77,13 @@ public sealed class LiveUpdates(
       {
         return;
       }
+      catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+      {
+        // Retrying can't help without a session; signing in again starts the connection anew.
+        await StopAsync();
+        store.ReportSessionExpired();
+        return;
+      }
       catch (Exception ex)
       {
         logger.LogWarning(ex, "Could not connect to live updates; retrying.");
@@ -81,14 +91,22 @@ public sealed class LiveUpdates(
     }
   }
 
-  public async ValueTask DisposeAsync()
+  public async Task StopAsync()
   {
     await _stopping.CancelAsync();
-    if (_connection is not null)
+    var connection = _connection;
+    _connection = null;
+    _stopping = new CancellationTokenSource();
+    await SetState(LiveState.Connecting);
+    if (connection is not null)
     {
-      await _connection.DisposeAsync();
+      await connection.DisposeAsync();
     }
+  }
 
+  public async ValueTask DisposeAsync()
+  {
+    await StopAsync();
     _stopping.Dispose();
   }
 

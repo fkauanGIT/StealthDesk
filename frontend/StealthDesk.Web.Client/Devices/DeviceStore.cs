@@ -18,6 +18,9 @@ public sealed class DeviceStore(HttpClient http)
   /// <summary>Raised whenever <see cref="Devices"/> or <see cref="Error"/> changes.</summary>
   public event Action? Changed;
 
+  /// <summary>Raised when the server refuses the session, so the user can sign in again instead of seeing errors.</summary>
+  public event Action? SessionExpired;
+
   /// <summary>Ordered by name; null until the first load finishes.</summary>
   public IReadOnlyList<DeviceSummary>? Devices { get; private set; }
 
@@ -47,6 +50,11 @@ public sealed class DeviceStore(HttpClient http)
       _loaded = true;
       Error = null;
     }
+    catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+    {
+      ReportSessionExpired();
+      return;
+    }
     catch (Exception ex) when (ex is HttpRequestException or JsonException)
     {
       Error = "Could not load the devices. Check that the server is running.";
@@ -70,6 +78,12 @@ public sealed class DeviceStore(HttpClient http)
     try
     {
       using var response = await http.GetAsync(Routes.Device(id));
+      if (response.StatusCode == HttpStatusCode.Unauthorized)
+      {
+        ReportSessionExpired();
+        return DeviceLookup.Failed;
+      }
+
       if (response.StatusCode == HttpStatusCode.NotFound)
       {
         return DeviceLookup.NotFound;
@@ -111,6 +125,15 @@ public sealed class DeviceStore(HttpClient http)
     _devices[device.Id] = device;
     _changedWhileLoading?.Add(device.Id);
     Publish();
+  }
+
+  /// <summary>The session is gone; anything shown so far belongs to it.</summary>
+  public void ReportSessionExpired()
+  {
+    _devices = [];
+    _loaded = false;
+    Devices = null;
+    SessionExpired?.Invoke();
   }
 
   private void Publish()
