@@ -1,0 +1,28 @@
+@page "/account/email-confirmed"
+
+<PageTitle>Email confirmation · StealthDesk</PageTitle>
+
+@if (Failed)
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">This link didn't work</h1>
+        <p class="sd-auth-subtitle">It may be incomplete, already used or expired.</p>
+    </header>
+    <p class="sd-auth-footer"><a href="account/resend-confirmation">Send a new link</a></p>
+}
+else
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">Email confirmed</h1>
+        <p class="sd-auth-subtitle">Thanks — your address is confirmed.</p>
+    </header>
+    <SdButton Block="true" OnClick="@(() => Navigation.NavigateTo("account/sign-in"))">Sign in</SdButton>
+}
+
+@code {
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    public bool Failed { get; set; }
+}

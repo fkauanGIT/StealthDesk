@@ -129,13 +129,9 @@ to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
 
 ## Running the Agent
 
-The agent runs on Windows. Agents join a tenant, so on a new server register the first user before starting one
-(in PowerShell):
-
-```powershell
-$account = @{ email = "admin@example.com"; password = "Choose-a-Passw0rd" } | ConvertTo-Json
-Invoke-RestMethod http://localhost:5099/api/auth/register -Method Post -Body $account -ContentType "application/json"
-```
+The agent runs on Windows. Agents join a tenant, so on a new server create the first account before starting one:
+open `http://localhost:5099`, choose **Create an account** on the sign-in page and register. You become the server
+administrator and land on the device list.
 
 With the server running (see above), open a second terminal and start the agent:
 
@@ -143,17 +139,18 @@ With the server running (see above), open a second terminal and start the agent:
 dotnet run --project agent/StealthDesk.Agent -- run
 ```
 
-In a few seconds the machine appears in the device list with `isOnline: true`. The list needs a signed-in user of
-the device's tenant (in PowerShell, with `$account` from the registration above):
+In a few seconds the machine appears in the list as online, without refreshing the page. Stop the agent with
+`Ctrl+C` and it turns offline; start it again and the same device comes back online.
+
+Scripts can do the same through the API (in PowerShell):
 
 ```powershell
+$account = @{ email = "admin@example.com"; password = "Choose-a-Passw0rd" } | ConvertTo-Json
+Invoke-RestMethod http://localhost:5099/api/auth/register -Method Post -Body $account -ContentType "application/json"
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 Invoke-WebRequest "http://localhost:5099/api/auth/login?useCookies=true" -Method Post -Body $account -ContentType "application/json" -WebSession $session | Out-Null
 Invoke-RestMethod http://localhost:5099/api/v1/devices -WebSession $session
 ```
-
-Stop the agent with `Ctrl+C` and the device is marked offline; start it again and the same device comes back
-online.
 
 On its first run the agent creates its key pair, and the server assigns the device an id with the first
 accepted report. Both are saved and reused on every later run: that is the device's identity.

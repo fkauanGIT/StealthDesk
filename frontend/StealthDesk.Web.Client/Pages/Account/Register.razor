@@ -1,0 +1,102 @@
+@page "/account/register"
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Create an account · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">Create your account</h1>
+    <p class="sd-auth-subtitle">Your account gets its own space for devices.</p>
+</header>
+
+@if (settings is null)
+{
+    <SdLoading Text="Checking registration..." />
+}
+else if (!settings.RegistrationOpen)
+{
+    <SdAlert Tone="Tone.Info">Registration is closed on this server. Ask an administrator to invite you.</SdAlert>
+    <p class="sd-auth-footer"><a href="account/sign-in">Back to sign in</a></p>
+}
+else
+{
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    <form class="sd-form" @onsubmit="SubmitAsync">
+        <SdTextField Label="Email" Type="email" Autocomplete="username" @bind-Value="email" Error="@emailError" />
+        <SdTextField Label="Password" Type="password" Autocomplete="new-password" @bind-Value="password" Error="@passwordError"
+                     Hint="At least 8 characters, with upper and lower case letters and a digit." />
+        <SdTextField Label="Confirm password" Type="password" Autocomplete="new-password" @bind-Value="confirmation" Error="@confirmationError" />
+        <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Creating..." : "Create account")</SdButton>
+    </form>
+
+    <p class="sd-auth-footer">Already have an account? <a href="account/sign-in">Sign in</a></p>
+}
+
+@code {
+    private AccountSettings? settings;
+    private string? email;
+    private string? password;
+    private string? confirmation;
+    private bool busy;
+    private string? error;
+    private string? emailError;
+    private string? passwordError;
+    private string? confirmationError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            settings = await Accounts.GetSettingsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            settings = new AccountSettings();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        error = emailError = passwordError = confirmationError = null;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            emailError = "Enter your email address.";
+            return;
+        }
+
+        if (password != confirmation)
+        {
+            confirmationError = "The passwords don't match.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.RegisterAsync(email.Trim(), password ?? string.Empty);
+        if (!result.Succeeded)
+        {
+            busy = false;
+            emailError = FieldErrors.ForEmail(result);
+            passwordError = FieldErrors.ForPassword(result);
+            error = emailError is null && passwordError is null ? FieldErrors.Remaining(result) : null;
+            return;
+        }
+
+        // Straight in when the account can be used now; otherwise the email has to be confirmed first.
+        var signIn = await Accounts.SignInAsync(email.Trim(), password!, remember: true);
+        busy = false;
+        if (signIn.Succeeded)
+        {
+            AuthState.Refresh();
+            Navigation.NavigateTo(string.Empty);
+        }
+        else
+        {
+            Navigation.NavigateTo($"account/register-confirmation?email={Uri.EscapeDataString(email.Trim())}");
+        }
+    }
+}

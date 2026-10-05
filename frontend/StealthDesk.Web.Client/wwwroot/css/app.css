@@ -124,6 +124,59 @@ a:hover {
   box-shadow: inset 2px 0 0 var(--sd-accent-text);
 }
 
+.sd-user {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: 10px;
+  background: var(--sd-surface);
+}
+
+.sd-avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--sd-accent-soft);
+  font-size: var(--sd-text-sm);
+  font-weight: 600;
+}
+
+.sd-user-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sd-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sd-text-sm);
+  font-weight: 500;
+}
+
+.sd-user-role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sd-text-xs);
+  color: var(--sd-text-muted);
+}
+
+.sd-user .sd-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
 .sd-content {
   flex: 999 1 560px;
   min-width: 0;
@@ -170,6 +223,83 @@ a:hover {
 
 .sd-page-header .sd-push {
   margin-left: auto;
+}
+
+/* ---------- Account pages ---------- */
+
+.sd-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sd-space-12) var(--sd-space-4);
+  background-color: var(--sd-ground);
+  background-image: radial-gradient(var(--sd-border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.sd-auth-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+  padding: 40px 36px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-xl);
+  background: var(--sd-sunken);
+  box-shadow: var(--sd-shadow-overlay);
+}
+
+@media (max-width: 480px) {
+  .sd-auth-card {
+    padding: var(--sd-space-8) var(--sd-space-5);
+  }
+}
+
+.sd-auth-brand {
+  align-self: center;
+  color: var(--sd-text);
+}
+
+.sd-auth-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  text-align: center;
+}
+
+.sd-auth-title {
+  font-size: var(--sd-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sd-auth-subtitle {
+  font-size: var(--sd-text-md);
+  color: var(--sd-text-muted);
+}
+
+.sd-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-4);
+}
+
+.sd-form-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.sd-auth-footer {
+  text-align: center;
+  font-size: var(--sd-text-md);
+  color: var(--sd-text-muted);
+}
+
+.sd-auth-footer a {
+  font-weight: 600;
 }
 
 /* ---------- Button ---------- */

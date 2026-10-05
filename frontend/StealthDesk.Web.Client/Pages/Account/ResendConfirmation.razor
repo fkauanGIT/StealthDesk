@@ -1,0 +1,55 @@
+@page "/account/resend-confirmation"
+@inject AccountApi Accounts
+
+<PageTitle>Confirm your email · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">Confirm your email</h1>
+    <p class="sd-auth-subtitle">We'll send the confirmation link again.</p>
+</header>
+
+@if (sent)
+{
+    <SdAlert Tone="Tone.Info">If an account uses @email and isn't confirmed yet, a new link is on its way.</SdAlert>
+}
+else
+{
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    <form class="sd-form" @onsubmit="SubmitAsync">
+        <SdTextField Label="Email" Type="email" Autocomplete="username" @bind-Value="email" />
+        <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Sending..." : "Send the link")</SdButton>
+    </form>
+}
+
+<p class="sd-auth-footer"><a href="account/sign-in">Back to sign in</a></p>
+
+@code {
+    private string? email;
+    private bool busy;
+    private bool sent;
+    private string? error;
+
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? InitialEmail { get; set; }
+
+    protected override void OnInitialized() => email = InitialEmail;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            error = "Enter your email address.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.ResendConfirmationAsync(email.Trim());
+        busy = false;
+        sent = result.Succeeded;
+        error = result.Succeeded ? null : result.Error;
+    }
+}
