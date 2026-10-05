@@ -102,6 +102,7 @@ Account rules come from the `Accounts` section of `appsettings.json`:
 | `RequireUniqueEmail` | `true` | When false, several accounts may share an email. |
 | `EnablePublicRegistration` | `false` | Lets anyone register at any time; each registration gets its own tenant. |
 | `DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
+| `RequireConfirmedEmail` | `false` | Users must confirm their email before signing in. Needs email sending. |
 
 A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
 tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
@@ -109,6 +110,22 @@ Agents can only join once that first tenant exists.
 
 Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
 passwords in a row lock the account for five minutes.
+
+### Email
+
+Account emails (confirm the address, reset the password, confirm a new email) go out by SMTP, configured in the
+`Email` section:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `DisableSending` | `false` (`true` in development) | Sends nothing. In development the messages, links included, are written to the server log. |
+| `SmtpHost`, `SmtpPort` | empty, `587` | The SMTP server. Port 465 uses TLS from the start; others use STARTTLS when offered. |
+| `SmtpUserName`, `SmtpPassword` | empty | Credentials, when the server needs them. |
+| `SenderName`, `SenderAddress` | `StealthDesk`, empty | Who the messages come from. |
+
+The first user's email is confirmed right away, and so is everyone's while sending is disabled. A message that can't
+be delivered is logged and can be asked for again; it never fails the registration or the reset. The server refuses
+to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
 
 ## Running the Agent
 

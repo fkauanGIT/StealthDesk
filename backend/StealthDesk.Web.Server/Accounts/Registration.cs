@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using StealthDesk.Web.Server.Email;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -25,6 +26,8 @@ public sealed class Registration(
   StealthDeskDb db,
   RegistrationGate gate,
   IOptionsMonitor<AccountOptions> options,
+  IOptionsMonitor<EmailOptions> emailOptions,
+  AccountEmails emails,
   ILogger<Registration> logger) : IRegistration
 {
   public async Task<bool> IsOpenAsync(CancellationToken cancellationToken = default)
@@ -62,9 +65,17 @@ public sealed class Registration(
     if (serverAdministrator)
     {
       await users.AddClaimAsync(user, StealthDeskClaims.Marker(StealthDeskClaims.ServerAdministrator));
+    }
 
-      // Nobody could confirm it otherwise on a server that has no email set up yet.
-      await users.ConfirmEmailAsync(user, await users.GenerateEmailConfirmationTokenAsync(user));
+    // The first user, and anyone on a server that sends no email, could never get the link: confirmed right away.
+    var confirmation = await users.GenerateEmailConfirmationTokenAsync(user);
+    if (serverAdministrator || emailOptions.CurrentValue.DisableSending)
+    {
+      await users.ConfirmEmailAsync(user, confirmation);
+    }
+    else
+    {
+      await emails.SendRegistrationConfirmationAsync(user, confirmation);
     }
 
     logger.LogInformation(

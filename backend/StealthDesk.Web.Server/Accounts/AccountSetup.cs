@@ -27,6 +27,7 @@ public static class AccountSetup
       {
         ConfigureStores(options);
         options.User.RequireUniqueEmail = accounts.RequireUniqueEmail;
+        options.SignIn.RequireConfirmedEmail = accounts.RequireConfirmedEmail;
         options.Password.RequiredLength = 8;
         options.Password.RequireNonAlphanumeric = false;
         options.Lockout.AllowedForNewUsers = true;
