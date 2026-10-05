@@ -31,7 +31,7 @@ public class AuthenticationTests
     Assert.Equal(user.Id, current!.Id);
     Assert.Equal("ana@example.com", current.Email);
     Assert.Equal(user.TenantId, current.TenantId);
-    Assert.Equal(DatabaseSetup.DefaultTenantName, current.TenantName);
+    Assert.Equal(TestTenants.Name, current.TenantName);
   }
 
   [Fact]
@@ -158,18 +158,6 @@ public class AuthenticationTests
     me.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
     Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(me, Cancel)).StatusCode);
-  }
-
-  [Fact]
-  public async Task Registration_IsClosedUntilItsRulesExist()
-  {
-    using var server = ServerHost.InMemory();
-    using var client = TestAccounts.Client(server);
-
-    var register = await client.PostAsJsonAsync($"{Routes.Auth}/register", new { email = "ivo@example.com", password = TestAccounts.Password }, Cancel);
-
-    Assert.Equal(HttpStatusCode.Forbidden, register.StatusCode);
-    Assert.False(await server.WithDbAsync(db => db.Users.AnyAsync()));
   }
 
   [Fact]

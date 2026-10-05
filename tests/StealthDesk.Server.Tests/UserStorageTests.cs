@@ -40,7 +40,7 @@ public class UserStorageTests
     var stored = await server.WithDbAsync(db => db.Users.Include(x => x.Tenant).SingleAsync(x => x.Id == created));
     Assert.Equal("ana@example.com", stored.Email);
     Assert.Equal(tenantId, stored.TenantId);
-    Assert.Equal(DatabaseSetup.DefaultTenantName, stored.Tenant!.Name);
+    Assert.Equal(TestTenants.Name, stored.Tenant!.Name);
     Assert.Equal(AccountType.Member, stored.AccountType);
     Assert.False(stored.MustChangePassword);
   }
@@ -136,7 +136,7 @@ public class UserStorageTests
   private static UserRecord NewUser(string email, Guid tenantId) => new() { UserName = email, Email = email, TenantId = tenantId };
 
   private static Task<Guid> DefaultTenant(ServerHost server) =>
-    server.WithDbAsync(db => db.Tenants.Select(x => x.Id).SingleAsync());
+    TestTenants.EnsureAsync(server);
 
   private static async Task<T> Users<T>(ServerHost server, Func<UserManager<UserRecord>, Task<T>> action)
   {
