@@ -1,5 +1,6 @@
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
+using StealthDesk.Web.Server.Email;
 using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
@@ -14,6 +15,7 @@ public static class ServerSetup
     builder.AddObservability(ServiceNames.Server);
     builder.AddStealthDeskDatabase();
     builder.AddStealthDeskAccounts();
+    builder.AddStealthDeskEmail();
 
     builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection(GatewayOptions.Section));
     builder.Services.AddSignalR().AddMessagePackProtocol();

@@ -9,7 +9,7 @@ public static class TestAccounts
 {
   public const string Password = "Correct-horse-9";
 
-  public static async Task<UserRecord> CreateUserAsync(ServerHost server, string email, Guid? tenantId = null)
+  public static async Task<UserRecord> CreateUserAsync(ServerHost server, string email, Guid? tenantId = null, bool confirmed = false)
   {
     await using var scope = server.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<StealthDeskDb>();
@@ -20,6 +20,7 @@ public static class TestAccounts
       UserName = email,
       Email = email,
       TenantId = tenantId ?? await TestTenants.EnsureAsync(server),
+      EmailConfirmed = confirmed,
     };
     var result = await users.CreateAsync(user, Password);
     Assert.True(result.Succeeded, string.Join(", ", result.Errors.Select(x => x.Description)));

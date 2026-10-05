@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
@@ -7,6 +8,7 @@ namespace StealthDesk.Server.Tests.Infrastructure;
 public sealed class ServerHost : WebApplicationFactory<Program>
 {
   private readonly Dictionary<string, string?> _settings;
+  private readonly List<Action<IServiceCollection>> _services = [];
 
   private ServerHost(Dictionary<string, string?> settings)
   {
@@ -48,6 +50,18 @@ public sealed class ServerHost : WebApplicationFactory<Program>
     return await action(scope.ServiceProvider.GetRequiredService<StealthDeskDb>());
   }
 
+  /// <summary>Replaces services after the server's own registrations. Only before the server starts.</summary>
+  public ServerHost WithServices(Action<IServiceCollection> configure)
+  {
+    _services.Add(configure);
+    return this;
+  }
+
+  /// <summary>Captures account emails instead of sending them, with sending turned on.</summary>
+  public ServerHost WithCapturedEmails(CapturedEmails emails) =>
+    With("Email:DisableSending", "false")
+      .WithServices(services => services.AddSingleton<StealthDesk.Web.Server.Email.IEmailTransport>(emails));
+
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
     builder.UseEnvironment("Development");
@@ -55,5 +69,13 @@ public sealed class ServerHost : WebApplicationFactory<Program>
     {
       builder.UseSetting(key, value);
     }
+
+    builder.ConfigureTestServices(services =>
+    {
+      foreach (var configure in _services)
+      {
+        configure(services);
+      }
+    });
   }
 }

@@ -15,6 +15,9 @@ public sealed class AccountOptions
   /// <summary>When false, several accounts may share an email address, or have none.</summary>
   public bool RequireUniqueEmail { get; set; } = true;
 
+  /// <summary>Users must confirm their email address before they can sign in. Needs email sending.</summary>
+  public bool RequireConfirmedEmail { get; set; }
+
   /// <summary>Anyone can register at any time; each registration creates its own tenant.</summary>
   public bool EnablePublicRegistration { get; set; }
 
