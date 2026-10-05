@@ -1,18 +1,29 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Web.Server.Accounts;
 
 namespace StealthDesk.Web.Server.Dashboard;
 
 /// <summary>
 /// The realtime endpoint browsers stay connected to. Kept apart from the agent gateway: agents prove who they are
-/// with a key, while dashboards are tied to a signed-in user, who counts as online while connected.
+/// with a key, while dashboards are tied to a signed-in user, who counts as online while connected and only hears
+/// about their own tenant's devices.
 /// </summary>
+[Authorize]
 public sealed class DashboardHub(UserManager<UserRecord> users, TimeProvider clock, ILogger<DashboardHub> logger)
   : Hub<IDashboardCallbacks>
 {
+  public static string TenantGroup(Guid tenantId) => $"tenant:{tenantId}";
+
   public override async Task OnConnectedAsync()
   {
+    if (Context.User?.GetTenantId() is { } tenantId)
+    {
+      await Groups.AddToGroupAsync(Context.ConnectionId, TenantGroup(tenantId));
+    }
+
     await base.OnConnectedAsync();
     await MarkUser(online: true);
   }

@@ -12,7 +12,7 @@ public class DashboardHubTests
   public async Task Dashboard_AcceptsBrowserConnections()
   {
     using var server = ServerHost.InMemory();
-    await using var dashboard = await TestDashboard.ConnectAsync(server);
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
 
     Assert.Equal(HubConnectionState.Connected, dashboard.Connection.State);
   }
@@ -21,7 +21,7 @@ public class DashboardHubTests
   public async Task DeviceChanged_SentByTheServer_ReachesConnectedDashboards()
   {
     using var server = ServerHost.InMemory();
-    await using var dashboard = await TestDashboard.ConnectAsync(server);
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
 
     var sent = new DeviceSummary
     {

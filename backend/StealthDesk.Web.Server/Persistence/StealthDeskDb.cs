@@ -2,13 +2,18 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using StealthDesk.Web.Server.Accounts;
 
 namespace StealthDesk.Web.Server.Persistence;
 
 // Users without Identity roles: access is decided by StealthDesk's own permissions.
-public class StealthDeskDb(DbContextOptions<StealthDeskDb> options)
+public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope tenantScope)
   : IdentityUserContext<UserRecord, Guid>(options), IDataProtectionKeyContext
 {
+  // Read on every query, not when the context is created: signing in validates the cookie against the database,
+  // which creates the request's context before the user is known.
+  private Guid? CurrentTenantId => tenantScope.TenantId;
+
   public DbSet<TenantRecord> Tenants => Set<TenantRecord>();
   public DbSet<DeviceRecord> Devices => Set<DeviceRecord>();
 
@@ -59,6 +64,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options)
       device.Property(x => x.OsArchitecture).HasConversion<string>().HasMaxLength(20);
       device.OwnsMany(x => x.Disks, disks => disks.ToJson());
       device.HasIndex(x => x.TenantId);
+      device.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });
 
     modelBuilder.Entity<UserRecord>(user =>
@@ -66,6 +72,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options)
       user.ToTable("users");
       user.Property(x => x.AccountType).HasConversion<string>().HasMaxLength(20);
       user.HasIndex(x => x.TenantId);
+      user.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });
 
     modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");

@@ -20,7 +20,7 @@ public sealed class DeviceNotifier(
   {
     try
     {
-      await dashboards.Clients.All.DeviceChanged(DeviceEndpoints.ToSummary(device));
+      await dashboards.Clients.Group(DashboardHub.TenantGroup(device.TenantId)).DeviceChanged(DeviceEndpoints.ToSummary(device));
     }
     catch (Exception ex)
     {

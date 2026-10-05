@@ -8,7 +8,7 @@ public class DeviceApiTests
   public async Task Devices_IsEmptyWhenNothingReported()
   {
     using var server = ServerHost.InMemory();
-    using var client = server.CreateClient();
+    using var client = await TestAccounts.SignedInClientAsync(server);
 
     var devices = await client.GetFromJsonAsync<List<DeviceSummary>>(Routes.Devices, TestContext.Current.CancellationToken);
 
@@ -20,14 +20,14 @@ public class DeviceApiTests
   public async Task Devices_ListsStoredDevices()
   {
     using var server = ServerHost.InMemory();
-    using var client = server.CreateClient();
+    using var client = await TestAccounts.SignedInClientAsync(server);
+    var tenantId = await TestTenants.EnsureAsync(server);
     await server.WithDbAsync(async db =>
     {
-      var tenant = new TenantRecord { Name = TestTenants.Name };
       db.Devices.Add(new DeviceRecord
       {
         Id = Guid.NewGuid(),
-        Tenant = tenant,
+        TenantId = tenantId,
         Name = "FRONT-DESK",
         Platform = DevicePlatform.Windows,
         IsOnline = true,
@@ -52,7 +52,7 @@ public class DeviceApiTests
     await using var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
     await agent.ReportAsync(TestAgent.Report(deviceId));
-    using var client = server.CreateClient();
+    using var client = await TestAccounts.SignedInClientAsync(server);
 
     var device = await client.GetFromJsonAsync<DeviceSummary>(Routes.Device(deviceId), TestContext.Current.CancellationToken);
 
@@ -70,7 +70,7 @@ public class DeviceApiTests
   public async Task Device_UnknownId_IsNotFound()
   {
     using var server = ServerHost.InMemory();
-    using var client = server.CreateClient();
+    using var client = await TestAccounts.SignedInClientAsync(server);
 
     var response = await client.GetAsync(Routes.Device(Guid.NewGuid()), TestContext.Current.CancellationToken);
 

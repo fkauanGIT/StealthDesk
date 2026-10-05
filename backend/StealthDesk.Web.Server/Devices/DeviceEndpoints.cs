@@ -2,9 +2,12 @@ namespace StealthDesk.Web.Server.Devices;
 
 public static class DeviceEndpoints
 {
+  // Signed-in users only; the database filters by their tenant, so a device of another tenant is simply not found.
   public static IEndpointRouteBuilder MapDeviceEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    endpoints.MapGet(Routes.Devices, async (StealthDeskDb db, CancellationToken cancellationToken) =>
+    var devices = endpoints.MapGroup(string.Empty).RequireAuthorization();
+
+    devices.MapGet(Routes.Devices, async (StealthDeskDb db, CancellationToken cancellationToken) =>
     {
       var devices = await db.Devices
         .AsNoTracking()
@@ -14,7 +17,7 @@ public static class DeviceEndpoints
       return devices.Select(ToSummary);
     });
 
-    endpoints.MapGet($"{Routes.Devices}/{{id:guid}}", async (Guid id, StealthDeskDb db, CancellationToken cancellationToken) =>
+    devices.MapGet($"{Routes.Devices}/{{id:guid}}", async (Guid id, StealthDeskDb db, CancellationToken cancellationToken) =>
     {
       var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
       return device is null ? Results.NotFound() : Results.Ok(ToSummary(device));

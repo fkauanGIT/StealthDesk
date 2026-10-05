@@ -65,6 +65,8 @@ public static class AccountSetup
     });
 
     builder.Services.AddAuthorization();
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<ITenantScope, RequestTenantScope>();
     builder.Services.AddSingleton<RegistrationGate>();
     builder.Services.AddScoped<IRegistration, Registration>();
 

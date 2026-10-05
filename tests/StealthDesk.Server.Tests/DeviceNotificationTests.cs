@@ -15,7 +15,7 @@ public class DeviceNotificationTests
   public async Task AcceptedReport_ReachesDashboardsAsOnline()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectAsync(server);
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
 
@@ -36,7 +36,7 @@ public class DeviceNotificationTests
   public async Task AgentDisconnecting_ReachesDashboardsAsOffline()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectAsync(server);
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
     await agent.ReportAsync(TestAgent.Report(deviceId));
@@ -53,7 +53,7 @@ public class DeviceNotificationTests
   public async Task RefusedReport_IsNotSentToDashboards()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectAsync(server);
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
     var envelope = agent.Signer.Sign(TestAgent.Report(Guid.NewGuid()), agent.Keys.PrivateKey);
 

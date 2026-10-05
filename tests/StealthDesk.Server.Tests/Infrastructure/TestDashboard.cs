@@ -21,6 +21,14 @@ public sealed class TestDashboard : IAsyncDisposable
 
   public HubConnection Connection { get; }
 
+  /// <summary>Connects as a new user of the test tenant, the one test agents join.</summary>
+  public static async Task<TestDashboard> ConnectSignedInAsync(ServerHost server)
+  {
+    var email = $"viewer-{Guid.NewGuid():N}@example.com";
+    await TestAccounts.CreateUserAsync(server, email);
+    return await ConnectAsync(server, await TestAccounts.SignInForCookieAsync(server, email));
+  }
+
   /// <param name="cookie">A session cookie from <see cref="TestAccounts.SignInForCookieAsync"/>, to connect as that user.</param>
   public static async Task<TestDashboard> ConnectAsync(ServerHost server, string? cookie = null)
   {

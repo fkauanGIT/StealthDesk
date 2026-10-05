@@ -12,7 +12,9 @@ public class LiveDeviceListTests
   public async Task AgentGoingOnlineAndOffline_ReachesTheStoreWithoutReloading()
   {
     using var server = ServerHost.InMemory();
-    var store = new DeviceStore(server.CreateClient());
+    using var client = await TestAccounts.SignedInClientAsync(server);
+    var cookie = client.DefaultRequestHeaders.GetValues("Cookie").Single();
+    var store = new DeviceStore(client);
     await using var live = new LiveUpdates(
       store,
       new Uri(server.Server.BaseAddress, Routes.Dashboard),
@@ -21,6 +23,7 @@ public class LiveDeviceListTests
       {
         options.HttpMessageHandlerFactory = _ => server.Server.CreateHandler();
         options.Transports = HttpTransportType.LongPolling;
+        options.Headers["Cookie"] = cookie;
       });
 
     await live.StartAsync();

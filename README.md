@@ -143,10 +143,13 @@ With the server running (see above), open a second terminal and start the agent:
 dotnet run --project agent/StealthDesk.Agent -- run
 ```
 
-In a few seconds the machine appears in the device list with `isOnline: true`:
+In a few seconds the machine appears in the device list with `isOnline: true`. The list needs a signed-in user of
+the device's tenant (in PowerShell, with `$account` from the registration above):
 
-```
-curl http://localhost:5099/api/v1/devices
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-WebRequest "http://localhost:5099/api/auth/login?useCookies=true" -Method Post -Body $account -ContentType "application/json" -WebSession $session | Out-Null
+Invoke-RestMethod http://localhost:5099/api/v1/devices -WebSession $session
 ```
 
 Stop the agent with `Ctrl+C` and the device is marked offline; start it again and the same device comes back
@@ -169,9 +172,9 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | Path | Transport | Purpose |
 |------|-----------|---------|
 | `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports. |
-| `/hubs/dashboard` | WebSockets | SignalR hub browsers connect to for live device updates. |
-| `/api/v1/devices` | HTTP | Lists the devices known to the server. |
-| `/api/v1/devices/{id}` | HTTP | Returns one device, or 404 if the server doesn't know it. |
+| `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
+| `/api/v1/devices` | HTTP | Lists the devices of the signed-in user's tenant; 401 when signed out. |
+| `/api/v1/devices/{id}` | HTTP | Returns one of the tenant's devices, or 404 for an unknown device or one of another tenant. |
 | `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
 | `/api/auth/register` | HTTP | Registers following the account rules above; 404 while registration is closed. |
 | `/api/auth/settings` | HTTP | Whether registration is open, for the sign-up page. |
