@@ -31,6 +31,24 @@ public class AccountEmailTests
   }
 
   [Fact]
+  public async Task ConfirmationLink_EndsOnTheWebClientPage()
+  {
+    var emails = new CapturedEmails();
+    using var server = ServerHost.InMemory().WithCapturedEmails(emails);
+    await TestAccounts.CreateUserAsync(server, "gil@example.com");
+    using var client = server.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+    await client.PostAsJsonAsync($"{Routes.Auth}/resendConfirmationEmail", new { email = "gil@example.com" }, Cancel);
+    var link = CapturedEmails.LinkIn(emails.To("gil@example.com"));
+
+    var confirmed = await client.GetAsync(link, Cancel);
+    var broken = await client.GetAsync(link.Replace("code=", "code=x", StringComparison.Ordinal), Cancel);
+
+    Assert.Equal(HttpStatusCode.Redirect, confirmed.StatusCode);
+    Assert.Equal("/account/email-confirmed", confirmed.Headers.Location!.OriginalString);
+    Assert.Equal("/account/email-confirmed?failed=true", broken.Headers.Location!.OriginalString);
+  }
+
+  [Fact]
   public async Task FirstUser_IsConfirmedWithoutAnEmail()
   {
     var emails = new CapturedEmails();
