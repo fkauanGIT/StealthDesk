@@ -21,7 +21,7 @@ a Windows machine running the agent shows up in the server's device list, online
 - It connects to the SignalR hub at `/hubs/agent`, retries with backoff and jitter, and sends a heartbeat every
   5 minutes (10 seconds in debug)
 - The server verifies each signature, rejects stale messages and key changes, and saves the device
-- Devices are marked offline when their agent disconnects, and a default tenant is created on startup
+- Devices are marked offline when their agent disconnects
 - Devices can be listed through the REST API
 
 **v0.2 - Live device dashboard** ([#24](https://github.com/fkauanGIT/StealthDesk/issues/24)) is complete: the
@@ -100,13 +100,27 @@ Account rules come from the `Accounts` section of `appsettings.json`:
 | `BearerTokenLifetime` | `01:00:00` | How long a bearer token lasts. |
 | `RefreshTokenLifetime` | `30.00:00:00` | How long a refresh token lasts. |
 | `RequireUniqueEmail` | `true` | When false, several accounts may share an email. |
+| `EnablePublicRegistration` | `false` | Lets anyone register at any time; each registration gets its own tenant. |
+| `DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
+
+A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
+tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
+Agents can only join once that first tenant exists.
 
 Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
 passwords in a row lock the account for five minutes.
 
 ## Running the Agent
 
-The agent runs on Windows. With the server running (see above), open a second terminal and start it:
+The agent runs on Windows. Agents join a tenant, so on a new server register the first user before starting one
+(in PowerShell):
+
+```powershell
+$account = @{ email = "admin@example.com"; password = "Choose-a-Passw0rd" } | ConvertTo-Json
+Invoke-RestMethod http://localhost:5099/api/auth/register -Method Post -Body $account -ContentType "application/json"
+```
+
+With the server running (see above), open a second terminal and start the agent:
 
 ```
 dotnet run --project agent/StealthDesk.Agent -- run
@@ -142,6 +156,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/v1/devices` | HTTP | Lists the devices known to the server. |
 | `/api/v1/devices/{id}` | HTTP | Returns one device, or 404 if the server doesn't know it. |
 | `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
+| `/api/auth/register` | HTTP | Registers following the account rules above; 404 while registration is closed. |
+| `/api/auth/settings` | HTTP | Whether registration is open, for the sign-up page. |
 | `/api/auth/me` | HTTP | The signed-in user and tenant, or 401. |
 | `/api/auth/sign-out` | HTTP | Ends the cookie session. |
 | `/api/auth/*` | HTTP | The other ASP.NET Core Identity endpoints: refresh, confirm email, forgot and reset password, manage info. |
