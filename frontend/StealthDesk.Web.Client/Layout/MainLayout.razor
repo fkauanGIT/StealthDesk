@@ -22,12 +22,15 @@
 
         <AuthorizeView>
             <Authorized>
+                <RequirePasswordChange User="context.User" />
                 <div class="sd-user">
-                    <span class="sd-avatar" aria-hidden="true">@Initials(context.User.Identity?.Name)</span>
-                    <span class="sd-user-text">
-                        <span class="sd-user-name">@context.User.Identity?.Name</span>
-                        <span class="sd-user-role">@Role(context.User)</span>
-                    </span>
+                    <a class="sd-user-link" href="account/manage" title="Account settings">
+                        <span class="sd-avatar" aria-hidden="true">@Initials(context.User.Identity?.Name)</span>
+                        <span class="sd-user-text">
+                            <span class="sd-user-name">@context.User.Identity?.Name</span>
+                            <span class="sd-user-role">@Role(context.User)</span>
+                        </span>
+                    </a>
                     <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.SignOut" AriaLabel="Sign out" OnClick="SignOutAsync" />
                 </div>
             </Authorized>

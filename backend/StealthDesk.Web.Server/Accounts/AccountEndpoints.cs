@@ -64,8 +64,42 @@ public static class AccountEndpoints
     // People open this from an email: answer with the web client's page instead of Identity's plain text.
     if (path.EndsWith("/confirmEmail", StringComparison.OrdinalIgnoreCase))
     {
-      var confirmed = Unwrap(await next(context)) is not (IStatusCodeHttpResult { StatusCode: >= 400 } or UnauthorizedHttpResult);
-      return Results.Redirect(confirmed ? "/account/email-confirmed" : "/account/email-confirmed?failed=true");
+      if (!Succeeded(await next(context)))
+      {
+        return Results.Redirect("/account/email-confirmed?failed=true");
+      }
+
+      if (!request.Query.ContainsKey("changedEmail"))
+      {
+        return Results.Redirect("/account/email-confirmed");
+      }
+
+      // The change renewed the security stamp: when the link is opened where the user is signed in, keep them signed in.
+      var signIn = context.HttpContext.RequestServices.GetRequiredService<SignInManager<UserRecord>>();
+      var userId = request.Query["userId"].ToString();
+      if (signIn.UserManager.GetUserId(context.HttpContext.User) == userId
+        && await signIn.UserManager.FindByIdAsync(userId) is { } changed)
+      {
+        await signIn.RefreshSignInAsync(changed);
+      }
+
+      return Results.Redirect("/account/email-confirmed?changed=true");
+    }
+
+    // A password picked through a reset link ends a forced change, like changing it while signed in.
+    if (path.EndsWith("/resetPassword", StringComparison.OrdinalIgnoreCase))
+    {
+      var outcome = await next(context);
+      if (Succeeded(outcome) && context.Arguments.OfType<ResetPasswordRequest>().FirstOrDefault() is { } reset)
+      {
+        var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<UserRecord>>();
+        if (await users.FindByEmailAsync(reset.Email) is { } user)
+        {
+          await ManageEndpoints.PasswordChosenAsync(users, user);
+        }
+      }
+
+      return outcome;
     }
 
     var accounts = context.HttpContext.RequestServices.GetRequiredService<IOptions<AccountOptions>>().Value;
@@ -100,15 +134,16 @@ public static class AccountEndpoints
 
     if (!result.Succeeded)
     {
-      return Results.ValidationProblem(result.Identity.Errors
-        .GroupBy(x => string.IsNullOrWhiteSpace(x.Code) ? nameof(IdentityError) : x.Code)
-        .ToDictionary(x => x.Key, x => x.Select(error => error.Description).ToArray()));
+      return ManageEndpoints.ValidationProblem(result.Identity);
     }
 
     return Results.Ok();
   }
 
   private static bool IsTrue(string? value) => bool.TryParse(value, out var result) && result;
+
+  private static bool Succeeded(object? outcome) =>
+    Unwrap(outcome) is not (IStatusCodeHttpResult { StatusCode: >= 400 } or UnauthorizedHttpResult);
 
   // Identity's endpoints answer with Results<A, B>, which wraps the result that actually ran.
   private static object? Unwrap(object? result) => result is INestedHttpResult nested ? Unwrap(nested.Result) : result;

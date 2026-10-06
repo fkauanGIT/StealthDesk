@@ -1,0 +1,34 @@
+@inherits LayoutComponentBase
+@layout MainLayout
+
+<header class="sd-page-header">
+    <div>
+        <h1 class="sd-page-title">Account settings</h1>
+        <p class="sd-muted">Manage your profile, sign-in and data.</p>
+    </div>
+</header>
+
+<div class="sd-manage">
+    <nav class="sd-manage-nav" aria-label="Account settings">
+        <NavLink class="sd-nav-link" href="account/manage" Match="NavLinkMatch.All">
+            <SdIcon Name="IconName.Account" />
+            Profile
+        </NavLink>
+        <NavLink class="sd-nav-link" href="account/manage/email">
+            <SdIcon Name="IconName.Mail" />
+            Email
+        </NavLink>
+        <NavLink class="sd-nav-link" href="account/manage/password">
+            <SdIcon Name="IconName.Lock" />
+            Password
+        </NavLink>
+        <NavLink class="sd-nav-link" href="account/manage/personal-data">
+            <SdIcon Name="IconName.Download" />
+            Personal data
+        </NavLink>
+    </nav>
+
+    <div class="sd-manage-body">
+        @Body
+    </div>
+</div>

@@ -12,9 +12,14 @@ namespace StealthDesk.Web.Server.Email;
 /// </summary>
 public sealed class AccountEmails(IEmailTransport transport, IHttpContextAccessor http) : IEmailSender<UserRecord>
 {
+  // Identity sends an email change through here too, with the new address in the link.
   public Task SendConfirmationLinkAsync(UserRecord user, string email, string confirmationLink) =>
-    Send(email, $"Confirm your {Brand.Name} account",
-      $"<p>Confirm your email address to finish setting up your {Brand.Name} account:</p>{Button(confirmationLink, "Confirm email")}");
+    confirmationLink.Contains("changedEmail=", StringComparison.Ordinal)
+      ? Send(email, $"Confirm your new {Brand.Name} email address",
+        $"<p>Confirm this address to use it for your {Brand.Name} account. Until then, the current one stays.</p>"
+        + $"{Button(confirmationLink, "Confirm new email")}<p>If you didn't ask for this, you can ignore this message.</p>")
+      : Send(email, $"Confirm your {Brand.Name} account",
+        $"<p>Confirm your email address to finish setting up your {Brand.Name} account:</p>{Button(confirmationLink, "Confirm email")}");
 
   public Task SendPasswordResetLinkAsync(UserRecord user, string email, string resetLink) =>
     Send(email, $"Reset your {Brand.Name} password",

@@ -10,6 +10,14 @@
     </header>
     <p class="sd-auth-footer"><a href="account/resend-confirmation">Send a new link</a></p>
 }
+else if (Changed)
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">Email changed</h1>
+        <p class="sd-auth-subtitle">Your account now uses the new address. Sign in with it from now on.</p>
+    </header>
+    <SdButton Block="true" OnClick="@(() => Navigation.NavigateTo("account/manage/email"))">Back to account settings</SdButton>
+}
 else
 {
     <header class="sd-auth-header">
@@ -25,4 +33,7 @@ else
 
     [SupplyParameterFromQuery]
     public bool Failed { get; set; }
+
+    [SupplyParameterFromQuery]
+    public bool Changed { get; set; }
 }

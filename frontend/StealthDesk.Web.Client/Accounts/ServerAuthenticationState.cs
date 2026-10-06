@@ -14,6 +14,7 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
   public const string TenantIdClaim = "stealthdesk:tenant_id";
   public const string ServerAdministratorClaim = "stealthdesk:server_admin";
   public const string TenantAdministratorClaim = "stealthdesk:tenant_admin";
+  public const string MustChangePasswordClaim = "stealthdesk:must_change_password";
 
   private static readonly AuthenticationState SignedOut = new(new ClaimsPrincipal(new ClaimsIdentity()));
 
@@ -67,6 +68,11 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
       claims.Add(new Claim(TenantAdministratorClaim, "true"));
     }
 
+    if (user.MustChangePassword)
+    {
+      claims.Add(new Claim(MustChangePasswordClaim, "true"));
+    }
+
     return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "StealthDesk"));
   }
 }
@@ -83,7 +89,8 @@ public sealed class SessionGuard(ServerAuthenticationState state, NavigationMana
   public static string SignInPath(NavigationManager navigation)
   {
     var returnUrl = navigation.ToBaseRelativePath(navigation.Uri);
-    return returnUrl.Length == 0 || returnUrl.StartsWith("account/", StringComparison.Ordinal)
+    var signInPage = returnUrl.StartsWith("account/", StringComparison.Ordinal) && !returnUrl.StartsWith("account/manage", StringComparison.Ordinal);
+    return returnUrl.Length == 0 || signInPage
       ? "account/sign-in"
       : $"account/sign-in?returnUrl={Uri.EscapeDataString("/" + returnUrl)}";
   }

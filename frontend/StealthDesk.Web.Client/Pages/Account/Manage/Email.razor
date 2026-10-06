@@ -1,0 +1,119 @@
+@page "/account/manage/email"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+
+<PageTitle>Email · StealthDesk</PageTitle>
+
+<SdCard Title="Email">
+    @if (profile is null)
+    {
+        <SdLoading Text="Loading your email..." />
+    }
+    else
+    {
+        @if (message is not null)
+        {
+            <SdAlert Tone="Tone.Info">@message</SdAlert>
+        }
+        else if (error is not null)
+        {
+            <SdAlert>@error</SdAlert>
+        }
+
+        <div class="sd-current">
+            <span class="sd-label">Current email</span>
+            <span class="sd-current-value">
+                @profile.Email
+                @if (profile.EmailConfirmed)
+                {
+                    <SdStatus Tone="Tone.Online" Text="Confirmed" />
+                }
+                else
+                {
+                    <SdStatus Tone="Tone.Warning" Text="Not confirmed" />
+                }
+            </span>
+        </div>
+
+        @if (!profile.EmailConfirmed)
+        {
+            <div>
+                <SdButton Variant="ButtonVariant.Secondary" Disabled="busy" OnClick="SendVerificationAsync">Send verification email</SdButton>
+            </div>
+        }
+
+        <form class="sd-form" @onsubmit="ChangeAsync">
+            <SdTextField Label="New email" Type="email" Autocomplete="email" @bind-Value="newEmail" Error="@emailError"
+                         Hint="We send a link to the new address. Your email changes once you open it." />
+            <div>
+                <SdButton Type="submit" Disabled="busy">@(busy ? "Sending..." : "Change email")</SdButton>
+            </div>
+        </form>
+    }
+</SdCard>
+
+@code {
+    private AccountProfile? profile;
+    private string? newEmail;
+    private bool busy;
+    private string? message;
+    private string? error;
+    private string? emailError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await Accounts.GetProfileAsync();
+        if (profile is null)
+        {
+            Session.Expired();
+        }
+    }
+
+    private async Task ChangeAsync()
+    {
+        message = error = emailError = null;
+        var address = newEmail?.Trim();
+        if (string.IsNullOrEmpty(address))
+        {
+            emailError = "Enter the new email address.";
+            return;
+        }
+
+        if (string.Equals(address, profile!.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            emailError = "This is already your email.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.ChangeEmailAsync(address);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            message = $"We sent a confirmation link to {address}. Open it to finish changing your email.";
+            newEmail = null;
+            return;
+        }
+
+        emailError = FieldErrors.ForEmail(result);
+        error = emailError is null ? FieldErrors.Remaining(result) : null;
+    }
+
+    private async Task SendVerificationAsync()
+    {
+        message = error = emailError = null;
+        busy = true;
+        var result = await Accounts.ResendConfirmationAsync(profile!.Email);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            message = "Verification email sent. Check your inbox.";
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+}
