@@ -69,6 +69,7 @@ public class SignInStateTests : AccountTestContext
   [InlineData("devices/42", "account/sign-in?returnUrl=%2Fdevices%2F42")]
   [InlineData("", "account/sign-in")]
   [InlineData("account/register", "account/sign-in")]
+  [InlineData("account/manage/email", "account/sign-in?returnUrl=%2Faccount%2Fmanage%2Femail")]
   public void RedirectToSignIn_RemembersWhereTheUserWasGoing(string from, string expected)
   {
     Navigation.NavigateTo(from);
@@ -125,6 +126,39 @@ public class SignInStateTests : AccountTestContext
 
     layout.WaitForAssertion(() => Assert.Equal("ana@example.com", layout.Find(".sd-user-name").TextContent));
     Assert.Equal("Server administrator", layout.Find(".sd-user-role").TextContent);
+  }
+
+  [Fact]
+  public void Layout_LinksTheUserToTheirAccountSettings()
+  {
+    Api.RespondWith(Ana);
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => Assert.Equal("account/manage", layout.Find(".sd-user-link").GetAttribute("href")));
+  }
+
+  [Fact]
+  public void MustChangePassword_SendsTheUserToChangeItFirst()
+  {
+    Api.RespondWith(Ana with { MustChangePassword = true });
+    Navigation.NavigateTo("devices/42");
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => Assert.Equal("account/password-change-required", Location));
+  }
+
+  [Fact]
+  public void WithoutAForcedChange_TheUserStaysWhereTheyAre()
+  {
+    Api.RespondWith(Ana);
+    Navigation.NavigateTo("devices/42");
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => layout.Find(".sd-user"));
+    Assert.Equal("devices/42", Location);
   }
 
   [Fact]
