@@ -39,7 +39,8 @@ public static class AccountSetup
 
     builder.Services
       .AddAuthentication(options => options.DefaultScheme = Scheme)
-      .AddPolicyScheme(Scheme, "Cookie, or bearer token when enabled", options =>
+      // No display name: Identity lists every scheme that has one as an external sign-in provider.
+      .AddPolicyScheme(Scheme, displayName: null, options =>
       {
         options.ForwardDefaultSelector = context =>
           accounts.EnableBearerLogin
