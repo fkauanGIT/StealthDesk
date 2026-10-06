@@ -17,6 +17,11 @@
     <SdAlert Tone="Tone.Info">Your account has been deleted.</SdAlert>
 }
 
+@if (ExternalMessage is { } externalMessage && error is null)
+{
+    <SdAlert>@externalMessage</SdAlert>
+}
+
 @if (error is not null)
 {
     <SdAlert>
@@ -49,6 +54,15 @@
     <SdButton Variant="ButtonVariant.Secondary" Block="true" Icon="IconName.Key" Disabled="busy" OnClick="SignInWithPasskeyAsync">Sign in with a passkey</SdButton>
 }
 
+@if (providers.Count > 0)
+{
+    @if (!passkeysSupported)
+    {
+        <div class="sd-divider"><span>or</span></div>
+    }
+    <ExternalProviderButtons Providers="providers" ReturnUrl="@ReturnUrl" />
+}
+
 @if (registrationOpen)
 {
     <p class="sd-auth-footer">New here? <a href="account/register">Create an account</a></p>
@@ -62,6 +76,7 @@
     private string? error;
     private bool needsConfirmation;
     private bool registrationOpen;
+    private IReadOnlyList<ExternalProvider> providers = [];
     private bool passkeysSupported;
 
     [SupplyParameterFromQuery]
@@ -70,11 +85,25 @@
     [SupplyParameterFromQuery]
     public bool Deleted { get; set; }
 
+    /// <summary>How a sign-in with Microsoft or GitHub ended, when it came back here.</summary>
+    [SupplyParameterFromQuery]
+    public string? External { get; set; }
+
+    private string? ExternalMessage => External switch
+    {
+        "cancelled" => "The sign-in with the provider was cancelled.",
+        "failed" => "The provider couldn't sign you in. Try again.",
+        "unconfirmed" => "Confirm your email address before signing in.",
+        _ => null,
+    };
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            registrationOpen = (await Accounts.GetSettingsAsync()).RegistrationOpen;
+            var settings = await Accounts.GetSettingsAsync();
+            registrationOpen = settings.RegistrationOpen;
+            providers = settings.ExternalProviders;
         }
         catch (HttpRequestException)
         {

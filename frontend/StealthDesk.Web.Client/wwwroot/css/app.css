@@ -478,6 +478,12 @@ a.sd-btn:hover {
   background: var(--sd-border);
 }
 
+.sd-providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+}
+
 .sd-auth-footer {
   text-align: center;
   font-size: var(--sd-text-md);

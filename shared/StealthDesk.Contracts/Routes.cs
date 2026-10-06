@@ -40,4 +40,15 @@ public static class Routes
   /// <summary>Signing in with a passkey: the challenge first, then what the authenticator signed.</summary>
   public const string SignInPasskey = "/api/auth/passkey";
   public const string PasskeyRequestOptions = "/api/auth/passkey/request-options";
+
+  /// <summary>Signing in with Microsoft or GitHub. The browser goes to these addresses; they aren't fetched.</summary>
+  public static string ExternalSignIn(string provider) => $"/api/auth/external/{provider}";
+  public const string ExternalCallback = "/api/auth/external/callback";
+  public const string PendingExternalLogin = "/api/auth/external/pending";
+  public const string ExternalRegistration = "/api/auth/external/register";
+
+  public const string Logins = "/api/account/logins";
+  public static string LinkLogin(string provider) => $"/api/account/logins/link/{provider}";
+  public const string LinkLoginCallback = "/api/account/logins/link-callback";
+  public static string Login(string provider, string providerKey) => $"/api/account/logins/{provider}/{Uri.EscapeDataString(providerKey)}";
 }

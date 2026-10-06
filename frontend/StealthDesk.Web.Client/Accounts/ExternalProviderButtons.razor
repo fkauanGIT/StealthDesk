@@ -1,0 +1,30 @@
+@inject NavigationManager Navigation
+
+@if (Providers.Count > 0)
+{
+    <div class="sd-providers">
+        @foreach (var provider in Providers)
+        {
+            <SdButton Variant="ButtonVariant.Secondary" Block="true" OnClick="() => Go(provider)">
+                <ProviderLogo Scheme="@provider.Scheme" />
+                Continue with @provider.DisplayName
+            </SdButton>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Only the providers the server is configured for: with none, nothing shows.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ExternalProvider> Providers { get; set; } = [];
+
+    [Parameter]
+    public string? ReturnUrl { get; set; }
+
+    // A full page load: the server answers with a redirect to the provider, which the router can't follow.
+    private void Go(ExternalProvider provider) =>
+        Navigation.NavigateTo(
+            Navigation.GetUriWithQueryParameters(Routes.ExternalSignIn(provider.Scheme).TrimStart('/'),
+                new Dictionary<string, object?> { ["returnUrl"] = "/" + LocalUrl.Or(ReturnUrl) }),
+            forceLoad: true);
+}

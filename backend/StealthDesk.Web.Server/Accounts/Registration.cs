@@ -10,6 +10,9 @@ public interface IRegistration
   Task<bool> IsOpenAsync(CancellationToken cancellationToken = default);
 
   Task<RegistrationResult> RegisterAsync(string email, string password, CancellationToken cancellationToken = default);
+
+  /// <summary>A first sign-in with Microsoft or GitHub: an account without a password, linked to that login.</summary>
+  Task<RegistrationResult> RegisterExternalAsync(string email, UserLoginInfo login, CancellationToken cancellationToken = default);
 }
 
 public sealed record RegistrationResult(IdentityResult Identity, UserRecord? User)
@@ -37,7 +40,38 @@ public sealed class Registration(
       || (!rules.DisableFirstUserSelfRegistration && !await db.Users.AnyAsync(cancellationToken));
   }
 
-  public async Task<RegistrationResult> RegisterAsync(string email, string password, CancellationToken cancellationToken = default)
+  public Task<RegistrationResult> RegisterAsync(string email, string password, CancellationToken cancellationToken = default) =>
+    CreateAsync(email, user => users.CreateAsync(user, password), cancellationToken);
+
+  public async Task<RegistrationResult> RegisterExternalAsync(string email, UserLoginInfo login, CancellationToken cancellationToken = default)
+  {
+    if (await users.FindByLoginAsync(login.LoginProvider, login.ProviderKey) is not null)
+    {
+      return new RegistrationResult(IdentityResult.Failed(new IdentityErrorDescriber().LoginAlreadyAssociated()), null);
+    }
+
+    return await CreateAsync(email, async user =>
+    {
+      var created = await users.CreateAsync(user);
+      if (!created.Succeeded)
+      {
+        return created;
+      }
+
+      // An account without its login would have no way to sign in.
+      var linked = await users.AddLoginAsync(user, login);
+      if (!linked.Succeeded)
+      {
+        await users.DeleteAsync(user);
+        db.Tenants.Remove(user.Tenant!);
+        await db.SaveChangesAsync(cancellationToken);
+      }
+
+      return linked;
+    }, cancellationToken);
+  }
+
+  private async Task<RegistrationResult> CreateAsync(string email, Func<UserRecord, Task<IdentityResult>> create, CancellationToken cancellationToken)
   {
     // One at a time: two registrations on an empty server must not both become its administrator.
     using var turn = await gate.WaitAsync(cancellationToken);
@@ -52,7 +86,7 @@ public sealed class Registration(
 
     // Without an invite, every account starts its own tenant.
     var user = new UserRecord { UserName = email, Email = email, Tenant = new TenantRecord() };
-    var created = await users.CreateAsync(user, password);
+    var created = await create(user);
     if (!created.Succeeded)
     {
       return new RegistrationResult(created, null);

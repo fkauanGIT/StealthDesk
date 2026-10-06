@@ -37,9 +37,16 @@ public static class AccountSetup
       .AddClaimsPrincipalFactory<StealthDeskClaimsFactory>()
       .AddDefaultTokenProviders();
 
-    builder.Services
-      .AddAuthentication(options => options.DefaultScheme = Scheme)
-      .AddPolicyScheme(Scheme, "Cookie, or bearer token when enabled", options =>
+    var authentication = builder.Services
+      .AddAuthentication(options =>
+      {
+        options.DefaultScheme = Scheme;
+
+        // Microsoft and GitHub hand the user back to Identity's short-lived external cookie, read by the callback.
+        options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+      })
+      // No display name: Identity lists every scheme that has one as an external sign-in provider.
+      .AddPolicyScheme(Scheme, displayName: null, options =>
       {
         options.ForwardDefaultSelector = context =>
           accounts.EnableBearerLogin
@@ -47,6 +54,30 @@ public static class AccountSetup
             ? IdentityConstants.BearerScheme
             : IdentityConstants.ApplicationScheme;
       });
+
+    // A provider exists only when it is configured, so the sign-in page shows only the ones that work.
+    if (!string.IsNullOrWhiteSpace(accounts.MicrosoftClientId) && !string.IsNullOrWhiteSpace(accounts.MicrosoftClientSecret))
+    {
+      authentication.AddMicrosoftAccount(options =>
+      {
+        options.ClientId = accounts.MicrosoftClientId;
+        options.ClientSecret = accounts.MicrosoftClientSecret;
+        BackToSignIn(options);
+      });
+    }
+
+    if (!string.IsNullOrWhiteSpace(accounts.GitHubClientId) && !string.IsNullOrWhiteSpace(accounts.GitHubClientSecret))
+    {
+      authentication.AddGitHub(options =>
+      {
+        options.ClientId = accounts.GitHubClientId;
+        options.ClientSecret = accounts.GitHubClientSecret;
+
+        // Without it GitHub gives the email only when the user made it public.
+        options.Scope.Add("user:email");
+        BackToSignIn(options);
+      });
+    }
 
     builder.Services.Configure<BearerTokenOptions>(IdentityConstants.BearerScheme, options =>
     {
@@ -84,6 +115,23 @@ public static class AccountSetup
   /// these options, so migrations must see the same value as the running server.
   /// </summary>
   public static void ConfigureStores(IdentityOptions options) => options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+
+  /// <summary>Turning the provider down, or the provider failing, ends on the sign-in page instead of an error page.</summary>
+  public static void BackToSignIn(RemoteAuthenticationOptions options)
+  {
+    options.Events.OnAccessDenied = context =>
+    {
+      context.Response.Redirect("/account/sign-in?external=cancelled");
+      context.HandleResponse();
+      return Task.CompletedTask;
+    };
+    options.Events.OnRemoteFailure = context =>
+    {
+      context.Response.Redirect("/account/sign-in?external=failed");
+      context.HandleResponse();
+      return Task.CompletedTask;
+    };
+  }
 
   private static Task Answer(RedirectContext<CookieAuthenticationOptions> context, int status)
   {

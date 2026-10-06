@@ -38,6 +38,7 @@ public static class ServerSetup
     app.MapManageEndpoints();
     app.MapTwoFactorEndpoints();
     app.MapPasskeyEndpoints();
+    app.MapExternalLoginEndpoints();
     app.MapDeviceEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
