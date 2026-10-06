@@ -356,6 +356,41 @@ a:hover {
   background: var(--sd-sunken);
 }
 
+.sd-passkeys {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+}
+
+.sd-passkey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-3) var(--sd-space-4);
+}
+
+.sd-passkey + .sd-passkey {
+  border-top: 1px solid var(--sd-border);
+}
+
+.sd-passkey-text {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--sd-text-sm);
+}
+
+.sd-passkey-name {
+  font-size: var(--sd-text-md);
+  font-weight: 500;
+}
+
 a.sd-btn:hover {
   text-decoration: none;
 }
@@ -425,6 +460,22 @@ a.sd-btn:hover {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+}
+
+.sd-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  color: var(--sd-text-muted);
+  font-size: var(--sd-text-sm);
+}
+
+.sd-divider::before,
+.sd-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--sd-border);
 }
 
 .sd-auth-footer {

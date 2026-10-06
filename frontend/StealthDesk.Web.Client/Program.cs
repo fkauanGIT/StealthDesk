@@ -18,6 +18,7 @@ builder.Services.AddScoped<AccountApi>();
 builder.Services.AddScoped<ServerAuthenticationState>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerAuthenticationState>());
 builder.Services.AddScoped<SessionGuard>();
+builder.Services.AddScoped<IPasskeyBridge, PasskeyBridge>();
 
 builder.Services.AddScoped<DeviceStore>();
 builder.Services.AddScoped<ILiveUpdates>(sp => new LiveUpdates(
