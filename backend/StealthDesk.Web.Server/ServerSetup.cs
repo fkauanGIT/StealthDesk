@@ -31,6 +31,8 @@ public static class ServerSetup
 
   public static WebApplication MapStealthDesk(this WebApplication app)
   {
+    // The web client's files, under their own names and the fingerprinted names its import map points to.
+    app.MapStaticAssets();
     app.MapHealthEndpoints();
     app.MapAccountEndpoints();
     app.MapManageEndpoints();

@@ -12,8 +12,6 @@ if (app.Environment.IsDevelopment())
   app.UseWebAssemblyDebugging();
 }
 
-app.UseBlazorFrameworkFiles();
-app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<MustChangePasswordMiddleware>();
