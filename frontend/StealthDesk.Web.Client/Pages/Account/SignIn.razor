@@ -10,6 +10,11 @@
     <p class="sd-auth-subtitle">Intelligent remote device management</p>
 </header>
 
+@if (Deleted && error is null)
+{
+    <SdAlert Tone="Tone.Info">Your account has been deleted.</SdAlert>
+}
+
 @if (error is not null)
 {
     <SdAlert>
@@ -51,6 +56,9 @@
 
     [SupplyParameterFromQuery]
     public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public bool Deleted { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

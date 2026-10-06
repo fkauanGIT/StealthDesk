@@ -1,0 +1,23 @@
+@page "/account/manage/personal-data"
+
+<PageTitle>Personal data · StealthDesk</PageTitle>
+
+<SdCard Title="Personal data">
+    <p class="sd-muted">
+        Your account holds personal data you gave us. Download a copy of it, or delete your account and the data with it.
+    </p>
+    <div>
+        @* A plain download: the browser sends the session cookie and saves the file. *@
+        <a class="sd-btn sd-btn--secondary" href="@Routes.AccountPersonalData.TrimStart('/')" download="PersonalData.json">
+            <SdIcon Name="IconName.Download" />
+            Download my data
+        </a>
+    </div>
+</SdCard>
+
+<SdCard Title="Delete account">
+    <SdAlert Tone="Tone.Warning">Deleting your account removes it and its personal data for good. This can't be undone.</SdAlert>
+    <div>
+        <a class="sd-btn sd-btn--danger" href="account/manage/delete">Delete my account</a>
+    </div>
+</SdCard>

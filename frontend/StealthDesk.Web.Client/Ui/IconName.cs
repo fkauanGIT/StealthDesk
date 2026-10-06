@@ -10,4 +10,7 @@ public enum IconName
   Back,
   Alert,
   Close,
+  Mail,
+  Lock,
+  Download,
 }

@@ -1,0 +1,78 @@
+@page "/account/manage/delete"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+@inject ServerAuthenticationState AuthState
+@inject ILiveUpdates Live
+@inject NavigationManager Navigation
+
+<PageTitle>Delete account · StealthDesk</PageTitle>
+
+<SdCard Title="Delete account">
+    @if (profile is null)
+    {
+        <SdLoading Text="Loading..." />
+    }
+    else
+    {
+        <SdAlert>Deleting your account removes it and its personal data for good. This can't be undone.</SdAlert>
+
+        @if (error is not null)
+        {
+            <SdAlert>@error</SdAlert>
+        }
+
+        <form class="sd-form" @onsubmit="DeleteAsync">
+            @if (profile.HasPassword)
+            {
+                <SdTextField Label="Password" Type="password" Autocomplete="current-password" @bind-Value="password" Error="@passwordError"
+                             Hint="Enter your password to confirm it's you." />
+            }
+            <div class="sd-actions">
+                <SdButton Type="submit" Variant="ButtonVariant.Danger" Disabled="busy">@(busy ? "Deleting..." : "Delete data and close my account")</SdButton>
+                <a class="sd-btn sd-btn--ghost" href="account/manage/personal-data">Cancel</a>
+            </div>
+        </form>
+    }
+</SdCard>
+
+@code {
+    private AccountProfile? profile;
+    private string? password;
+    private bool busy;
+    private string? error;
+    private string? passwordError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await Accounts.GetProfileAsync();
+        if (profile is null)
+        {
+            Session.Expired();
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        error = passwordError = null;
+        if (profile!.HasPassword && string.IsNullOrEmpty(password))
+        {
+            passwordError = "Enter your password.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.DeleteAccountAsync(password);
+        busy = false;
+
+        if (!result.Succeeded)
+        {
+            passwordError = FieldErrors.ForCurrentPassword(result);
+            error = passwordError is null ? FieldErrors.Remaining(result) : null;
+            return;
+        }
+
+        await Live.StopAsync();
+        AuthState.MarkSignedOut();
+        Navigation.NavigateTo("account/sign-in?deleted=true");
+    }
+}

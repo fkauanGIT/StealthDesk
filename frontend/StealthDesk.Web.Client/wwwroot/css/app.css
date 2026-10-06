@@ -171,6 +171,23 @@ a:hover {
   color: var(--sd-text-muted);
 }
 
+.sd-user-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: calc(-1 * var(--sd-space-2));
+  padding: var(--sd-space-2);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-text);
+}
+
+.sd-user-link:hover {
+  background: var(--sd-raised);
+  text-decoration: none;
+}
+
 .sd-user .sd-btn {
   width: 36px;
   height: 36px;
@@ -223,6 +240,63 @@ a:hover {
 
 .sd-page-header .sd-push {
   margin-left: auto;
+}
+
+/* ---------- Account settings ---------- */
+
+.sd-manage {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 640px);
+  align-items: start;
+  gap: var(--sd-space-8);
+}
+
+.sd-manage-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+}
+
+.sd-manage-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+@media (max-width: 820px) {
+  .sd-manage {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sd-space-4);
+  }
+
+  .sd-manage-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.sd-current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+}
+
+.sd-current-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  font-weight: 500;
+}
+
+.sd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-3);
+}
+
+a.sd-btn:hover {
+  text-decoration: none;
 }
 
 /* ---------- Account pages ---------- */
@@ -410,6 +484,12 @@ a:hover {
   outline: none;
   border-color: var(--sd-focus);
   box-shadow: 0 0 0 3px var(--sd-accent-soft);
+}
+
+.sd-input:disabled {
+  background: var(--sd-sunken);
+  color: var(--sd-text-muted);
+  cursor: default;
 }
 
 .sd-input[aria-invalid="true"] {

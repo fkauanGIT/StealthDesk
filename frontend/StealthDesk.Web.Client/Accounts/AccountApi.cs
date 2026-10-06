@@ -52,11 +52,40 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> ResendConfirmationAsync(string email) =>
     PostAsync($"{Routes.Auth}/resendConfirmationEmail", new { email });
 
-  private async Task<AccountResult> PostAsync(string path, object body)
+  /// <summary>The signed-in user's account, or null when the session is gone.</summary>
+  public async Task<AccountProfile?> GetProfileAsync(CancellationToken cancellationToken = default)
+  {
+    using var response = await http.GetAsync(Routes.AccountProfile, cancellationToken);
+    return response.StatusCode == HttpStatusCode.OK
+      ? await response.Content.ReadFromJsonAsync<AccountProfile>(cancellationToken)
+      : null;
+  }
+
+  public Task<AccountResult> UpdateProfileAsync(string? phoneNumber) =>
+    SendAsync(HttpMethod.Put, Routes.AccountProfile, new ProfileUpdate { PhoneNumber = phoneNumber });
+
+  public Task<AccountResult> ChangePasswordAsync(string currentPassword, string newPassword) =>
+    PostAsync(Routes.AccountPassword, new PasswordChange { CurrentPassword = currentPassword, NewPassword = newPassword });
+
+  /// <summary>For an account that only signs in with an external login.</summary>
+  public Task<AccountResult> SetPasswordAsync(string newPassword) =>
+    PostAsync(Routes.AccountPasswordSet, new PasswordSet { NewPassword = newPassword });
+
+  /// <summary>Sends a link to the new address; the email changes once it is opened.</summary>
+  public Task<AccountResult> ChangeEmailAsync(string newEmail) =>
+    PostAsync($"{Routes.Auth}/manage/info", new { newEmail });
+
+  public Task<AccountResult> DeleteAccountAsync(string? password) =>
+    PostAsync(Routes.AccountDeletion, new AccountDeletion { Password = password });
+
+  private Task<AccountResult> PostAsync(string path, object body) => SendAsync(HttpMethod.Post, path, body);
+
+  private async Task<AccountResult> SendAsync(HttpMethod method, string path, object body)
   {
     try
     {
-      using var response = await http.PostAsJsonAsync(path, body);
+      using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body) };
+      using var response = await http.SendAsync(request);
       return response.IsSuccessStatusCode ? AccountResult.Success : await FailureAsync(response);
     }
     catch (HttpRequestException)

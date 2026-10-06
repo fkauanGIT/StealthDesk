@@ -1,0 +1,71 @@
+@page "/account/manage"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+
+<PageTitle>Profile · StealthDesk</PageTitle>
+
+<SdCard Title="Profile">
+    @if (profile is null)
+    {
+        <SdLoading Text="Loading your profile..." />
+    }
+    else
+    {
+        @if (saved)
+        {
+            <SdAlert Tone="Tone.Info">Your profile has been updated.</SdAlert>
+        }
+        else if (error is not null)
+        {
+            <SdAlert>@error</SdAlert>
+        }
+
+        <form class="sd-form" @onsubmit="SaveAsync">
+            <SdTextField Label="Email" Value="@profile.Email" Disabled="true" Hint="Change it on the Email page." />
+            <SdTextField Label="User ID" Value="@profile.Id.ToString()" Disabled="true" Hint="Your unique user identifier." class="sd-input sd-mono" />
+            <SdTextField Label="Phone number" Type="tel" Autocomplete="tel" @bind-Value="phoneNumber" Error="@phoneError" />
+            <div>
+                <SdButton Type="submit" Disabled="busy">@(busy ? "Saving..." : "Save")</SdButton>
+            </div>
+        </form>
+    }
+</SdCard>
+
+@code {
+    private AccountProfile? profile;
+    private string? phoneNumber;
+    private bool busy;
+    private bool saved;
+    private string? error;
+    private string? phoneError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await Accounts.GetProfileAsync();
+        if (profile is null)
+        {
+            Session.Expired();
+            return;
+        }
+
+        phoneNumber = profile.PhoneNumber;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        saved = false;
+        error = phoneError = null;
+        var result = await Accounts.UpdateProfileAsync(phoneNumber);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            saved = true;
+            return;
+        }
+
+        phoneError = FieldErrors.ForPhoneNumber(result);
+        error = phoneError is null ? FieldErrors.Remaining(result) : null;
+    }
+}
