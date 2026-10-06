@@ -34,6 +34,12 @@ else
         <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Creating..." : "Create account")</SdButton>
     </form>
 
+    @if (settings.ExternalProviders.Count > 0)
+    {
+        <div class="sd-divider"><span>or</span></div>
+        <ExternalProviderButtons Providers="settings.ExternalProviders" />
+    }
+
     <p class="sd-auth-footer">Already have an account? <a href="account/sign-in">Sign in</a></p>
 }
 

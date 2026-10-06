@@ -1,0 +1,99 @@
+@page "/account/external-login"
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Create your account · StealthDesk</PageTitle>
+
+@if (!loaded)
+{
+    <SdLoading Text="Loading..." />
+}
+else if (pending is null)
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">This sign-in expired</h1>
+        <p class="sd-auth-subtitle">Sign in with the provider again to continue.</p>
+    </header>
+    <p class="sd-auth-footer"><a href="account/sign-in">Back to sign in</a></p>
+}
+else if (closed)
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">No account for this @pending.ProviderDisplayName login</h1>
+        <p class="sd-auth-subtitle">Registration is closed on this server. Ask an administrator to invite you.</p>
+    </header>
+    <p class="sd-auth-footer"><a href="account/sign-in">Back to sign in</a></p>
+}
+else
+{
+    <header class="sd-auth-header">
+        <h1 class="sd-auth-title">Create your account</h1>
+        <p class="sd-auth-subtitle">You signed in with @pending.ProviderDisplayName. Confirm the email for your new StealthDesk account.</p>
+    </header>
+
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    <form class="sd-form" @onsubmit="CreateAsync">
+        <SdTextField Label="Email" Type="email" Autocomplete="email" @bind-Value="email" Error="@emailError" />
+        <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Creating..." : "Create account")</SdButton>
+    </form>
+
+    <p class="sd-auth-footer">Already have an account? <a href="account/sign-in">Sign in</a> and link @pending.ProviderDisplayName in your account settings.</p>
+}
+
+@code {
+    private PendingExternalLogin? pending;
+    private bool loaded;
+    private bool closed;
+    private string? email;
+    private bool busy;
+    private string? error;
+    private string? emailError;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        pending = await Accounts.GetPendingExternalLoginAsync();
+        email = pending?.Email;
+        loaded = true;
+    }
+
+    private async Task CreateAsync()
+    {
+        error = emailError = null;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            emailError = "Enter your email address.";
+            return;
+        }
+
+        busy = true;
+        var (result, registration) = await Accounts.RegisterExternalAsync(email.Trim());
+        busy = false;
+
+        if (result.Succeeded && registration is { SignedIn: true })
+        {
+            AuthState.Refresh();
+            Navigation.NavigateTo(LocalUrl.Or(ReturnUrl));
+        }
+        else if (result.Succeeded)
+        {
+            Navigation.NavigateTo($"account/register-confirmation?email={Uri.EscapeDataString(email.Trim())}");
+        }
+        else if (result.IsNotFound)
+        {
+            closed = true;
+        }
+        else
+        {
+            emailError = FieldErrors.ForEmail(result);
+            error = emailError is null ? FieldErrors.Remaining(result) : null;
+        }
+    }
+}

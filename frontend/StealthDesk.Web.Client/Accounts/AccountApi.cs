@@ -19,6 +19,9 @@ public sealed record AccountResult(bool Succeeded, string? Error = null, IReadOn
   /// <summary>Signing in is refused until the email is confirmed.</summary>
   public bool IsNotAllowed => Detail == "NotAllowed";
 
+  /// <summary>The server has nothing there, e.g. registration is closed.</summary>
+  public bool IsNotFound { get; init; }
+
   /// <summary>The password was right; the account also needs a code from the authenticator app.</summary>
   public bool IsTwoFactorRequired => Detail == "RequiresTwoFactor";
 }
@@ -118,18 +121,7 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> RenamePasskeyAsync(string id, string name) =>
     SendAsync(HttpMethod.Put, Routes.Passkey(id), new PasskeyRename { Name = name });
 
-  public async Task<AccountResult> RemovePasskeyAsync(string id)
-  {
-    try
-    {
-      using var response = await http.DeleteAsync(Routes.Passkey(id));
-      return response.IsSuccessStatusCode ? AccountResult.Success : await FailureAsync(response);
-    }
-    catch (HttpRequestException)
-    {
-      return Unreachable;
-    }
-  }
+  public Task<AccountResult> RemovePasskeyAsync(string id) => DeleteAsync(Routes.Passkey(id));
 
   /// <param name="email">Names that user's passkeys; without it, the browser offers any passkey it has for this site.</param>
   public Task<(AccountResult Result, string? Json)> GetPasskeyRequestOptionsAsync(string? email = null) =>
@@ -139,6 +131,31 @@ public sealed class AccountApi(HttpClient http)
 
   public Task<AccountResult> SignInWithPasskeyAsync(string credentialJson) =>
     PostAsync(Routes.SignInPasskey, new PasskeyCredential { CredentialJson = credentialJson });
+
+  /// <summary>Who came back from a provider without an account here; null when that sign-in expired.</summary>
+  public async Task<PendingExternalLogin?> GetPendingExternalLoginAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<PendingExternalLogin>(Routes.PendingExternalLogin, cancellationToken);
+
+  public Task<(AccountResult Result, ExternalRegistrationResult? Registration)> RegisterExternalAsync(string email) =>
+    PostForAsync<ExternalRegistrationResult>(Routes.ExternalRegistration, new ExternalRegistration { Email = email });
+
+  public async Task<LinkedLogins?> GetLoginsAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<LinkedLogins>(Routes.Logins, cancellationToken);
+
+  public Task<AccountResult> RemoveLoginAsync(string provider, string providerKey) => DeleteAsync(Routes.Login(provider, providerKey));
+
+  private async Task<AccountResult> DeleteAsync(string path)
+  {
+    try
+    {
+      using var response = await http.DeleteAsync(path);
+      return response.IsSuccessStatusCode ? AccountResult.Success : await FailureAsync(response);
+    }
+    catch (HttpRequestException)
+    {
+      return Unreachable;
+    }
+  }
 
   private async Task<(AccountResult, string?)> PostForTextAsync(string path)
   {
@@ -229,6 +246,6 @@ public sealed class AccountApi(HttpClient http)
       _ => detail ?? "Something went wrong. Try again.",
     };
 
-    return new AccountResult(false, message, errors) { Detail = detail };
+    return new AccountResult(false, message, errors) { Detail = detail, IsNotFound = response.StatusCode == HttpStatusCode.NotFound };
   }
 }

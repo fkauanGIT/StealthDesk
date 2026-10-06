@@ -1,0 +1,122 @@
+@page "/account/manage/external-logins"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Linked accounts · StealthDesk</PageTitle>
+
+<SdCard Title="Linked accounts">
+    <p class="sd-muted">Sign in with an account you already have. StealthDesk never sees its password.</p>
+
+    @if (Message is { } message)
+    {
+        <SdAlert Tone="Tone.Info">@message</SdAlert>
+    }
+    else if (Problem is { } problem)
+    {
+        <SdAlert>@problem</SdAlert>
+    }
+
+    @if (logins is null)
+    {
+        <SdLoading Text="Loading..." />
+    }
+    else
+    {
+        @if (logins.Linked.Count > 0)
+        {
+            <ul class="sd-passkeys">
+                @foreach (var login in logins.Linked)
+                {
+                    <li class="sd-passkey">
+                        <ProviderLogo Scheme="@login.Provider" />
+                        <span class="sd-passkey-text">
+                            <span class="sd-passkey-name">@login.DisplayName</span>
+                            <span class="sd-muted">Linked</span>
+                        </span>
+                        <SdButton Variant="ButtonVariant.Ghost" Disabled="busy || !logins.CanRemove" OnClick="() => RemoveAsync(login)">Unlink</SdButton>
+                    </li>
+                }
+            </ul>
+
+            @if (!logins.CanRemove)
+            {
+                <p class="sd-muted">
+                    This is the only way to sign in to your account. To unlink it,
+                    <a href="account/manage/set-password">set a password</a> or <a href="account/manage/passkeys">add a passkey</a> first.
+                </p>
+            }
+        }
+
+        @if (logins.Available.Count > 0)
+        {
+            <div class="sd-actions">
+                @foreach (var provider in logins.Available)
+                {
+                    <SdButton Variant="ButtonVariant.Secondary" OnClick="() => Link(provider)">
+                        <ProviderLogo Scheme="@provider.Scheme" />
+                        Link @provider.DisplayName
+                    </SdButton>
+                }
+            </div>
+        }
+        else if (logins.Linked.Count == 0)
+        {
+            <SdEmptyState Title="No providers on this server">An administrator can turn on Microsoft or GitHub sign-in.</SdEmptyState>
+        }
+    }
+</SdCard>
+
+@code {
+    private LinkedLogins? logins;
+    private bool busy;
+    private string? removed;
+    private string? error;
+
+    /// <summary>What linking, done on the provider's site, ended with.</summary>
+    [SupplyParameterFromQuery]
+    public string? Done { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? LinkError { get; set; }
+
+    private string? Message => removed ?? (Done == "linked" ? "The account is linked. You can sign in with it now." : null);
+
+    private string? Problem => error ?? LinkError switch
+    {
+        "taken" => "That account is already linked to another StealthDesk user.",
+        "failed" => "The provider couldn't link the account. Try again.",
+        _ => null,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        logins = await Accounts.GetLoginsAsync();
+        if (logins is null)
+        {
+            Session.Expired();
+        }
+    }
+
+    // A full page load: linking leaves for the provider's site and comes back here.
+    private void Link(ExternalProvider provider) => Navigation.NavigateTo(Routes.LinkLogin(provider.Scheme).TrimStart('/'), forceLoad: true);
+
+    private async Task RemoveAsync(LinkedLogin login)
+    {
+        busy = true;
+        var result = await Accounts.RemoveLoginAsync(login.Provider, login.ProviderKey);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            removed = $"{login.DisplayName} is unlinked.";
+            error = null;
+            logins = await Accounts.GetLoginsAsync() ?? logins;
+        }
+        else
+        {
+            error = result.Error;
+            removed = null;
+        }
+    }
+}

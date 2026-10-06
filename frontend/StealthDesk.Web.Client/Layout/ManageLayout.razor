@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @layout MainLayout
+@inject AccountApi Accounts
 
 <header class="sd-page-header">
     <div>
@@ -26,6 +27,13 @@
             <SdIcon Name="IconName.Key" />
             Passkeys
         </NavLink>
+        @if (hasProviders)
+        {
+            <NavLink class="sd-nav-link" href="account/manage/external-logins">
+                <SdIcon Name="IconName.Link" />
+                Linked accounts
+            </NavLink>
+        }
         <NavLink class="sd-nav-link" href="account/manage/two-factor">
             <SdIcon Name="IconName.Shield" />
             Two-factor
@@ -40,3 +48,20 @@
         @Body
     </div>
 </div>
+
+@code {
+    // Linked accounts only matter when the server has a provider to link.
+    private bool hasProviders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            hasProviders = (await Accounts.GetSettingsAsync()).ExternalProviders.Count > 0;
+        }
+        catch (HttpRequestException)
+        {
+            hasProviders = false;
+        }
+    }
+}
