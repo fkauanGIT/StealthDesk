@@ -104,6 +104,8 @@ Account rules come from the `Accounts` section of `appsettings.json`:
 | `DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
 | `RequireConfirmedEmail` | `false` | Users must confirm their email before signing in. Needs email sending. |
 | `PersistPasskeySignIn` | `false` | A passkey sign-in keeps the session after the browser closes, like "Remember me". |
+| `MicrosoftClientId`, `MicrosoftClientSecret` | empty | Sign in with a Microsoft account. On only when both are set. |
+| `GitHubClientId`, `GitHubClientSecret` | empty | Sign in with GitHub. On only when both are set. |
 
 A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
 tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
@@ -111,6 +113,25 @@ Agents can only join once that first tenant exists.
 
 Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
 passwords in a row lock the account for five minutes.
+
+#### Signing in with Microsoft or GitHub
+
+Each provider needs an app registered with it, whose callback address points back to this server:
+
+- **GitHub**: Settings → Developer settings → OAuth Apps → New OAuth App. Homepage `http://localhost:5099`,
+  callback `http://localhost:5099/signin-github`. Copy the client ID and generate a client secret.
+- **Microsoft**: Azure portal → App registrations → New registration, for personal and work accounts. Add a Web
+  redirect URI `http://localhost:5099/signin-microsoft`, then create a client secret under Certificates & secrets.
+
+Keep the secrets out of `appsettings.json`, e.g. with user secrets:
+
+```powershell
+dotnet user-secrets set "Accounts:GitHubClientId" "<client id>" --project backend/StealthDesk.Web.Server
+dotnet user-secrets set "Accounts:GitHubClientSecret" "<client secret>" --project backend/StealthDesk.Web.Server
+```
+
+A first sign-in with a provider follows the registration rules above, creating an account without a password.
+Providers can be linked and unlinked in the account settings, as long as the account keeps a way to sign in.
 
 ### Email
 
@@ -187,6 +208,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/auth/two-factor` | HTTP | The second sign-in step with the app's code, after `/login` answered `RequiresTwoFactor`. `/api/auth/recovery-code` does the same with a recovery code. |
 | `/api/account/passkeys` | HTTP | The user's passkeys: list (`GET`), add (`POST`, after `POST /creation-options`), rename (`PUT /{id}`) and remove (`DELETE /{id}`). |
 | `/api/auth/passkey` | HTTP | Signs in with a passkey, after `POST /api/auth/passkey/request-options`. Needs no second factor. |
+| `/api/auth/external/{provider}` | HTTP | Leaves for Microsoft or GitHub to sign in; the provider comes back to `/signin-microsoft` or `/signin-github`, then to `/api/auth/external/callback`. `/pending` and `/register` create the account on a first visit. |
+| `/api/account/logins` | HTTP | The providers linked to the account: list (`GET`), link (`GET /link/{provider}`), unlink (`DELETE /{provider}/{key}`). |
 
 A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 | `/api/internal/version/server` | HTTP | Returns the server version. |

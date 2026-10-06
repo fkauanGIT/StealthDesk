@@ -4,4 +4,7 @@ namespace StealthDesk.Contracts.Accounts;
 public sealed record AccountSettings
 {
   public bool RegistrationOpen { get; init; }
+
+  /// <summary>Only the providers the server is configured for; empty means no provider buttons.</summary>
+  public IReadOnlyList<ExternalProvider> ExternalProviders { get; init; } = [];
 }

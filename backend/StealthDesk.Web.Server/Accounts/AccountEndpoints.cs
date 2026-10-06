@@ -13,8 +13,12 @@ public static class AccountEndpoints
 
     auth.MapIdentityApi<UserRecord>().AddEndpointFilter(ApplyServerRules);
 
-    auth.MapGet("/settings", async (IRegistration registration, CancellationToken cancellationToken) =>
-      new AccountSettings { RegistrationOpen = await registration.IsOpenAsync(cancellationToken) });
+    auth.MapGet("/settings", async (IRegistration registration, SignInManager<UserRecord> signIn, CancellationToken cancellationToken) =>
+      new AccountSettings
+      {
+        RegistrationOpen = await registration.IsOpenAsync(cancellationToken),
+        ExternalProviders = await ExternalLoginEndpoints.ProvidersAsync(signIn),
+      });
 
     auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db) =>
     {

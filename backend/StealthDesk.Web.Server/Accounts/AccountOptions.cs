@@ -29,4 +29,14 @@ public sealed class AccountOptions
 
   /// <summary>A passkey sign-in keeps the session after the browser closes, like "remember me".</summary>
   public bool PersistPasskeySignIn { get; set; }
+
+  /// <summary>Sign in with a Microsoft account: on only when both the client ID and secret are set.</summary>
+  public string? MicrosoftClientId { get; set; }
+
+  public string? MicrosoftClientSecret { get; set; }
+
+  /// <summary>Sign in with GitHub: on only when both the client ID and secret are set.</summary>
+  public string? GitHubClientId { get; set; }
+
+  public string? GitHubClientSecret { get; set; }
 }
