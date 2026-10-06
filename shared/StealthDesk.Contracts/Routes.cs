@@ -29,8 +29,15 @@ public static class Routes
   public const string AuthenticatorReset = "/api/account/two-factor/authenticator/reset";
   public const string RecoveryCodes = "/api/account/two-factor/recovery-codes";
   public const string ForgetBrowser = "/api/account/two-factor/forget-browser";
+  public const string Passkeys = "/api/account/passkeys";
+  public const string PasskeyCreationOptions = "/api/account/passkeys/creation-options";
+  public static string Passkey(string id) => $"{Passkeys}/{id}";
 
   /// <summary>The second sign-in step, after /login answered that the account needs two-factor.</summary>
   public const string SignInTwoFactor = "/api/auth/two-factor";
   public const string SignInRecoveryCode = "/api/auth/recovery-code";
+
+  /// <summary>Signing in with a passkey: the challenge first, then what the authenticator signed.</summary>
+  public const string SignInPasskey = "/api/auth/passkey";
+  public const string PasskeyRequestOptions = "/api/auth/passkey/request-options";
 }

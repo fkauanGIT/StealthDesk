@@ -37,6 +37,7 @@ public static class ServerSetup
     app.MapAccountEndpoints();
     app.MapManageEndpoints();
     app.MapTwoFactorEndpoints();
+    app.MapPasskeyEndpoints();
     app.MapDeviceEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);

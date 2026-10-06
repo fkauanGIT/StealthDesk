@@ -78,7 +78,20 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
     modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");
     modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("user_logins");
     modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("user_tokens");
-    modelBuilder.Entity<IdentityUserPasskey<Guid>>().ToTable("user_passkeys");
+    modelBuilder.Entity<IdentityUserPasskey<Guid>>(passkey =>
+    {
+      passkey.ToTable("user_passkeys");
+
+      // Identity stores a passkey's data as an owned JSON document, which the in-memory provider reads back as
+      // null. There it is stored as JSON text instead; PostgreSQL keeps its jsonb column.
+      if (Database.IsInMemory())
+      {
+        passkey.Ignore(x => x.Data);
+        passkey.Property(x => x.Data).HasConversion(
+          data => System.Text.Json.JsonSerializer.Serialize(data, (System.Text.Json.JsonSerializerOptions?)null),
+          json => System.Text.Json.JsonSerializer.Deserialize<IdentityPasskeyData>(json, (System.Text.Json.JsonSerializerOptions?)null)!);
+      }
+    });
     modelBuilder.Entity<DataProtectionKey>().ToTable("data_protection_keys");
   }
 
