@@ -20,7 +20,11 @@ public abstract class AccountTestContext : BunitContext
     Services.AddSingleton<AccountApi>();
     Services.AddSingleton<ServerAuthenticationState>();
     Services.AddSingleton<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerAuthenticationState>());
+    Services.AddSingleton<IPasskeyBridge>(Passkeys);
   }
+
+  /// <summary>Passkeys as the browser offers them; unsupported unless a test says otherwise.</summary>
+  private protected FakePasskeys Passkeys { get; } = new();
 
   private protected FakeApi Api { get; } = new();
 
