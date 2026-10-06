@@ -1,4 +1,5 @@
 using StealthDesk.Web.Server;
+using StealthDesk.Web.Server.Accounts;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddStealthDeskServer();
@@ -15,6 +16,7 @@ app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<MustChangePasswordMiddleware>();
 app.MapStealthDesk();
 
 await app.RunAsync();

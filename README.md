@@ -178,6 +178,12 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/auth/me` | HTTP | The signed-in user and tenant, or 401. |
 | `/api/auth/sign-out` | HTTP | Ends the cookie session. |
 | `/api/auth/*` | HTTP | The other ASP.NET Core Identity endpoints: refresh, confirm email, forgot and reset password, manage info. |
+| `/api/account/profile` | HTTP | The signed-in user's own account (`GET`), and saving the phone number (`PUT`). |
+| `/api/account/password` | HTTP | Changes the password; other sessions are signed out. `/password/set` adds one to an account without it. |
+| `/api/account/personal-data` | HTTP | Downloads the user's personal data as JSON. |
+| `/api/account/delete` | HTTP | Deletes the signed-in account; needs the password when the account has one. |
+
+A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 | `/api/internal/version/server` | HTTP | Returns the server version. |
 | `/health` | HTTP | Readiness check: every registered health check must pass. |
 | `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |

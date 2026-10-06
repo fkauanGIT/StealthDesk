@@ -8,7 +8,9 @@ public class UserRecord : IdentityUser<Guid>
   public Guid TenantId { get; set; }
   public TenantRecord? Tenant { get; set; }
   public AccountType AccountType { get; set; }
+  [PersonalData]
   public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+  [PersonalData]
   public DateTimeOffset? LastSignIn { get; set; }
   public bool IsOnline { get; set; }
 
