@@ -13,4 +13,5 @@ public enum IconName
   Mail,
   Lock,
   Download,
+  Shield,
 }

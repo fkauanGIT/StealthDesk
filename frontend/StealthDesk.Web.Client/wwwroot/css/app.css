@@ -295,6 +295,67 @@ a:hover {
   gap: var(--sd-space-3);
 }
 
+.sd-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+  margin: 0;
+  padding-left: var(--sd-space-5);
+}
+
+/* Stays a list item so the step number shows; its parts stack below the title. */
+.sd-steps li {
+  padding-left: var(--sd-space-2);
+}
+
+.sd-steps li > * {
+  margin-top: var(--sd-space-2);
+}
+
+.sd-steps li > span,
+.sd-steps li > strong,
+.sd-steps li > img {
+  display: block;
+}
+
+.sd-steps li > strong {
+  margin-top: 0;
+}
+
+.sd-steps li::marker {
+  color: var(--sd-accent-text);
+  font-weight: 700;
+}
+
+.sd-key {
+  padding: 2px 6px;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-sunken);
+  color: var(--sd-text);
+  word-break: break-all;
+}
+
+/* The code is dark on light whatever the theme: scanners read it best that way. */
+.sd-qr {
+  width: 180px;
+  height: 180px;
+  padding: var(--sd-space-2);
+  border-radius: var(--sd-radius-md);
+  background: #FFFFFF;
+  image-rendering: pixelated;
+}
+
+.sd-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sd-space-2) var(--sd-space-4);
+  margin: 0;
+  padding: var(--sd-space-4) var(--sd-space-4) var(--sd-space-4) 3rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-sunken);
+}
+
 a.sd-btn:hover {
   text-decoration: none;
 }

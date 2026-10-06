@@ -1,0 +1,44 @@
+@page "/account/manage/two-factor/reset"
+@inject AccountApi Accounts
+@inject NavigationManager Navigation
+
+<PageTitle>Reset authenticator app · StealthDesk</PageTitle>
+
+<SdCard Title="Reset authenticator app">
+    <SdAlert Tone="Tone.Warning">
+        Resetting gives your account a new key: codes from the app you set up stop working, and two-factor authentication
+        turns off until you set up the app again.
+    </SdAlert>
+
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    <div class="sd-actions">
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="ResetAsync">@(busy ? "Resetting..." : "Reset authenticator key")</SdButton>
+        <a class="sd-btn sd-btn--ghost" href="account/manage/two-factor">Cancel</a>
+    </div>
+</SdCard>
+
+@code {
+    private bool busy;
+    private string? error;
+
+    private async Task ResetAsync()
+    {
+        error = null;
+        busy = true;
+        var result = await Accounts.ResetAuthenticatorAsync();
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("account/manage/two-factor/enable?reset=true");
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+}

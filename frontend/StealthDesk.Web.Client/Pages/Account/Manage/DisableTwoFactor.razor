@@ -1,0 +1,44 @@
+@page "/account/manage/two-factor/disable"
+@inject AccountApi Accounts
+@inject NavigationManager Navigation
+
+<PageTitle>Turn off two-factor · StealthDesk</PageTitle>
+
+<SdCard Title="Turn off two-factor authentication">
+    <SdAlert Tone="Tone.Warning">
+        Without two-factor, your password alone signs in. The authenticator key stays: turning it back on works with the
+        same app. To stop that app from working, reset the authenticator instead.
+    </SdAlert>
+
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    <div class="sd-actions">
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DisableAsync">@(busy ? "Turning off..." : "Turn off two-factor")</SdButton>
+        <a class="sd-btn sd-btn--ghost" href="account/manage/two-factor">Cancel</a>
+    </div>
+</SdCard>
+
+@code {
+    private bool busy;
+    private string? error;
+
+    private async Task DisableAsync()
+    {
+        error = null;
+        busy = true;
+        var result = await Accounts.DisableTwoFactorAsync();
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("account/manage/two-factor?done=disabled");
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+}

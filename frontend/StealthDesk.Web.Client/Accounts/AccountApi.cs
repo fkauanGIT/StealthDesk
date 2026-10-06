@@ -18,11 +18,16 @@ public sealed record AccountResult(bool Succeeded, string? Error = null, IReadOn
 
   /// <summary>Signing in is refused until the email is confirmed.</summary>
   public bool IsNotAllowed => Detail == "NotAllowed";
+
+  /// <summary>The password was right; the account also needs a code from the authenticator app.</summary>
+  public bool IsTwoFactorRequired => Detail == "RequiresTwoFactor";
 }
 
 /// <summary>The server's account endpoints, as the pages use them. The browser carries the session cookie.</summary>
 public sealed class AccountApi(HttpClient http)
 {
+  private static readonly AccountResult Unreachable = new(false, "The server can't be reached. Try again in a moment.");
+
   public async Task<CurrentUser?> GetCurrentUserAsync(CancellationToken cancellationToken = default)
   {
     using var response = await http.GetAsync(Routes.CurrentUser, cancellationToken);
@@ -53,13 +58,8 @@ public sealed class AccountApi(HttpClient http)
     PostAsync($"{Routes.Auth}/resendConfirmationEmail", new { email });
 
   /// <summary>The signed-in user's account, or null when the session is gone.</summary>
-  public async Task<AccountProfile?> GetProfileAsync(CancellationToken cancellationToken = default)
-  {
-    using var response = await http.GetAsync(Routes.AccountProfile, cancellationToken);
-    return response.StatusCode == HttpStatusCode.OK
-      ? await response.Content.ReadFromJsonAsync<AccountProfile>(cancellationToken)
-      : null;
-  }
+  public async Task<AccountProfile?> GetProfileAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<AccountProfile>(Routes.AccountProfile, cancellationToken);
 
   public Task<AccountResult> UpdateProfileAsync(string? phoneNumber) =>
     SendAsync(HttpMethod.Put, Routes.AccountProfile, new ProfileUpdate { PhoneNumber = phoneNumber });
@@ -78,6 +78,54 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> DeleteAccountAsync(string? password) =>
     PostAsync(Routes.AccountDeletion, new AccountDeletion { Password = password });
 
+  public async Task<TwoFactorStatus?> GetTwoFactorAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<TwoFactorStatus>(Routes.TwoFactor, cancellationToken);
+
+  /// <summary>The key and QR code for the authenticator app; the server creates the key the first time.</summary>
+  public async Task<AuthenticatorSetup?> GetAuthenticatorAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<AuthenticatorSetup>(Routes.Authenticator, cancellationToken);
+
+  /// <summary>Turns two-factor on once the app's code checks out. New recovery codes come back on a first setup.</summary>
+  public Task<(AccountResult Result, RecoveryCodeSet? Codes)> EnableTwoFactorAsync(string code) =>
+    PostForAsync<RecoveryCodeSet>(Routes.TwoFactorEnable, new TwoFactorEnable { Code = code });
+
+  public Task<AccountResult> DisableTwoFactorAsync() => PostAsync(Routes.TwoFactorDisable, new { });
+
+  public Task<AccountResult> ResetAuthenticatorAsync() => PostAsync(Routes.AuthenticatorReset, new { });
+
+  public Task<(AccountResult Result, RecoveryCodeSet? Codes)> GenerateRecoveryCodesAsync() =>
+    PostForAsync<RecoveryCodeSet>(Routes.RecoveryCodes, new { });
+
+  public Task<AccountResult> ForgetBrowserAsync() => PostAsync(Routes.ForgetBrowser, new { });
+
+  /// <summary>The second sign-in step, in the same browser that passed the password.</summary>
+  public Task<AccountResult> SignInWithCodeAsync(string code, bool rememberMe, bool rememberBrowser) =>
+    PostAsync(Routes.SignInTwoFactor, new TwoFactorSignIn { Code = code, RememberMe = rememberMe, RememberBrowser = rememberBrowser });
+
+  public Task<AccountResult> SignInWithRecoveryCodeAsync(string recoveryCode) =>
+    PostAsync(Routes.SignInRecoveryCode, new RecoveryCodeSignIn { RecoveryCode = recoveryCode });
+
+  private async Task<T?> GetOrNullAsync<T>(string path, CancellationToken cancellationToken)
+  {
+    using var response = await http.GetAsync(path, cancellationToken);
+    return response.StatusCode == HttpStatusCode.OK ? await response.Content.ReadFromJsonAsync<T>(cancellationToken) : default;
+  }
+
+  private async Task<(AccountResult, T?)> PostForAsync<T>(string path, object body)
+  {
+    try
+    {
+      using var response = await http.PostAsJsonAsync(path, body);
+      return response.IsSuccessStatusCode
+        ? (AccountResult.Success, await response.Content.ReadFromJsonAsync<T>())
+        : (await FailureAsync(response), default);
+    }
+    catch (HttpRequestException)
+    {
+      return (Unreachable, default);
+    }
+  }
+
   private Task<AccountResult> PostAsync(string path, object body) => SendAsync(HttpMethod.Post, path, body);
 
   private async Task<AccountResult> SendAsync(HttpMethod method, string path, object body)
@@ -90,7 +138,7 @@ public sealed class AccountApi(HttpClient http)
     }
     catch (HttpRequestException)
     {
-      return new AccountResult(false, "The server can't be reached. Try again in a moment.");
+      return Unreachable;
     }
   }
 

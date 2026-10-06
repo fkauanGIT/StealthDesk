@@ -98,6 +98,13 @@
             return;
         }
 
+        if (result.IsTwoFactorRequired)
+        {
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters("account/sign-in/two-factor",
+                new Dictionary<string, object?> { ["rememberMe"] = remember ? "true" : null, ["returnUrl"] = ReturnUrl }));
+            return;
+        }
+
         needsConfirmation = result.IsNotAllowed;
         error = result.Error;
     }

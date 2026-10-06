@@ -1,0 +1,99 @@
+@page "/account/manage/two-factor/enable"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Set up authenticator app · StealthDesk</PageTitle>
+
+<SdCard Title="Set up authenticator app">
+    @if (codes is not null)
+    {
+        <SdAlert Tone="Tone.Info">Your authenticator app is verified and two-factor authentication is on.</SdAlert>
+        <RecoveryCodeList Codes="codes" />
+        <div>
+            <a class="sd-btn sd-btn--primary" href="account/manage/two-factor">I saved my codes</a>
+        </div>
+    }
+    else if (setup is null)
+    {
+        <SdLoading Text="Loading..." />
+    }
+    else
+    {
+        @if (Reset)
+        {
+            <SdAlert Tone="Tone.Info">Your authenticator key was reset. Set up the app again with the new key.</SdAlert>
+        }
+
+        <ol class="sd-steps">
+            <li>
+                <strong>Install an authenticator app</strong>
+                <span class="sd-muted">Microsoft Authenticator or Google Authenticator, on your phone.</span>
+            </li>
+            <li>
+                <strong>Scan this QR code</strong>
+                <span class="sd-muted">Or type the key <span class="sd-key sd-mono">@setup.SharedKey</span> by hand. Spaces and case don't matter.</span>
+                <img class="sd-qr" src="@setup.QrCode" alt="QR code for the authenticator app" width="180" height="180" />
+            </li>
+            <li>
+                <strong>Enter the code the app shows</strong>
+                <form class="sd-form" @onsubmit="VerifyAsync">
+                    <SdTextField Label="Verification code" Autocomplete="one-time-code" inputmode="numeric" @bind-Value="code" Error="@codeError" />
+                    <div>
+                        <SdButton Type="submit" Disabled="busy">@(busy ? "Verifying..." : "Verify")</SdButton>
+                    </div>
+                </form>
+            </li>
+        </ol>
+    }
+</SdCard>
+
+@code {
+    private AuthenticatorSetup? setup;
+    private IReadOnlyList<string>? codes;
+    private string? code;
+    private bool busy;
+    private string? codeError;
+
+    [SupplyParameterFromQuery]
+    public bool Reset { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        setup = await Accounts.GetAuthenticatorAsync();
+        if (setup is null)
+        {
+            Session.Expired();
+        }
+    }
+
+    private async Task VerifyAsync()
+    {
+        codeError = null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            codeError = "Enter the code from your app.";
+            return;
+        }
+
+        busy = true;
+        var (result, set) = await Accounts.EnableTwoFactorAsync(code);
+        busy = false;
+
+        if (!result.Succeeded)
+        {
+            codeError = result.Error;
+            return;
+        }
+
+        // A first setup brings recovery codes to save; setting the app up again keeps the ones the user has.
+        if (set is { Codes.Count: > 0 })
+        {
+            codes = set.Codes;
+        }
+        else
+        {
+            Navigation.NavigateTo("account/manage/two-factor?done=enabled");
+        }
+    }
+}

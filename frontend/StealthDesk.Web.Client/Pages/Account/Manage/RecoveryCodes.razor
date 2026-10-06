@@ -1,0 +1,53 @@
+@page "/account/manage/two-factor/recovery-codes"
+@inject AccountApi Accounts
+
+<PageTitle>Recovery codes · StealthDesk</PageTitle>
+
+<SdCard Title="Reset recovery codes">
+    @if (codes is not null)
+    {
+        <RecoveryCodeList Codes="codes" />
+        <div>
+            <a class="sd-btn sd-btn--primary" href="account/manage/two-factor">I saved my codes</a>
+        </div>
+    }
+    else
+    {
+        <SdAlert Tone="Tone.Warning">
+            New codes replace the ones you have: the old codes stop working. Your authenticator app keeps working.
+        </SdAlert>
+
+        @if (error is not null)
+        {
+            <SdAlert>@error</SdAlert>
+        }
+
+        <div class="sd-actions">
+            <SdButton Disabled="busy" OnClick="GenerateAsync">@(busy ? "Generating..." : "Generate new codes")</SdButton>
+            <a class="sd-btn sd-btn--ghost" href="account/manage/two-factor">Cancel</a>
+        </div>
+    }
+</SdCard>
+
+@code {
+    private IReadOnlyList<string>? codes;
+    private bool busy;
+    private string? error;
+
+    private async Task GenerateAsync()
+    {
+        error = null;
+        busy = true;
+        var (result, set) = await Accounts.GenerateRecoveryCodesAsync();
+        busy = false;
+
+        if (result.Succeeded && set is not null)
+        {
+            codes = set.Codes;
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+}

@@ -1,0 +1,93 @@
+@page "/account/sign-in/two-factor"
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Two-factor authentication · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">Two-factor authentication</h1>
+    <p class="sd-auth-subtitle">Enter the code from your authenticator app.</p>
+</header>
+
+@if (looksLikeRecoveryCode)
+{
+    <SdAlert Tone="Tone.Info">
+        That looks like a recovery code. This field takes the 6-digit code from your app.
+        <a href="@RecoveryCodePage"> Use the recovery code instead</a>
+    </SdAlert>
+}
+else if (error is not null)
+{
+    <SdAlert>
+        @error
+        <a href="@SignInAgain"> Sign in again</a>
+    </SdAlert>
+}
+
+<form class="sd-form" @onsubmit="SubmitAsync">
+    <SdTextField Label="Authenticator code" Autocomplete="one-time-code" inputmode="numeric" @bind-Value="code" Error="@codeError" />
+    <SdCheckbox Label="Remember this browser" @bind-Checked="rememberBrowser" />
+    <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Checking..." : "Sign in")</SdButton>
+</form>
+
+<p class="sd-auth-footer">
+    Lost your device? <a href="@RecoveryCodePage">Use a recovery code</a>
+</p>
+
+@code {
+    private string? code;
+    private bool rememberBrowser;
+    private bool busy;
+    private string? error;
+    private string? codeError;
+
+    [SupplyParameterFromQuery]
+    public bool RememberMe { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private bool looksLikeRecoveryCode;
+
+    private string RecoveryCodePage => Navigation.GetUriWithQueryParameters("account/sign-in/recovery-code", new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl });
+
+    private string SignInAgain => Navigation.GetUriWithQueryParameters("account/sign-in", new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl });
+
+    private async Task SubmitAsync()
+    {
+        error = codeError = null;
+        looksLikeRecoveryCode = false;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            codeError = "Enter the code from your app.";
+            return;
+        }
+
+        // Recovery codes look like "ABCD1-EFGH2". Sending one here would only fail, so point to the right page.
+        if (System.Text.RegularExpressions.Regex.IsMatch(code.Trim(), "^[A-Za-z0-9]{5}-[A-Za-z0-9]{5}$"))
+        {
+            looksLikeRecoveryCode = true;
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.SignInWithCodeAsync(code, RememberMe, rememberBrowser);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            AuthState.Refresh();
+            Navigation.NavigateTo(LocalUrl.Or(ReturnUrl));
+        }
+        else if (result.IsLockedOut)
+        {
+            Navigation.NavigateTo("account/locked-out");
+        }
+        else
+        {
+            // The server can't tell a wrong code from a sign-in that waited too long: both have no pending password.
+            error = "The code is wrong, or this sign-in has expired.";
+        }
+    }
+}

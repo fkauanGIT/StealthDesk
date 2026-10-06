@@ -1,0 +1,115 @@
+@page "/account/manage/two-factor"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+
+<PageTitle>Two-factor authentication · StealthDesk</PageTitle>
+
+<SdCard Title="Two-factor authentication">
+    @if (status is null)
+    {
+        <SdLoading Text="Loading..." />
+    }
+    else
+    {
+        @if (Message is { } message)
+        {
+            <SdAlert Tone="Tone.Info">@message</SdAlert>
+        }
+
+        <div class="sd-current">
+            <span class="sd-label">Status</span>
+            <span class="sd-current-value">
+                @if (status.Enabled)
+                {
+                    <SdStatus Tone="Tone.Online" Text="On" />
+                    <span class="sd-muted">Signing in asks for a code from your authenticator app.</span>
+                }
+                else
+                {
+                    <SdStatus Tone="Tone.Neutral" Text="Off" />
+                    <span class="sd-muted">Signing in needs only your password.</span>
+                }
+            </span>
+        </div>
+
+        @if (status.Enabled)
+        {
+            @if (status.RecoveryCodesLeft == 0)
+            {
+                <SdAlert>You have no recovery codes left. <a href="account/manage/two-factor/recovery-codes">Generate new ones</a> before you need one.</SdAlert>
+            }
+            else if (status.RecoveryCodesLeft <= 3)
+            {
+                <SdAlert Tone="Tone.Warning">
+                    You have @status.RecoveryCodesLeft recovery @(status.RecoveryCodesLeft == 1 ? "code" : "codes") left.
+                    <a href="account/manage/two-factor/recovery-codes">Generate new ones</a>.
+                </SdAlert>
+            }
+
+            <div class="sd-actions">
+                @if (status.IsBrowserRemembered)
+                {
+                    <SdButton Variant="ButtonVariant.Secondary" Disabled="busy" OnClick="ForgetBrowserAsync">Forget this browser</SdButton>
+                }
+                <a class="sd-btn sd-btn--secondary" href="account/manage/two-factor/recovery-codes">Reset recovery codes</a>
+                <a class="sd-btn sd-btn--ghost" href="account/manage/two-factor/disable">Turn off</a>
+            </div>
+        }
+    }
+</SdCard>
+
+@if (status is not null)
+{
+    <SdCard Title="Authenticator app">
+        <p class="sd-muted">Use an app such as Microsoft Authenticator or Google Authenticator to get sign-in codes.</p>
+        <div class="sd-actions">
+            @if (!status.HasAuthenticator)
+            {
+                <a class="sd-btn sd-btn--primary" href="account/manage/two-factor/enable">Add authenticator app</a>
+            }
+            else
+            {
+                <a class="sd-btn sd-btn--primary" href="account/manage/two-factor/enable">Set up authenticator app</a>
+                <a class="sd-btn sd-btn--ghost" href="account/manage/two-factor/reset">Reset authenticator app</a>
+            }
+        </div>
+    </SdCard>
+}
+
+@code {
+    private TwoFactorStatus? status;
+    private bool busy;
+    private string? forgotten;
+
+    /// <summary>What the page that sent the user here did.</summary>
+    [SupplyParameterFromQuery]
+    public string? Done { get; set; }
+
+    private string? Message => forgotten ?? Done switch
+    {
+        "enabled" => "Two-factor authentication is on.",
+        "disabled" => "Two-factor authentication is off. Your authenticator app still has the key; reset it if you no longer trust that device.",
+        _ => null,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        status = await Accounts.GetTwoFactorAsync();
+        if (status is null)
+        {
+            Session.Expired();
+        }
+    }
+
+    private async Task ForgetBrowserAsync()
+    {
+        busy = true;
+        var result = await Accounts.ForgetBrowserAsync();
+        busy = false;
+        if (result.Succeeded)
+        {
+            status = status! with { IsBrowserRemembered = false };
+            forgotten = "This browser is forgotten. Signing in here asks for a code again.";
+        }
+    }
+}
