@@ -23,6 +23,11 @@ internal sealed class FakeApi : HttpMessageHandler
 
   private readonly System.Collections.Concurrent.ConcurrentQueue<string> _requests = new();
 
+  /// <summary>The bodies the fake received, in order; empty for requests without one.</summary>
+  public IReadOnlyList<string> Bodies => [.. _bodies];
+
+  private readonly System.Collections.Concurrent.ConcurrentQueue<string> _bodies = new();
+
   public void RespondWith<T>(T body) =>
     Send(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
 
@@ -37,6 +42,7 @@ internal sealed class FakeApi : HttpMessageHandler
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
   {
     _requests.Enqueue($"{request.Method} {request.RequestUri!.PathAndQuery}");
+    _bodies.Enqueue(request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult() ?? string.Empty);
     lock (_gate)
     {
       if (_ready.TryDequeue(out var response))

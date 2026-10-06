@@ -150,7 +150,7 @@ public static class ManageEndpoints
   };
 
   // Browsers keep the session in a cookie that must carry the new security stamp. Bearer tokens have nothing to renew.
-  private static async Task RefreshCookieAsync(HttpContext context, SignInManager<UserRecord> signIn, UserRecord user)
+  internal static async Task RefreshCookieAsync(HttpContext context, SignInManager<UserRecord> signIn, UserRecord user)
   {
     if (context.User.Identity?.AuthenticationType == IdentityConstants.ApplicationScheme)
     {

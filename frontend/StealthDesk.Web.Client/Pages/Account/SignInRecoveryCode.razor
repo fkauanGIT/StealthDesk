@@ -1,0 +1,66 @@
+@page "/account/sign-in/recovery-code"
+@inject AccountApi Accounts
+@inject ServerAuthenticationState AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in with a recovery code · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">Use a recovery code</h1>
+    <p class="sd-auth-subtitle">Each recovery code works once. This sign-in lasts until you close the browser.</p>
+</header>
+
+@if (error is not null)
+{
+    <SdAlert>
+        @error
+        <a href="@Navigation.GetUriWithQueryParameters("account/sign-in", new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl })"> Sign in again</a>
+    </SdAlert>
+}
+
+<form class="sd-form" @onsubmit="SubmitAsync">
+    <SdTextField Label="Recovery code" Autocomplete="off" @bind-Value="code" Error="@codeError" class="sd-input sd-mono" />
+    <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Checking..." : "Sign in")</SdButton>
+</form>
+
+<p class="sd-auth-footer">
+    Have your device? <a href="@Navigation.GetUriWithQueryParameters("account/sign-in/two-factor", new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl })">Use the authenticator code</a>
+</p>
+
+@code {
+    private string? code;
+    private bool busy;
+    private string? error;
+    private string? codeError;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        error = codeError = null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            codeError = "Enter one of your recovery codes.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.SignInWithRecoveryCodeAsync(code.Trim());
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            AuthState.Refresh();
+            Navigation.NavigateTo(LocalUrl.Or(ReturnUrl));
+        }
+        else if (result.IsLockedOut)
+        {
+            Navigation.NavigateTo("account/locked-out");
+        }
+        else
+        {
+            error = "This recovery code is wrong or already used, or this sign-in has expired.";
+        }
+    }
+}

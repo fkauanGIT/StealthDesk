@@ -182,6 +182,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/account/password` | HTTP | Changes the password; other sessions are signed out. `/password/set` adds one to an account without it. |
 | `/api/account/personal-data` | HTTP | Downloads the user's personal data as JSON. |
 | `/api/account/delete` | HTTP | Deletes the signed-in account; needs the password when the account has one. |
+| `/api/account/two-factor/*` | HTTP | Two-factor with an authenticator app: status, the key and QR code, turning it on and off, resetting the key, new recovery codes, forgetting this browser. |
+| `/api/auth/two-factor` | HTTP | The second sign-in step with the app's code, after `/login` answered `RequiresTwoFactor`. `/api/auth/recovery-code` does the same with a recovery code. |
 
 A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 | `/api/internal/version/server` | HTTP | Returns the server version. |

@@ -1,0 +1,15 @@
+@* New recovery codes, shown once: the server keeps only a protected copy. *@
+<SdAlert Tone="Tone.Warning">
+    Put these codes somewhere safe. If you lose your device, they are the only way back in, and you won't see them again.
+</SdAlert>
+<ol class="sd-codes">
+    @foreach (var recoveryCode in Codes)
+    {
+        <li class="sd-mono">@recoveryCode</li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Codes { get; set; } = [];
+}
