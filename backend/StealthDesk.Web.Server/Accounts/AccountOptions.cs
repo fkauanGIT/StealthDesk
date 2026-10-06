@@ -26,4 +26,7 @@ public sealed class AccountOptions
   /// administrator. Independent of <see cref="EnablePublicRegistration"/>.
   /// </summary>
   public bool DisableFirstUserSelfRegistration { get; set; }
+
+  /// <summary>A passkey sign-in keeps the session after the browser closes, like "remember me".</summary>
+  public bool PersistPasskeySignIn { get; set; }
 }

@@ -1,0 +1,88 @@
+@page "/account/manage/passkeys/{Id}"
+@inject AccountApi Accounts
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Name your passkey · StealthDesk</PageTitle>
+
+<SdCard Title="@(New ? "Name your new passkey" : "Rename passkey")">
+    @if (passkeys is null)
+    {
+        <SdLoading Text="Loading..." />
+    }
+    else if (passkey is null)
+    {
+        <SdEmptyState Title="Passkey not found">It may have been removed. <a href="account/manage/passkeys">Back to your passkeys</a></SdEmptyState>
+    }
+    else
+    {
+        @if (New)
+        {
+            <SdAlert Tone="Tone.Info">Passkey added. Give it a name you'll recognize, like the device it lives on.</SdAlert>
+        }
+
+        @if (error is not null)
+        {
+            <SdAlert>@error</SdAlert>
+        }
+
+        <form class="sd-form" @onsubmit="SaveAsync">
+            <SdTextField Label="Name" @bind-Value="name" Error="@nameError" placeholder="Work laptop" maxlength="200" />
+            <div class="sd-actions">
+                <SdButton Type="submit" Disabled="busy">@(busy ? "Saving..." : "Save")</SdButton>
+                <a class="sd-btn sd-btn--ghost" href="account/manage/passkeys">@(New ? "Skip" : "Cancel")</a>
+            </div>
+        </form>
+    }
+</SdCard>
+
+@code {
+    private IReadOnlyList<PasskeySummary>? passkeys;
+    private PasskeySummary? passkey;
+    private string? name;
+    private bool busy;
+    private string? error;
+    private string? nameError;
+
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Just added: the page asks for a first name instead of a new one.</summary>
+    [SupplyParameterFromQuery]
+    public bool New { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        passkeys = await Accounts.GetPasskeysAsync();
+        if (passkeys is null)
+        {
+            Session.Expired();
+            return;
+        }
+
+        passkey = passkeys.FirstOrDefault(x => x.Id == Id);
+        name = passkey?.Name;
+    }
+
+    private async Task SaveAsync()
+    {
+        error = nameError = null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            nameError = "Enter a name.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.RenamePasskeyAsync(Id, name);
+        busy = false;
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("account/manage/passkeys");
+            return;
+        }
+
+        error = result.Error;
+    }
+}

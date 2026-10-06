@@ -103,6 +103,7 @@ Account rules come from the `Accounts` section of `appsettings.json`:
 | `EnablePublicRegistration` | `false` | Lets anyone register at any time; each registration gets its own tenant. |
 | `DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
 | `RequireConfirmedEmail` | `false` | Users must confirm their email before signing in. Needs email sending. |
+| `PersistPasskeySignIn` | `false` | A passkey sign-in keeps the session after the browser closes, like "Remember me". |
 
 A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
 tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
@@ -184,6 +185,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/account/delete` | HTTP | Deletes the signed-in account; needs the password when the account has one. |
 | `/api/account/two-factor/*` | HTTP | Two-factor with an authenticator app: status, the key and QR code, turning it on and off, resetting the key, new recovery codes, forgetting this browser. |
 | `/api/auth/two-factor` | HTTP | The second sign-in step with the app's code, after `/login` answered `RequiresTwoFactor`. `/api/auth/recovery-code` does the same with a recovery code. |
+| `/api/account/passkeys` | HTTP | The user's passkeys: list (`GET`), add (`POST`, after `POST /creation-options`), rename (`PUT /{id}`) and remove (`DELETE /{id}`). |
+| `/api/auth/passkey` | HTTP | Signs in with a passkey, after `POST /api/auth/passkey/request-options`. Needs no second factor. |
 
 A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 | `/api/internal/version/server` | HTTP | Returns the server version. |

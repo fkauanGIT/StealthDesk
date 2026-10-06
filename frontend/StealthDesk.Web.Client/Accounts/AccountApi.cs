@@ -105,6 +105,56 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> SignInWithRecoveryCodeAsync(string recoveryCode) =>
     PostAsync(Routes.SignInRecoveryCode, new RecoveryCodeSignIn { RecoveryCode = recoveryCode });
 
+  /// <summary>The user's passkeys, or null when the session is gone.</summary>
+  public async Task<IReadOnlyList<PasskeySummary>?> GetPasskeysAsync(CancellationToken cancellationToken = default) =>
+    await GetOrNullAsync<List<PasskeySummary>>(Routes.Passkeys, cancellationToken);
+
+  /// <summary>The options, with a fresh challenge, that the browser hands to the authenticator to create a passkey.</summary>
+  public Task<(AccountResult Result, string? Json)> GetPasskeyCreationOptionsAsync() => PostForTextAsync(Routes.PasskeyCreationOptions);
+
+  public Task<(AccountResult Result, PasskeySummary? Passkey)> AddPasskeyAsync(string credentialJson) =>
+    PostForAsync<PasskeySummary>(Routes.Passkeys, new PasskeyCredential { CredentialJson = credentialJson });
+
+  public Task<AccountResult> RenamePasskeyAsync(string id, string name) =>
+    SendAsync(HttpMethod.Put, Routes.Passkey(id), new PasskeyRename { Name = name });
+
+  public async Task<AccountResult> RemovePasskeyAsync(string id)
+  {
+    try
+    {
+      using var response = await http.DeleteAsync(Routes.Passkey(id));
+      return response.IsSuccessStatusCode ? AccountResult.Success : await FailureAsync(response);
+    }
+    catch (HttpRequestException)
+    {
+      return Unreachable;
+    }
+  }
+
+  /// <param name="email">Names that user's passkeys; without it, the browser offers any passkey it has for this site.</param>
+  public Task<(AccountResult Result, string? Json)> GetPasskeyRequestOptionsAsync(string? email = null) =>
+    PostForTextAsync(string.IsNullOrWhiteSpace(email)
+      ? Routes.PasskeyRequestOptions
+      : $"{Routes.PasskeyRequestOptions}?email={Uri.EscapeDataString(email.Trim())}");
+
+  public Task<AccountResult> SignInWithPasskeyAsync(string credentialJson) =>
+    PostAsync(Routes.SignInPasskey, new PasskeyCredential { CredentialJson = credentialJson });
+
+  private async Task<(AccountResult, string?)> PostForTextAsync(string path)
+  {
+    try
+    {
+      using var response = await http.PostAsync(path, null);
+      return response.IsSuccessStatusCode
+        ? (AccountResult.Success, await response.Content.ReadAsStringAsync())
+        : (await FailureAsync(response), null);
+    }
+    catch (HttpRequestException)
+    {
+      return (Unreachable, null);
+    }
+  }
+
   private async Task<T?> GetOrNullAsync<T>(string path, CancellationToken cancellationToken)
   {
     using var response = await http.GetAsync(path, cancellationToken);

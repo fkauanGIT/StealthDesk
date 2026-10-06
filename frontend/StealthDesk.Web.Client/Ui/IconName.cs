@@ -14,4 +14,5 @@ public enum IconName
   Lock,
   Download,
   Shield,
+  Key,
 }

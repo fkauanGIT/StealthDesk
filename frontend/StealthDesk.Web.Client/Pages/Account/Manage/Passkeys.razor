@@ -1,0 +1,154 @@
+@page "/account/manage/passkeys"
+@inject AccountApi Accounts
+@inject IPasskeyBridge Bridge
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Passkeys · StealthDesk</PageTitle>
+
+<SdCard Title="Passkeys">
+    <p class="sd-muted">
+        Sign in with your fingerprint, face, PIN or security key instead of your password. The key stays on your device:
+        StealthDesk keeps only the public half, which can't sign anyone in.
+    </p>
+
+    @if (message is not null)
+    {
+        <SdAlert Tone="Tone.Info">@message</SdAlert>
+    }
+    else if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    @if (passkeys is null)
+    {
+        <SdLoading Text="Loading your passkeys..." />
+    }
+    else if (passkeys.Count == 0)
+    {
+        <SdEmptyState Title="No passkeys yet">Add one to sign in without typing your password.</SdEmptyState>
+    }
+    else
+    {
+        <ul class="sd-passkeys">
+            @foreach (var passkey in passkeys)
+            {
+                <li class="sd-passkey">
+                    <SdIcon Name="IconName.Key" />
+                    <span class="sd-passkey-text">
+                        <span class="sd-passkey-name">@(passkey.Name ?? "Unnamed passkey")</span>
+                        <span class="sd-muted">Added @passkey.CreatedAt.ToLocalTime().ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</span>
+                    </span>
+                    @if (passkey.IsBackedUp)
+                    {
+                        <SdStatus Tone="Tone.Neutral" Text="Synced" />
+                    }
+                    <a class="sd-btn sd-btn--ghost" href="account/manage/passkeys/@passkey.Id">Rename</a>
+                    <SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = passkey">Remove</SdButton>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (supported)
+    {
+        <div>
+            <SdButton Icon="IconName.Key" Disabled="busy" OnClick="AddAsync">@(busy ? "Waiting for your device..." : "Add a passkey")</SdButton>
+        </div>
+    }
+    else if (passkeys is not null)
+    {
+        <SdAlert Tone="Tone.Warning">This browser doesn't support passkeys. Use an up-to-date Edge, Chrome, Firefox or Safari.</SdAlert>
+    }
+</SdCard>
+
+<SdDialog Open="removing is not null" Title="Remove this passkey?" OnClose="() => removing = null">
+    <ChildContent>
+        <p class="sd-muted">
+            "@(removing?.Name ?? "Unnamed passkey")" will no longer sign you in. You can still sign in with your password.
+        </p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="RemoveAsync">Remove</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private IReadOnlyList<PasskeySummary>? passkeys;
+    private PasskeySummary? removing;
+    private bool supported;
+    private bool busy;
+    private string? message;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        passkeys = await Accounts.GetPasskeysAsync();
+        if (passkeys is null)
+        {
+            Session.Expired();
+            return;
+        }
+
+        supported = await Bridge.IsSupportedAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        message = error = null;
+        busy = true;
+        try
+        {
+            var (options, json) = await Accounts.GetPasskeyCreationOptionsAsync();
+            if (!options.Succeeded)
+            {
+                error = options.Error;
+                return;
+            }
+
+            var outcome = await Bridge.CreateAsync(json!);
+            if (!outcome.Succeeded)
+            {
+                error = outcome.Message;
+                return;
+            }
+
+            var (added, passkey) = await Accounts.AddPasskeyAsync(outcome.CredentialJson!);
+            if (!added.Succeeded)
+            {
+                error = added.Error;
+                return;
+            }
+
+            // A new passkey has no name yet: ask for one right away.
+            Navigation.NavigateTo($"account/manage/passkeys/{passkey!.Id}?new=true");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        var passkey = removing!;
+        busy = true;
+        var result = await Accounts.RemovePasskeyAsync(passkey.Id);
+        busy = false;
+        removing = null;
+
+        if (result.Succeeded)
+        {
+            passkeys = [.. passkeys!.Where(x => x.Id != passkey.Id)];
+            message = $"\"{passkey.Name ?? "Unnamed passkey"}\" was removed.";
+            error = null;
+        }
+        else
+        {
+            error = result.Error;
+            message = null;
+        }
+    }
+}
