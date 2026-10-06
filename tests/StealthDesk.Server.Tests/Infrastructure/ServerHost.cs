@@ -13,6 +13,12 @@ public sealed class ServerHost : WebApplicationFactory<Program>
   private ServerHost(Dictionary<string, string?> settings)
   {
     _settings = settings;
+
+    // Development reads the machine's user secrets: providers configured there must not leak into tests.
+    foreach (var key in new[] { "MicrosoftClientId", "MicrosoftClientSecret", "GitHubClientId", "GitHubClientSecret" })
+    {
+      _settings.TryAdd($"Accounts:{key}", string.Empty);
+    }
   }
 
   /// <param name="databaseName">Two servers given the same name share the database, like a restart.</param>
