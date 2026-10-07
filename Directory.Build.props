@@ -4,7 +4,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 
     <!-- Product version for every project. Bumped when a milestone is released (tag vX.Y.Z). -->
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
 
     <Authors>StealthDesk</Authors>
     <Copyright>©️ $([System.DateTime]::Now.Year) StealthDesk</Copyright>
