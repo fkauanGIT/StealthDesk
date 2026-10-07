@@ -14,9 +14,12 @@ public class PasskeyTests
   public async Task Passkey_Added_SignsIn_IsRenamed_AndOnceRemovedIsRefused()
   {
     await using var app = await UiApp.StartAsync();
+
+    // No passkey autofill in the email field here, so only the button signs in; the other test covers autofill.
+    await app.Context.AddInitScriptAsync("PublicKeyCredential.isConditionalMediationAvailable = async () => false;");
     var devtools = await app.Context.NewCDPSessionAsync(app.Page);
     await devtools.SendAsync("WebAuthn.enable");
-    var authenticator = (await devtools.SendAsync("WebAuthn.addVirtualAuthenticator", new Dictionary<string, object>
+    await devtools.SendAsync("WebAuthn.addVirtualAuthenticator", new Dictionary<string, object>
     {
       ["options"] = new Dictionary<string, object>
       {
@@ -27,11 +30,7 @@ public class PasskeyTests
         ["isUserVerified"] = true,
         ["automaticPresenceSimulation"] = true,
       },
-    }))!.Value.GetProperty("authenticatorId").GetString()!;
-
-    // Without simulated touches, the email field's autofill waits instead of signing in by itself.
-    Task Touches(bool on) => devtools.SendAsync("WebAuthn.setAutomaticPresenceSimulation",
-      new Dictionary<string, object> { ["authenticatorId"] = authenticator, ["enabled"] = on });
+    });
 
     await app.RegisterAsync("admin@example.com", Password);
     await app.GoAsync("account/manage/passkeys");
@@ -42,9 +41,7 @@ public class PasskeyTests
     await app.ClickAsync("Save");
     await Expect(app.Page.Locator(".sd-passkey-name")).ToHaveTextAsync("Virtual authenticator");
 
-    await Touches(false);
     await app.SignOutAsync();
-    await Touches(true);
     await app.ClickAsync("Sign in with a passkey");
     await Expect(app.Heading("Devices")).ToBeVisibleAsync();
 
@@ -60,9 +57,7 @@ public class PasskeyTests
     await Expect(app.Page.Locator(".sd-empty-title")).ToHaveTextAsync("No passkeys yet");
 
     // The device still has the key, but the server no longer knows it.
-    await Touches(false);
     await app.SignOutAsync();
-    await Touches(true);
     await app.ClickAsync("Sign in with a passkey");
     await Expect(app.Alert).ToContainTextAsync("This passkey isn't registered here");
     Assert.StartsWith("/account/sign-in", app.Location, StringComparison.Ordinal);
