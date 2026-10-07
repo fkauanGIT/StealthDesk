@@ -86,7 +86,7 @@ public class ServerStartupTests
     var version = await client.GetStringAsync(Routes.ServerVersion, TestContext.Current.CancellationToken);
 
     // Update together with <Version> in Directory.Build.props when a release is cut.
-    Assert.Equal("0.2.0.0", version);
+    Assert.Equal("0.3.0.0", version);
   }
 
   [Fact]

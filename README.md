@@ -8,8 +8,9 @@ StealthDesk is a self-hosted remote device management platform built with .NET 1
 A lightweight agent runs on each managed machine and keeps a signed, real-time SignalR connection to
 the server, which tracks every device and, in later versions, lets technicians reach them from the browser.
 
-> **Early development:** until v1.0 there may be breaking changes between versions. The API has no
-> authentication until v0.3, so don't expose the server to the internet.
+> **Early development:** until v1.0 there may be breaking changes between versions. Users sign in since v0.3, but
+> every user of a tenant still sees all of its devices until permissions arrive in v0.4, and the server has not
+> been hardened for the internet yet.
 
 ## Project Status
 
@@ -33,7 +34,19 @@ browser shows every device and keeps it current without refreshing.
 - The page shows whether it is live or reconnecting, and reloads the list after reconnecting
 - Devices are marked offline when the server starts, and agents the server forgot register again on their own
 
-Next up: **v0.3**, user accounts.
+**v0.3 - User accounts** ([#25](https://github.com/fkauanGIT/StealthDesk/issues/25)) is complete: people sign in
+from the browser, and each tenant sees only its own devices.
+
+- The first person to register becomes the server administrator; public registration and email confirmation are
+  optional, and account emails go out by SMTP
+- Sign-in with a password, a passkey (Windows Hello, a phone or a security key) or a Microsoft or GitHub account
+- Two-factor authentication with an authenticator app, recovery codes and remembered browsers
+- Account settings: profile, email change, password, passkeys, linked accounts, two-factor, personal data download
+  and account deletion
+- The device API and the dashboard hub require sign-in, and devices and users are kept per tenant
+- Account journeys are tested end to end on PostgreSQL, and browser tests with Playwright run in their own workflow
+
+Next up: **v0.4**, permissions and access.
 
 ### Roadmap
 
