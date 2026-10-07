@@ -234,6 +234,24 @@ installation is not needed. Agent tests that call Windows APIs are skipped on ot
 tested with [bUnit](https://bunit.dev/), which renders them without a browser. CI runs every
 test project on each pull request and on every push to `main`, with a separate job for the Windows tests.
 
+### UI tests
+
+`tests/StealthDesk.Web.UITests` drives a real browser with [Playwright](https://playwright.dev/dotnet/) through
+registration, sign-in, account settings, two-factor, passkeys and the external providers. Each test starts the built
+server as its own process on a fresh PostgreSQL database, so build first and keep Docker running:
+
+```
+dotnet build StealthDesk.slnx
+dotnet run --project tests/StealthDesk.Web.UITests
+```
+
+On Windows they use the installed Edge; elsewhere they install Playwright's Chromium on the first run.
+`STEALTHDESK_UI_BROWSER` picks another browser channel (e.g. `chrome`) and `STEALTHDESK_UI_HEADED=1` shows the
+window. Each test's last screen and the server's log land in `TestResults/StealthDesk.Web.UITests/`.
+
+They take a few minutes, so CI leaves them out; the **UI tests** workflow runs them when started from the Actions
+tab, and on pull requests that change them.
+
 ## Repository Layout
 
 | Path | Contents |
@@ -242,7 +260,7 @@ test project on each pull request and on every push to `main`, with a separate j
 | `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent gateway, REST API and EF Core database |
 | `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
-| `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests` |
+| `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests`, and the browser tests in `StealthDesk.Web.UITests` |
 
 ## Contributing
 

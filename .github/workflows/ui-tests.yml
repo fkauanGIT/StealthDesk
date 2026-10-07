@@ -1,0 +1,66 @@
+name: UI tests
+
+# Browser tests take minutes, so they run when asked for instead of on every pull request; only a pull request that
+# changes the UI tests themselves runs them on its own.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/StealthDesk.Web.UITests/**
+      - .github/workflows/ui-tests.yml
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  ui-tests:
+    name: UI tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build StealthDesk.slnx --configuration Release
+
+      # Playwright's own Chromium and the Linux libraries it needs.
+      - name: Install Chromium
+        run: ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run UI tests
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build
+          if ($LASTEXITCODE -ne 0) {
+            throw "UI tests failed."
+          }
+
+      # Each test's last screen and the server's log, to see what went wrong.
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-test-results
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
