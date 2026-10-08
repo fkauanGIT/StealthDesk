@@ -56,8 +56,9 @@ Next up: **v0.4**, permissions and access.
 | v0.2 | Live device dashboard | [#24](https://github.com/fkauanGIT/StealthDesk/issues/24) |
 | v0.3 | User accounts | [#25](https://github.com/fkauanGIT/StealthDesk/issues/25) |
 | v0.4 | Permissions and access | [#100](https://github.com/fkauanGIT/StealthDesk/issues/100) |
-| v0.5 | Remote terminal | [#26](https://github.com/fkauanGIT/StealthDesk/issues/26) |
-| v0.6 | Remote desktop (MVP) | [#27](https://github.com/fkauanGIT/StealthDesk/issues/27) |
+| v0.5 | Deployment | [#127](https://github.com/fkauanGIT/StealthDesk/issues/127) |
+| v0.6 | Remote terminal | [#26](https://github.com/fkauanGIT/StealthDesk/issues/26) |
+| v0.7 | Remote desktop (MVP) | [#27](https://github.com/fkauanGIT/StealthDesk/issues/27) |
 
 ## Prerequisites
 
