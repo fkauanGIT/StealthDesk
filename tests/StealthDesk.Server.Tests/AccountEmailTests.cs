@@ -181,9 +181,11 @@ public class AccountEmailTests
     using var client = TestAccounts.Client(server);
 
     // The fake server never answers, so a real attempt connects and then gives up; the request still succeeds.
+    // Whichever comes first decides: a busy machine may take seconds to connect, but never finishes the request
+    // before connecting when sending is on.
     var accept = smtp.AcceptTcpClientAsync(Cancel).AsTask();
     var forgot = client.PostAsJsonAsync($"{Routes.Auth}/forgotPassword", new { email = "edu@example.com" }, Cancel);
-    var connected = await Task.WhenAny(accept, Task.Delay(TimeSpan.FromSeconds(3), Cancel)) == accept;
+    var connected = await Task.WhenAny(accept, forgot, Task.Delay(TimeSpan.FromSeconds(30), Cancel)) == accept;
     if (connected)
     {
       (await accept).Dispose();
