@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Identity;
+using StealthDesk.Contracts.Permissions;
+using StealthDesk.Web.Server.Permissions;
 using StealthDesk.Web.Server.Email;
 
 namespace StealthDesk.Web.Server.Accounts;
@@ -31,6 +33,7 @@ public sealed class Registration(
   IOptionsMonitor<AccountOptions> options,
   IOptionsMonitor<EmailOptions> emailOptions,
   AccountEmails emails,
+  PermissionSeeder permissions,
   ILogger<Registration> logger) : IRegistration
 {
   public async Task<bool> IsOpenAsync(CancellationToken cancellationToken = default)
@@ -95,11 +98,9 @@ public sealed class Registration(
     var firstUser = await db.Users.CountAsync(cancellationToken) == 1;
     var serverAdministrator = firstUser && !options.CurrentValue.DisableFirstUserSelfRegistration;
 
-    await users.AddClaimAsync(user, StealthDeskClaims.Marker(StealthDeskClaims.TenantAdministrator));
-    if (serverAdministrator)
-    {
-      await users.AddClaimAsync(user, StealthDeskClaims.Marker(StealthDeskClaims.ServerAdministrator));
-    }
+    // The account created its tenant, so it administers it; the server's first one administers the server too.
+    var presets = PermissionPresets.TenantCreator.Concat(PermissionPresets.Baseline);
+    await permissions.SeedAsync(user.Id, user.TenantId, serverAdministrator ? PermissionPresets.FirstUser.Concat(presets) : presets, cancellationToken);
 
     // The first user, and anyone on a server that sends no email, could never get the link: confirmed right away.
     var confirmation = await users.GenerateEmailConfirmationTokenAsync(user);

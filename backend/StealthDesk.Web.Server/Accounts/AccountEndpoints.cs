@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Contracts.Permissions;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -20,7 +22,7 @@ public static class AccountEndpoints
         ExternalProviders = await ExternalLoginEndpoints.ProvidersAsync(signIn),
       });
 
-    auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db) =>
+    auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db, IPermissionEvaluator permissions) =>
     {
       var user = await users.GetUserAsync(context.User);
       if (user is null)
@@ -29,7 +31,10 @@ public static class AccountEndpoints
       }
 
       var tenantName = await db.Tenants.Where(x => x.Id == user.TenantId).Select(x => x.Name).FirstOrDefaultAsync();
-      var claims = await users.GetClaimsAsync(user);
+      // Administrators are whoever may manage access, at the server or in their tenant.
+      var principal = new Principal(PermissionPrincipalKind.User, user.Id, user.TenantId);
+      var server = await permissions.EvaluateAsync(principal, PermissionNames.ServerPermissionsWrite, Resource.Server, context.RequestAborted);
+      var tenant = await permissions.EvaluateAsync(principal, PermissionNames.TenantPermissionsWrite, Resource.Tenant(user.TenantId), context.RequestAborted);
       return Results.Ok(new CurrentUser
       {
         Id = user.Id,
@@ -39,8 +44,8 @@ public static class AccountEndpoints
         EmailConfirmed = user.EmailConfirmed,
         TwoFactorEnabled = user.TwoFactorEnabled,
         MustChangePassword = user.MustChangePassword,
-        IsServerAdministrator = claims.Any(x => x.Type == StealthDeskClaims.ServerAdministrator),
-        IsTenantAdministrator = claims.Any(x => x.Type == StealthDeskClaims.TenantAdministrator),
+        IsServerAdministrator = server.Allowed,
+        IsTenantAdministrator = tenant.Allowed,
       });
     }).RequireAuthorization();
 
