@@ -4,7 +4,7 @@ using StealthDesk.Web.Server.Devices;
 
 namespace StealthDesk.Web.Server.Dashboard;
 
-/// <summary>Tells the connected dashboards that a device changed.</summary>
+/// <summary>Tells the dashboards subscribed to a device that it changed.</summary>
 public interface IDeviceNotifier
 {
   Task DeviceChangedAsync(DeviceRecord device);
@@ -20,7 +20,7 @@ public sealed class DeviceNotifier(
   {
     try
     {
-      await dashboards.Clients.Group(DashboardHub.TenantGroup(device.TenantId)).DeviceChanged(DeviceEndpoints.ToSummary(device));
+      await dashboards.Clients.Group(DashboardHub.DeviceGroup(device.Id)).DeviceChanged(DeviceEndpoints.ToSummary(device));
     }
     catch (Exception ex)
     {

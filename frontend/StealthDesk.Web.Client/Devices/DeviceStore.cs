@@ -103,6 +103,7 @@ public sealed class DeviceStore(HttpClient http)
       }
 
       _devices[id] = device;
+      Changed?.Invoke();
       return DeviceLookup.Found(device);
     }
     catch (Exception ex) when (ex is HttpRequestException or JsonException)
@@ -112,6 +113,9 @@ public sealed class DeviceStore(HttpClient http)
   }
 
   public DeviceSummary? Get(Guid id) => _devices.GetValueOrDefault(id);
+
+  /// <summary>Every device known, listed or opened directly: the ones live updates subscribe to.</summary>
+  public IReadOnlyCollection<Guid> KnownIds => _devices.Keys;
 
   /// <summary>A change pushed by the server: replaces the device, or adds it if it's new.</summary>
   public void Apply(DeviceSummary device)

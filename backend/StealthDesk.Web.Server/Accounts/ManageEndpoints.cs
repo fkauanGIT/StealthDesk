@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -14,7 +15,7 @@ public static class ManageEndpoints
 {
   public static IEndpointRouteBuilder MapManageEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    var account = endpoints.MapGroup(Routes.Account).RequireAuthorization();
+    var account = endpoints.MapGroup(Routes.Account).RequireAuthorization().OwnAccount();
 
     account.MapGet("/profile", async (ClaimsPrincipal principal, UserManager<UserRecord> users) =>
       await users.GetUserAsync(principal) is { } user ? Results.Ok(await ProfileAsync(users, user)) : Results.Unauthorized());

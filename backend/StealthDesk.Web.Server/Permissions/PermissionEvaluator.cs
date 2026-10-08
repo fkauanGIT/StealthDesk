@@ -13,6 +13,9 @@ public interface IPermissionEvaluator
     IReadOnlyCollection<string> permissions,
     Resource resource,
     CancellationToken cancellationToken = default);
+
+  /// <summary>The rules that apply to the principal, for checks that become a database filter instead of one decision.</summary>
+  Task<IReadOnlyCollection<PermissionRule>> RulesAsync(Principal principal, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -22,7 +25,7 @@ public interface IPermissionEvaluator
 public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
 {
   public async Task<PermissionDecision> EvaluateAsync(Principal principal, string permission, Resource resource, CancellationToken cancellationToken = default) =>
-    PermissionRules.Evaluate(await LoadRulesAsync(principal, cancellationToken), permission, resource);
+    PermissionRules.Evaluate(await RulesAsync(principal, cancellationToken), permission, resource);
 
   public async Task<IReadOnlyDictionary<string, PermissionDecision>> EvaluateManyAsync(
     Principal principal,
@@ -30,7 +33,7 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
     Resource resource,
     CancellationToken cancellationToken = default)
   {
-    var rules = await LoadRulesAsync(principal, cancellationToken);
+    var rules = await RulesAsync(principal, cancellationToken);
     return permissions
       .Distinct(StringComparer.Ordinal)
       .ToDictionary(x => x, x => PermissionRules.Evaluate(rules, x, resource), StringComparer.Ordinal);
@@ -38,7 +41,7 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
 
   // The principal's own assignments and, for a user, those of every group they are in. The tenant query filters
   // are bypassed: the rules apply the tenant boundary themselves, for any principal.
-  private async Task<IReadOnlyCollection<PermissionRule>> LoadRulesAsync(Principal principal, CancellationToken cancellationToken)
+  public async Task<IReadOnlyCollection<PermissionRule>> RulesAsync(Principal principal, CancellationToken cancellationToken = default)
   {
     var direct = await db.PermissionAssignments
       .IgnoreQueryFilters()

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
@@ -13,14 +14,19 @@ public static class AccountEndpoints
   {
     var auth = endpoints.MapGroup(Routes.Auth);
 
-    auth.MapIdentityApi<UserRecord>().AddEndpointFilter(ApplyServerRules);
+    // Identity's endpoints are for signing in, so they are open, except /manage, which Identity limits to the
+    // signed-in user's own account.
+    auth.MapIdentityApi<UserRecord>().AddEndpointFilter(ApplyServerRules).Finally(endpoint =>
+      endpoint.Metadata.Add(endpoint.Metadata.OfType<IAuthorizeData>().Any()
+        ? new NoPermissionAttribute(NoPermissionAttribute.OwnAccount)
+        : new AllowAnonymousAttribute()));
 
     auth.MapGet("/settings", async (IRegistration registration, SignInManager<UserRecord> signIn, CancellationToken cancellationToken) =>
       new AccountSettings
       {
         RegistrationOpen = await registration.IsOpenAsync(cancellationToken),
         ExternalProviders = await ExternalLoginEndpoints.ProvidersAsync(signIn),
-      });
+      }).AllowAnonymous();
 
     auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db, IPermissionEvaluator permissions) =>
     {
@@ -47,14 +53,14 @@ public static class AccountEndpoints
         IsServerAdministrator = server.Allowed,
         IsTenantAdministrator = tenant.Allowed,
       });
-    }).RequireAuthorization();
+    }).RequireAuthorization().OwnAccount();
 
     // Identity's endpoints have no sign-out: the cookie is removed here.
     auth.MapPost("/sign-out", async (SignInManager<UserRecord> signIn) =>
     {
       await signIn.SignOutAsync();
       return Results.NoContent();
-    }).RequireAuthorization();
+    }).RequireAuthorization().OwnAccount();
 
     return endpoints;
   }

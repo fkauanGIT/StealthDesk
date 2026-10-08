@@ -1,26 +1,42 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using StealthDesk.Contracts.Permissions;
+using StealthDesk.Web.Server.Permissions;
+
 namespace StealthDesk.Web.Server.Devices;
 
 public static class DeviceEndpoints
 {
-  // Signed-in users only; the database filters by their tenant, so a device of another tenant is simply not found.
+  // The list holds only the devices the caller may read. A device they may not read answers 404, like one that
+  // doesn't exist, so asking can't reveal that it does.
   public static IEndpointRouteBuilder MapDeviceEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    var devices = endpoints.MapGroup(string.Empty).RequireAuthorization();
+    var devices = endpoints.MapGroup(string.Empty).RequireAuthorization().ChecksPermission(PermissionNames.DeviceRead);
 
-    devices.MapGet(Routes.Devices, async (StealthDeskDb db, CancellationToken cancellationToken) =>
+    devices.MapGet(Routes.Devices, async (ClaimsPrincipal user, IDeviceAccess access, StealthDeskDb db, CancellationToken cancellationToken) =>
     {
-      var devices = await db.Devices
-        .AsNoTracking()
+      var scope = await access.ForAsync(user, cancellationToken);
+      var devices = await scope.Apply(db.Devices.AsNoTracking())
         .OrderBy(x => x.Name)
         .ToListAsync(cancellationToken);
 
       return devices.Select(ToSummary);
     });
 
-    devices.MapGet($"{Routes.Devices}/{{id:guid}}", async (Guid id, StealthDeskDb db, CancellationToken cancellationToken) =>
+    devices.MapGet($"{Routes.Devices}/{{id:guid}}", async (
+      Guid id,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
     {
       var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-      return device is null ? Results.NotFound() : Results.Ok(ToSummary(device));
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceRead))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      return Results.Ok(ToSummary(device));
     });
 
     return endpoints;

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using QRCoder;
 using StealthDesk.Branding;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -18,7 +19,7 @@ public static class TwoFactorEndpoints
 
   public static IEndpointRouteBuilder MapTwoFactorEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    var manage = endpoints.MapGroup(Routes.TwoFactor).RequireAuthorization();
+    var manage = endpoints.MapGroup(Routes.TwoFactor).RequireAuthorization().OwnAccount();
 
     manage.MapGet("/", async (ClaimsPrincipal principal, SignInManager<UserRecord> signIn) =>
     {
@@ -149,7 +150,7 @@ public static class TwoFactorEndpoints
     });
 
     // The first step, /login, left a short-lived cookie saying who passed the password; these finish the sign-in.
-    var signInStep = endpoints.MapGroup(Routes.Auth);
+    var signInStep = endpoints.MapGroup(Routes.Auth).AllowAnonymous();
 
     signInStep.MapPost("/two-factor", async (TwoFactorSignIn request, SignInManager<UserRecord> signIn) =>
       Outcome(await signIn.TwoFactorAuthenticatorSignInAsync(Normalize(request.Code), request.RememberMe, request.RememberBrowser)));

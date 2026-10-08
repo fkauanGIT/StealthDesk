@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
@@ -21,11 +22,11 @@ public sealed class TestDashboard : IAsyncDisposable
 
   public HubConnection Connection { get; }
 
-  /// <summary>Connects as a new user of the test tenant, the one test agents join.</summary>
+  /// <summary>Connects as a new user of the test tenant, the one test agents join, who can read its devices.</summary>
   public static async Task<TestDashboard> ConnectSignedInAsync(ServerHost server)
   {
     var email = $"viewer-{Guid.NewGuid():N}@example.com";
-    await TestAccounts.CreateUserAsync(server, email);
+    await TestPermissions.AllowTenantDevicesAsync(server, await TestAccounts.CreateUserAsync(server, email));
     return await ConnectAsync(server, await TestAccounts.SignInForCookieAsync(server, email));
   }
 
@@ -47,6 +48,15 @@ public sealed class TestDashboard : IAsyncDisposable
     var dashboard = new TestDashboard(connection);
     await connection.StartAsync(TestContext.Current.CancellationToken);
     return dashboard;
+  }
+
+  /// <summary>Asks for these devices' changes, as the web client does for the devices it shows; returns the ids accepted.</summary>
+  public async Task<IReadOnlyList<Guid>> SubscribeAsync(params Guid[] deviceIds)
+  {
+    var reply = await Connection.InvokeAsync<GatewayReply<IReadOnlyList<Guid>>>(
+      nameof(IDashboardHub.SubscribeToDevices), deviceIds, TestContext.Current.CancellationToken);
+    Assert.True(reply.Accepted, reply.Error);
+    return reply.Value!;
   }
 
   /// <summary>The next change received; throws <see cref="TimeoutException"/> if none arrives in time (5 s by default).</summary>

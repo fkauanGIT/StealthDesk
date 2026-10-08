@@ -7,7 +7,8 @@ using StealthDesk.Web.Server.Dashboard;
 namespace StealthDesk.Server.Tests;
 
 /// <summary>
-/// End to end: what the dashboards hear when agents report and disconnect, with the devices stored in PostgreSQL.
+/// End to end: what a dashboard subscribed to a device hears when its agent reports and disconnects, with the
+/// devices stored in PostgreSQL.
 /// </summary>
 public class DeviceNotificationTests
 {
@@ -15,9 +16,11 @@ public class DeviceNotificationTests
   public async Task AcceptedReport_ReachesDashboardsAsOnline()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
+    await agent.ReportAsync(TestAgent.Report(deviceId) with { LoggedOnUsers = [] });
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
+    await dashboard.SubscribeAsync(deviceId);
 
     await agent.ReportAsync(TestAgent.Report(deviceId));
 
@@ -36,11 +39,11 @@ public class DeviceNotificationTests
   public async Task AgentDisconnecting_ReachesDashboardsAsOffline()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     var agent = await TestAgent.ConnectAsync(server);
     var deviceId = Guid.NewGuid();
     await agent.ReportAsync(TestAgent.Report(deviceId));
-    await dashboard.NextChangeAsync();
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
+    await dashboard.SubscribeAsync(deviceId);
 
     await agent.DisposeAsync();
 
@@ -53,9 +56,12 @@ public class DeviceNotificationTests
   public async Task RefusedReport_IsNotSentToDashboards()
   {
     using var server = await ServerHost.OnPostgresAsync();
-    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
     await using var agent = await TestAgent.ConnectAsync(server);
-    var envelope = agent.Signer.Sign(TestAgent.Report(Guid.NewGuid()), agent.Keys.PrivateKey);
+    var deviceId = Guid.NewGuid();
+    await agent.ReportAsync(TestAgent.Report(deviceId));
+    await using var dashboard = await TestDashboard.ConnectSignedInAsync(server);
+    await dashboard.SubscribeAsync(deviceId);
+    var envelope = agent.Signer.Sign(TestAgent.Report(deviceId), agent.Keys.PrivateKey);
 
     var reply = await agent.SubmitAsync(envelope with { Payload = envelope.Payload with { CpuCores = 64 } });
 

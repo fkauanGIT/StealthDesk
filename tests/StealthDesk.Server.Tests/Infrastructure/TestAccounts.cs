@@ -27,11 +27,14 @@ public static class TestAccounts
     return user;
   }
 
-  /// <summary>A new user of the test tenant, signed in: the returned client sends their session on every request.</summary>
+  /// <summary>
+  /// A new user of the test tenant who can read its devices, signed in: the returned client sends their session on
+  /// every request.
+  /// </summary>
   public static async Task<HttpClient> SignedInClientAsync(ServerHost server, string? email = null)
   {
     email ??= $"viewer-{Guid.NewGuid():N}@example.com";
-    await CreateUserAsync(server, email);
+    await TestPermissions.AllowTenantDevicesAsync(server, await CreateUserAsync(server, email));
     var client = Client(server);
     client.DefaultRequestHeaders.Add("Cookie", await SignInForCookieAsync(server, email));
     return client;

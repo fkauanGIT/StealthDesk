@@ -60,7 +60,8 @@ public class TenantIsolationTests
     using var server = await ServerHost.OnPostgresAsync();
     var deviceId = await RegisterDeviceInFirstTenantAsync(server);
     var otherTenant = await TestTenants.CreateAsync(server, "Other");
-    await TestAccounts.CreateUserAsync(server, "outsider@example.com", otherTenant);
+    // The outsider reads every device of their own tenant, so seeing none here is the tenant boundary at work.
+    await TestPermissions.AllowTenantDevicesAsync(server, await TestAccounts.CreateUserAsync(server, "outsider@example.com", otherTenant));
     using var outsider = TestAccounts.Client(server);
     outsider.DefaultRequestHeaders.Add("Cookie", await TestAccounts.SignInForCookieAsync(server, "outsider@example.com"));
     using var member = await TestAccounts.SignedInClientAsync(server);
@@ -85,9 +86,14 @@ public class TenantIsolationTests
     Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
 
     var otherTenant = await TestTenants.CreateAsync(server, "Other");
-    await TestAccounts.CreateUserAsync(server, "outsider@example.com", otherTenant);
+    // The outsider reads every device of their own tenant, so seeing none here is the tenant boundary at work.
+    await TestPermissions.AllowTenantDevicesAsync(server, await TestAccounts.CreateUserAsync(server, "outsider@example.com", otherTenant));
     await using var outsider = await TestDashboard.ConnectAsync(server, await TestAccounts.SignInForCookieAsync(server, "outsider@example.com"));
     await using var member = await TestDashboard.ConnectSignedInAsync(server);
+
+    // The outsider asks for the device by id; the server leaves it out.
+    Assert.Empty(await outsider.SubscribeAsync(deviceId));
+    Assert.Equal([deviceId], await member.SubscribeAsync(deviceId));
 
     await agent.ReportAsync(TestAgent.Report(deviceId) with { CpuLoad = 0.5 });
 
