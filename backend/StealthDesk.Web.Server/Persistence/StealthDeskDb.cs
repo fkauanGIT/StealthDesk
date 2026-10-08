@@ -16,6 +16,9 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
 
   public DbSet<TenantRecord> Tenants => Set<TenantRecord>();
   public DbSet<DeviceRecord> Devices => Set<DeviceRecord>();
+  public DbSet<PermissionAssignmentRecord> PermissionAssignments => Set<PermissionAssignmentRecord>();
+  public DbSet<UserGroupRecord> UserGroups => Set<UserGroupRecord>();
+  public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
 
   /// <summary>The keys that protect sign-in cookies, kept so sessions survive a restart.</summary>
   public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -73,6 +76,39 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       user.Property(x => x.AccountType).HasConversion<string>().HasMaxLength(20);
       user.HasIndex(x => x.TenantId);
       user.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
+    });
+
+    // Read by the permission evaluator for any principal, so it has no tenant filter; the evaluator applies the
+    // tenant rules itself.
+    modelBuilder.Entity<PermissionAssignmentRecord>(assignment =>
+    {
+      assignment.ToTable("permission_assignments");
+      assignment.Property(x => x.Permission).HasMaxLength(PermissionAssignmentRecord.PermissionMax);
+      assignment.Property(x => x.Notes).HasMaxLength(PermissionAssignmentRecord.NotesMax);
+      assignment.Property(x => x.CreatedByKind).HasMaxLength(PermissionAssignmentRecord.CreatedByKindMax);
+      assignment.Property(x => x.PrincipalKind).HasConversion<string>().HasMaxLength(30);
+      assignment.Property(x => x.Effect).HasConversion<string>().HasMaxLength(10);
+      assignment.Property(x => x.ScopeKind).HasConversion<string>().HasMaxLength(20);
+      assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId });
+      assignment.HasIndex(x => x.OwningTenantId);
+    });
+
+    modelBuilder.Entity<UserGroupRecord>(group =>
+    {
+      group.ToTable("user_groups");
+      group.Property(x => x.Name).HasMaxLength(UserGroupRecord.NameMax);
+      group.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      group.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+      group.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
+    });
+
+    modelBuilder.Entity<UserGroupMemberRecord>(member =>
+    {
+      member.ToTable("user_group_members");
+      member.HasKey(x => new { x.UserGroupId, x.UserId });
+      member.HasOne(x => x.UserGroup).WithMany(x => x.Members).HasForeignKey(x => x.UserGroupId).OnDelete(DeleteBehavior.Cascade);
+      member.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+      member.HasIndex(x => x.UserId);
     });
 
     modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");

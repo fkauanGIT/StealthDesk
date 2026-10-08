@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Branding;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -96,6 +97,7 @@ public static class AccountSetup
     });
 
     builder.Services.AddAuthorization();
+    builder.Services.AddPermissions();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ITenantScope, RequestTenantScope>();
     builder.Services.AddSingleton<RegistrationGate>();

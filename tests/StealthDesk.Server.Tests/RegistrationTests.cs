@@ -114,8 +114,11 @@ public class RegistrationTests
       return await RegisterAsync(client, $"racer{i}@example.com");
     }));
 
-    var administrators = await server.WithDbAsync(db =>
-      db.UserClaims.CountAsync(x => x.ClaimType == StealthDeskClaims.ServerAdministrator));
+    var administrators = await server.WithDbAsync(db => db.PermissionAssignments
+      .Where(x => x.Permission == Contracts.Permissions.PermissionNames.ServerPermissionsWrite)
+      .Select(x => x.PrincipalId)
+      .Distinct()
+      .CountAsync());
     Assert.Equal(6, await server.WithDbAsync(db => db.Users.CountAsync()));
     Assert.Equal(1, administrators);
   }
