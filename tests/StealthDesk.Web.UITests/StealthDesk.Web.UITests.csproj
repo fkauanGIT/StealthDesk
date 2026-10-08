@@ -8,6 +8,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3" />
@@ -19,6 +20,8 @@
   <ItemGroup>
     <!-- Built first; the tests start it as its own process, like the server would run for real. -->
     <ProjectReference Include="..\..\backend\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
+    <!-- The test agent's realtime channel, the one the real agent uses. -->
+    <ProjectReference Include="..\..\shared\StealthDesk.Realtime\StealthDesk.Realtime.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- One server and browser at a time: several at once make the web client too slow to load on small machines. -->

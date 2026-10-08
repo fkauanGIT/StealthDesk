@@ -24,20 +24,24 @@ public sealed class UiServer : IAsyncDisposable
   private readonly Process _process;
   private readonly StreamWriter _log;
 
-  private UiServer(Process process, StreamWriter log, Uri baseAddress)
+  private UiServer(Process process, StreamWriter log, Uri baseAddress, string database)
   {
     _process = process;
     _log = log;
     BaseAddress = baseAddress;
+    Database = database;
   }
 
   /// <summary>Where the browser opens the web client, ending with a slash.</summary>
   public Uri BaseAddress { get; }
 
+  /// <summary>The connection string of this server's database, for tests that arrange data the pages can't yet.</summary>
+  public string Database { get; }
+
   /// <param name="settings">Extra settings, e.g. <c>("Accounts:EnablePublicRegistration", "true")</c>.</param>
   public static async Task<UiServer> StartAsync(string testName, params (string Key, string Value)[] settings)
   {
-    var database = await CreateDatabaseAsync();
+    var (database, connectionString) = await CreateDatabaseAsync();
     var port = FreePort();
     var baseAddress = new Uri($"http://localhost:{port}/");
 
@@ -73,7 +77,7 @@ public sealed class UiServer : IAsyncDisposable
     process.BeginOutputReadLine();
     process.BeginErrorReadLine();
 
-    var server = new UiServer(process, log, baseAddress);
+    var server = new UiServer(process, log, baseAddress, connectionString);
     await server.WaitUntilAliveAsync();
     return server;
   }
@@ -126,7 +130,7 @@ public sealed class UiServer : IAsyncDisposable
     throw new TimeoutException($"The server didn't answer within a minute; see its log in {UiPaths.Results}.");
   }
 
-  private static async Task<(string Key, string Value)[]> CreateDatabaseAsync()
+  private static async Task<((string Key, string Value)[] Settings, string ConnectionString)> CreateDatabaseAsync()
   {
     var container = await Container.Value;
     var name = $"ui_{Guid.NewGuid():N}";
@@ -139,7 +143,8 @@ public sealed class UiServer : IAsyncDisposable
     }
 
     var server = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
-    return
+    var connectionString = new NpgsqlConnectionStringBuilder(server.ConnectionString) { Database = name }.ConnectionString;
+    return (
     [
       ("UseInMemoryDatabase", "false"),
       ("POSTGRES_HOST", server.Host!),
@@ -150,7 +155,7 @@ public sealed class UiServer : IAsyncDisposable
       // Development reads the machine's user secrets: providers configured there must not change the pages.
       ("Accounts:MicrosoftClientId", string.Empty),
       ("Accounts:GitHubClientId", string.Empty),
-    ];
+    ], connectionString);
   }
 
   private static int FreePort()
