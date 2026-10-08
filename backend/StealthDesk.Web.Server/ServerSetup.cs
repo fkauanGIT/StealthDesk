@@ -23,6 +23,7 @@ public static class ServerSetup
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IMessageSigner, MessageSigner>();
     builder.Services.AddScoped<IDeviceRegistry, DeviceRegistry>();
+    builder.Services.AddScoped<IDeviceAccess, DeviceAccess>();
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 

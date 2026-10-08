@@ -102,4 +102,28 @@ public class DeviceStoreTests
 
     Assert.Equal(1, announced);
   }
+
+  [Fact]
+  public async Task DeviceOpenedDirectly_IsKnownAndAnnounced_SoLiveUpdatesSubscribeToIt()
+  {
+    var device = SampleDevices.Sample("FRONT-DESK");
+    var announced = 0;
+    _store.Changed += () => announced++;
+    _api.RespondWith(device);
+
+    await _store.FindAsync(device.Id);
+
+    Assert.Equal([device.Id], _store.KnownIds);
+    Assert.Equal(1, announced);
+  }
+
+  [Fact]
+  public async Task DeviceNotFound_IsNotKnown()
+  {
+    _api.Respond(System.Net.HttpStatusCode.NotFound);
+
+    await _store.FindAsync(Guid.NewGuid());
+
+    Assert.Empty(_store.KnownIds);
+  }
 }

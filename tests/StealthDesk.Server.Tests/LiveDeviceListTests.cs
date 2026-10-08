@@ -9,13 +9,56 @@ namespace StealthDesk.Server.Tests;
 public class LiveDeviceListTests
 {
   [Fact]
-  public async Task AgentGoingOnlineAndOffline_ReachesTheStoreWithoutReloading()
+  public async Task ListedDevice_GoingOfflineAndOnline_ReachesTheStoreWithoutReloading()
   {
     using var server = ServerHost.InMemory();
-    using var client = await TestAccounts.SignedInClientAsync(server);
+    var deviceId = Guid.NewGuid();
+    var agent = await TestAgent.ConnectAsync(server);
+    await agent.ReportAsync(TestAgent.Report(deviceId));
+    var (store, live) = await OpenDashboardAsync(server);
+    await using var _ = live;
+
+    await store.LoadAsync();
+    await live.StartAsync();
+    Assert.True(store.Devices!.Single().IsOnline);
+
+    await agent.DisposeAsync();
+    Assert.True(await Eventually.TrueAsync(() => Task.FromResult(!store.Devices!.Single().IsOnline)), "The device never turned offline.");
+
+    await using var back = await TestAgent.ConnectAsync(server, agent.Keys);
+    await back.ReportAsync(TestAgent.Report(deviceId));
+    Assert.True(await Eventually.TrueAsync(() => Task.FromResult(store.Devices!.Single().IsOnline)), "The device never came back online.");
+  }
+
+  [Fact]
+  public async Task NewDevice_ShowsUpOnTheNextLoad_AndThenUpdatesLive()
+  {
+    using var server = ServerHost.InMemory();
+    var (store, live) = await OpenDashboardAsync(server);
+    await using var _ = live;
+    await live.StartAsync();
+    await store.LoadAsync();
+
+    var agent = await TestAgent.ConnectAsync(server);
+    var deviceId = Guid.NewGuid();
+    await agent.ReportAsync(TestAgent.Report(deviceId));
+    await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+    Assert.Empty(store.Devices!);
+
+    await store.LoadAsync();
+    Assert.Equal(deviceId, store.Devices!.Single().Id);
+
+    // Loading subscribed to it: its next change arrives on its own.
+    await agent.DisposeAsync();
+    Assert.True(await Eventually.TrueAsync(() => Task.FromResult(!store.Devices!.Single().IsOnline)), "The device never turned offline.");
+  }
+
+  private static async Task<(DeviceStore Store, LiveUpdates Live)> OpenDashboardAsync(ServerHost server)
+  {
+    var client = await TestAccounts.SignedInClientAsync(server);
     var cookie = client.DefaultRequestHeaders.GetValues("Cookie").Single();
     var store = new DeviceStore(client);
-    await using var live = new LiveUpdates(
+    var live = new LiveUpdates(
       store,
       new Uri(server.Server.BaseAddress, Routes.Dashboard),
       NullLogger<LiveUpdates>.Instance,
@@ -25,24 +68,6 @@ public class LiveDeviceListTests
         options.Transports = HttpTransportType.LongPolling;
         options.Headers["Cookie"] = cookie;
       });
-
-    await live.StartAsync();
-    await store.LoadAsync();
-    Assert.Equal(LiveState.Live, live.State);
-    Assert.Empty(store.Devices!);
-
-    var agent = await TestAgent.ConnectAsync(server);
-    var deviceId = Guid.NewGuid();
-    await agent.ReportAsync(TestAgent.Report(deviceId));
-
-    Assert.True(
-      await Eventually.TrueAsync(() => Task.FromResult(store.Devices!.Any(x => x.Id == deviceId && x.IsOnline))),
-      "The device never showed up online.");
-
-    await agent.DisposeAsync();
-
-    Assert.True(
-      await Eventually.TrueAsync(() => Task.FromResult(store.Devices!.Any(x => x.Id == deviceId && !x.IsOnline))),
-      "The device never turned offline.");
+    return (store, live);
   }
 }
