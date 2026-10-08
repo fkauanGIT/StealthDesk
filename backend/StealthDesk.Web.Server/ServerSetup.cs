@@ -41,13 +41,13 @@ public static class ServerSetup
     app.MapPasskeyEndpoints();
     app.MapExternalLoginEndpoints();
     app.MapDeviceEndpoints();
-    app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown");
+    app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);
 
     // Any other path is a page of the web app, but an unknown API or hub path is an error, not a page.
-    app.MapFallback("/api/{**path}", () => Results.NotFound());
-    app.MapFallback("/hubs/{**path}", () => Results.NotFound());
+    app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();
+    app.MapFallback("/hubs/{**path}", () => Results.NotFound()).AllowAnonymous();
     app.MapFallbackToFile("index.html");
     return app;
   }

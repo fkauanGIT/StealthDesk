@@ -14,6 +14,8 @@ public sealed class ChecksPermissionAttribute(string permission) : Attribute
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public sealed class NoPermissionAttribute(string reason) : Attribute
 {
+  public const string OwnAccount = "It only reads or changes the signed-in user's own account.";
+
   public string Reason { get; } = reason;
 }
 
@@ -24,4 +26,7 @@ public static class PermissionEndpointExtensions
 
   public static TBuilder NoPermission<TBuilder>(this TBuilder builder, string reason) where TBuilder : IEndpointConventionBuilder =>
     builder.WithMetadata(new NoPermissionAttribute(reason));
+
+  public static TBuilder OwnAccount<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
+    builder.NoPermission(NoPermissionAttribute.OwnAccount);
 }

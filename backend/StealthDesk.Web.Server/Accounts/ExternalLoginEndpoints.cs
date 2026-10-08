@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -13,7 +14,7 @@ public static class ExternalLoginEndpoints
 {
   public static IEndpointRouteBuilder MapExternalLoginEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    var external = endpoints.MapGroup("/api/auth/external");
+    var external = endpoints.MapGroup("/api/auth/external").AllowAnonymous();
 
     external.MapGet("/{provider}", async (string provider, string? returnUrl, HttpContext context, SignInManager<UserRecord> signIn) =>
     {
@@ -97,7 +98,7 @@ public static class ExternalLoginEndpoints
       return Results.Ok(new ExternalRegistrationResult { SignedIn = true });
     });
 
-    var logins = endpoints.MapGroup(Routes.Logins).RequireAuthorization();
+    var logins = endpoints.MapGroup(Routes.Logins).RequireAuthorization().OwnAccount();
 
     logins.MapGet("/", async (ClaimsPrincipal principal, SignInManager<UserRecord> signIn) =>
     {

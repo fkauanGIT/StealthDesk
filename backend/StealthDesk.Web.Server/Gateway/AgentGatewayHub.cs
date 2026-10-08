@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Web.Server.Dashboard;
@@ -6,6 +7,8 @@ using StealthDesk.Web.Server.Devices;
 namespace StealthDesk.Web.Server.Gateway;
 
 /// <summary>The realtime endpoint agents stay connected to.</summary>
+// No signed-in user here: agents prove who they are by signing every report with their device key.
+[AllowAnonymous]
 public sealed class AgentGatewayHub(
   ReportProcessor processor,
   IDeviceRegistry registry,

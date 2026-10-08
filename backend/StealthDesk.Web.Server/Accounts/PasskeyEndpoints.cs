@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -15,7 +16,7 @@ public static class PasskeyEndpoints
 
   public static IEndpointRouteBuilder MapPasskeyEndpoints(this IEndpointRouteBuilder endpoints)
   {
-    var manage = endpoints.MapGroup(Routes.Passkeys).RequireAuthorization();
+    var manage = endpoints.MapGroup(Routes.Passkeys).RequireAuthorization().OwnAccount();
 
     manage.MapGet("/", async (ClaimsPrincipal principal, UserManager<UserRecord> users) =>
     {
@@ -123,7 +124,7 @@ public static class PasskeyEndpoints
       return Results.NoContent();
     });
 
-    var signInGroup = endpoints.MapGroup(Routes.SignInPasskey);
+    var signInGroup = endpoints.MapGroup(Routes.SignInPasskey).AllowAnonymous();
 
     // With an email, the options name that user's passkeys; without one, the browser offers any passkey it has here.
     signInGroup.MapPost("/request-options", async (string? email, SignInManager<UserRecord> signIn) =>
