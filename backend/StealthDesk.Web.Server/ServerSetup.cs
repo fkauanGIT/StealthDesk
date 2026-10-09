@@ -1,5 +1,6 @@
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
+using StealthDesk.Web.Server.AuthorizationLogs;
 using StealthDesk.Web.Server.Email;
 using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
@@ -26,6 +27,11 @@ public static class ServerSetup
     builder.Services.AddScoped<IDeviceAccess, DeviceAccess>();
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
+
+    builder.Services.Configure<AuthorizationLogOptions>(builder.Configuration.GetSection(AuthorizationLogOptions.Section));
+    builder.Services.AddSingleton<IAuthorizationChangeFactory, AuthorizationChangeFactory>();
+    builder.Services.AddSingleton<AuthorizationLogCleanup>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<AuthorizationLogCleanup>());
 
     return builder;
   }

@@ -20,6 +20,9 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<UserGroupRecord> UserGroups => Set<UserGroupRecord>();
   public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
 
+  // No tenant filter: server-wide entries belong to no tenant, and every read names the tenant it wants.
+  public DbSet<AuthorizationChangeRecord> AuthorizationChanges => Set<AuthorizationChangeRecord>();
+
   /// <summary>The keys that protect sign-in cookies, kept so sessions survive a restart.</summary>
   public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -91,6 +94,20 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       assignment.Property(x => x.ScopeKind).HasConversion<string>().HasMaxLength(20);
       assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId });
       assignment.HasIndex(x => x.OwningTenantId);
+    });
+
+    modelBuilder.Entity<AuthorizationChangeRecord>(change =>
+    {
+      change.ToTable("authorization_changes");
+      change.Property(x => x.Action).HasMaxLength(AuthorizationChangeRecord.ActionMax);
+      change.Property(x => x.ActorKind).HasMaxLength(AuthorizationChangeRecord.ActorKindMax);
+      change.Property(x => x.TargetKind).HasMaxLength(AuthorizationChangeRecord.TargetKindMax);
+      change.Property(x => x.IpAddress).HasMaxLength(AuthorizationChangeRecord.IpAddressMax);
+      change.Property(x => x.CorrelationId).HasMaxLength(AuthorizationChangeRecord.CorrelationIdMax);
+      change.HasIndex(x => x.OwningTenantId);
+      change.HasIndex(x => x.CreatedAt);
+      change.HasIndex(x => x.ActorId);
+      change.HasIndex(x => x.TargetId);
     });
 
     modelBuilder.Entity<UserGroupRecord>(group =>
