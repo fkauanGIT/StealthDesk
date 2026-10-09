@@ -25,6 +25,16 @@ public sealed record Principal(PermissionPrincipalKind Kind, Guid Id, Guid? Tena
     // Only a server-wide principal has no tenant; anyone else without one is refused.
     return tenantId is null && kind is not PermissionPrincipalKind.ServiceAccount ? null : new Principal(kind, id, tenantId);
   }
+
+  /// <summary>
+  /// The tenant a request names (<c>?tenantId=</c>), if this principal may act in it: its own tenant, also when the
+  /// request names none, or any tenant for a server-wide principal.
+  /// </summary>
+  public Guid? TenantFor(Guid requested) => TenantId switch
+  {
+    null => requested == Guid.Empty ? null : requested,
+    { } own => requested == Guid.Empty || requested == own ? own : null,
+  };
 }
 
 /// <summary>What is being accessed: the server, a tenant, a device or a user group.</summary>
