@@ -15,7 +15,7 @@ public abstract class AccountTestContext : BunitContext
     // bUnit puts placeholders here; the real services decide from the state the fake server answers with.
     Services.RemoveAll<Microsoft.AspNetCore.Authorization.IAuthorizationService>();
     Services.RemoveAll<Microsoft.AspNetCore.Authorization.IAuthorizationPolicyProvider>();
-    Services.AddAuthorizationCore();
+    Services.AddStealthDeskAuthorization();
     Services.AddSingleton(Api.CreateClient());
     Services.AddSingleton<AccountApi>();
     Services.AddSingleton<ServerAuthenticationState>();

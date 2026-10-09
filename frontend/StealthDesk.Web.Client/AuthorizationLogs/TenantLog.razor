@@ -1,0 +1,18 @@
+@* The log of the signed-in user's tenant. *@
+@if (tenantId is { } id)
+{
+    <AuthorizationLogPanel TenantId="id" />
+}
+
+@code {
+    private Guid? tenantId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        tenantId = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out var id) ? id : null;
+    }
+}

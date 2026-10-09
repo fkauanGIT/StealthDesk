@@ -16,6 +16,9 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
   public const string TenantAdministratorClaim = "stealthdesk:tenant_admin";
   public const string MustChangePasswordClaim = "stealthdesk:must_change_password";
 
+  /// <summary>One per permission the user holds on their tenant or the server; see <see cref="PermissionPolicyProvider"/>.</summary>
+  public const string PermissionClaim = "stealthdesk:permission";
+
   private static readonly AuthenticationState SignedOut = new(new ClaimsPrincipal(new ClaimsIdentity()));
 
   private Task<AuthenticationState>? _state;
@@ -72,6 +75,8 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
     {
       claims.Add(new Claim(MustChangePasswordClaim, "true"));
     }
+
+    claims.AddRange(user.Permissions.Select(x => new Claim(PermissionClaim, x)));
 
     return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "StealthDesk"));
   }

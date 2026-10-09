@@ -5,7 +5,14 @@
                 <div class="sd-boot" role="status">Checking your session...</div>
             </Authorizing>
             <NotAuthorized>
-                <RedirectToSignIn />
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <RedirectToAccessDenied />
+                }
+                else
+                {
+                    <RedirectToSignIn />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />

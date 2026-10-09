@@ -16,4 +16,7 @@ public enum IconName
   Shield,
   Key,
   Link,
+  ChevronDown,
+  ChevronUp,
+  History,
 }
