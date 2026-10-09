@@ -47,6 +47,7 @@ public class LiveDeviceListTests
 
     await store.LoadAsync();
     Assert.Equal(deviceId, store.Devices!.Single().Id);
+    await live.Subscribed;
 
     // Loading subscribed to it: its next change arrives on its own.
     await agent.DisposeAsync();
