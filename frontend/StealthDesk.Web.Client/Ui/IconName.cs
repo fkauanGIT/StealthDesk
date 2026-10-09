@@ -19,4 +19,6 @@ public enum IconName
   ChevronDown,
   ChevronUp,
   History,
+  Copy,
+  Users,
 }
