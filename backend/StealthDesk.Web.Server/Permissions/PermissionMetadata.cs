@@ -1,10 +1,10 @@
 namespace StealthDesk.Web.Server.Permissions;
 
 /// <summary>
-/// The endpoint or hub method checks this permission itself, on each resource it touches, because a policy can't:
-/// a list is filtered, and a single resource must be loaded before it can be checked.
+/// The endpoint or hub method checks this permission itself, because a policy can't: a list is filtered, a single
+/// resource must be loaded before it can be checked, or any of several permissions lets the caller in.
 /// </summary>
-[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
 public sealed class ChecksPermissionAttribute(string permission) : Attribute
 {
   public string Permission { get; } = permission;

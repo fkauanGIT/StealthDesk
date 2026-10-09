@@ -47,6 +47,7 @@ public static class ServerSetup
     app.MapPasskeyEndpoints();
     app.MapExternalLoginEndpoints();
     app.MapDeviceEndpoints();
+    app.MapAuthorizationLogEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);

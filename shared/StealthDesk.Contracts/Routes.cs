@@ -9,6 +9,10 @@ public static class Routes
   public static string Device(Guid id) => $"{Devices}/{id}";
   public const string ServerVersion = "/api/internal/version/server";
 
+  /// <summary>A tenant's authorization change log (<c>?tenantId=</c>), and the server's own entries.</summary>
+  public const string AuthorizationLogs = "/api/v1/authorization-logs";
+  public const string ServerAuthorizationLogs = "/api/v1/authorization-logs/server";
+
   /// <summary>ASP.NET Core Identity's account endpoints: /register, /login, /refresh, /manage/info and the rest.</summary>
   public const string Auth = "/api/auth";
   public const string CurrentUser = "/api/auth/me";

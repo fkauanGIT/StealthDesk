@@ -12,4 +12,11 @@ public sealed record CurrentUser
   public bool MustChangePassword { get; init; }
   public bool IsServerAdministrator { get; init; }
   public bool IsTenantAdministrator { get; init; }
+
+  /// <summary>
+  /// The permissions the user holds on their tenant, or on the server for those that only exist there. They decide
+  /// what the web client offers; the server still checks every request, and permissions on single devices or groups
+  /// aren't listed.
+  /// </summary>
+  public IReadOnlyList<string> Permissions { get; init; } = [];
 }
