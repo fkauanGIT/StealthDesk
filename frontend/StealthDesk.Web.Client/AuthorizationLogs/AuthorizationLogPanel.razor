@@ -1,0 +1,208 @@
+@using System.Text.Json
+@using StealthDesk.Contracts.AuthorizationLogs
+@inject AuthorizationLogApi Api
+@inject SessionGuard Session
+
+<form class="sd-log-filters" @onsubmit="ApplyAsync" @onsubmit:preventDefault>
+    <div class="sd-grid" style="--sd-grid-min: 180px">
+        <SdSelect Label="Action" Options="ActionOptions" @bind-Value="action" />
+        <SdSelect Label="Target" Options="TargetOptions" @bind-Value="target" />
+        <SdSelect Label="Actor" Options="ActorOptions" @bind-Value="actor" />
+        <SdTextField Label="Actor or target ID" Placeholder="Whole or part of an ID" @bind-Value="search" />
+        <SdTextField Label="From" Type="date" @bind-Value="from" />
+        <SdTextField Label="To" Type="date" @bind-Value="to" />
+    </div>
+    <div class="sd-actions">
+        <SdButton Type="submit" Icon="IconName.Search">Apply filters</SdButton>
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" OnClick="LoadAsync">Refresh</SdButton>
+    </div>
+</form>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+else if (current is null)
+{
+    <SdLoading Text="Loading the log..." />
+}
+else if (current.Items.Count == 0)
+{
+    <SdEmptyState Title="No changes recorded">Nothing in this log matches the filters.</SdEmptyState>
+}
+else
+{
+    <div class="sd-table-wrap">
+        <table class="sd-table sd-log-table" style="min-width: 960px">
+            <thead>
+                <tr>
+                    <th><span class="sd-visually-hidden">Details</span></th>
+                    <th>Time</th>
+                    <th>Action</th>
+                    <th>Actor</th>
+                    <th>Target</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in current.Items)
+                {
+                    var open = expanded == entry.Id;
+                    <tr @key="entry.Id">
+                        <td>
+                            <SdButton Variant="ButtonVariant.Ghost" Icon="@(open ? IconName.ChevronUp : IconName.ChevronDown)"
+                                      AriaLabel="@(open ? "Hide before and after" : "Show before and after")"
+                                      aria-expanded="@(open ? "true" : "false")" OnClick="() => Toggle(entry.Id)" />
+                        </td>
+                        <td class="sd-mono" style="white-space: nowrap">@entry.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td class="sd-mono">@entry.Action</td>
+                        <td>
+                            <div class="sd-cell-title">
+                                <span>@entry.ActorKind</span>
+                                <span class="sd-cell-sub sd-mono">@IdOrDash(entry.ActorId)</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="sd-cell-title">
+                                <span>@entry.TargetKind</span>
+                                <span class="sd-cell-sub sd-mono">@IdOrDash(entry.TargetId)</span>
+                            </div>
+                        </td>
+                        <td class="sd-mono">@(entry.IpAddress ?? "—")</td>
+                    </tr>
+                    @if (open)
+                    {
+                        <tr class="sd-log-detail">
+                            <td colspan="6">
+                                <div class="sd-grid" style="--sd-grid-min: 280px">
+                                    <div>
+                                        <h3 class="sd-log-detail-title">Before</h3>
+                                        <pre class="sd-log-json">@Pretty(entry.BeforeJson)</pre>
+                                    </div>
+                                    <div>
+                                        <h3 class="sd-log-detail-title">After</h3>
+                                        <pre class="sd-log-json">@Pretty(entry.AfterJson)</pre>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="sd-pager">
+        <span class="sd-muted" data-pager="range">@First–@Last of @current.TotalItems</span>
+        <div class="sd-pager-size">
+            <SdSelect Label="Rows per page" Options="PageSizeOptions" Value="@pageSize.ToString()" ValueChanged="PageSizeChangedAsync" />
+        </div>
+        <SdButton Variant="ButtonVariant.Secondary" Disabled="pageNumber == 0" OnClick="() => GoToAsync(pageNumber - 1)">Previous</SdButton>
+        <SdButton Variant="ButtonVariant.Secondary" Disabled="Last >= current.TotalItems" OnClick="() => GoToAsync(pageNumber + 1)">Next</SdButton>
+    </div>
+}
+
+@code {
+    private const string Any = "";
+
+    private static readonly IReadOnlyList<SelectOption> ActionOptions = Options("Any action", ChangeLogVocabulary.Actions);
+    private static readonly IReadOnlyList<SelectOption> TargetOptions = Options("Any target", ChangeLogVocabulary.Targets);
+    private static readonly IReadOnlyList<SelectOption> ActorOptions = Options("Anyone", ChangeLogVocabulary.Actors);
+    private static readonly IReadOnlyList<SelectOption> PageSizeOptions = [new("25", "25"), new("50", "50"), new("100", "100")];
+    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    private string? action = Any;
+    private string? target = Any;
+    private string? actor = Any;
+    private string? search;
+    private string? from;
+    private string? to;
+    private int pageNumber;
+    private int pageSize = 25;
+    private AuthorizationChangePage? current;
+    private string? error;
+    private Guid? expanded;
+
+    /// <summary>The tenant whose log is shown.</summary>
+    [Parameter, EditorRequired]
+    public Guid TenantId { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private int First => current is { TotalItems: > 0 } ? pageNumber * pageSize + 1 : 0;
+
+    private int Last => current is null ? 0 : pageNumber * pageSize + current.Items.Count;
+
+    private Task ApplyAsync() => GoToAsync(0);
+
+    private Task GoToAsync(int number)
+    {
+        pageNumber = Math.Max(number, 0);
+        return LoadAsync();
+    }
+
+    private Task PageSizeChangedAsync(string? value)
+    {
+        pageSize = int.TryParse(value, out var size) ? size : pageSize;
+        return GoToAsync(0);
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        current = null;
+        expanded = null;
+        var result = await Api.GetTenantAsync(TenantId, new AuthorizationChangeQuery
+        {
+            Action = Blank(action),
+            TargetKind = Blank(target),
+            ActorKind = Blank(actor),
+            Search = Blank(search),
+            From = Day(from),
+            // The "to" day is included: entries up to its end.
+            To = Day(to)?.AddDays(1),
+            Page = pageNumber,
+            PageSize = pageSize,
+        });
+
+        if (result.SessionExpired)
+        {
+            Session.Expired();
+            return;
+        }
+
+        current = result.Page;
+        error = result.Error;
+    }
+
+    private void Toggle(Guid id) => expanded = expanded == id ? null : id;
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    // A date picked in the browser is a local day.
+    private static DateTimeOffset? Day(string? value) =>
+        DateOnly.TryParse(value, out var day) ? new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local)) : null;
+
+    private static string IdOrDash(Guid? id) => id?.ToString() ?? "—";
+
+    private static string Pretty(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "(none)";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, Indented);
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+
+    private static List<SelectOption> Options(string anyText, IEnumerable<string> values) =>
+        [new(Any, anyText), .. values.Select(x => new SelectOption(x, x))];
+}

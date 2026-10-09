@@ -1,0 +1,11 @@
+@page "/server/authorization-logs"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.ServerAuthorizationLogsRead)]
+
+<PageTitle>Server authorization log · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Server authorization log</h1>
+</header>
+<p class="sd-muted sd-page-lead">Changes to who can do what, across the tenants this server administers.</p>
+
+<TenantLog />

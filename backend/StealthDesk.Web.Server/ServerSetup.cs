@@ -1,5 +1,6 @@
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
+using StealthDesk.Web.Server.AuthorizationLogs;
 using StealthDesk.Web.Server.Email;
 using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
@@ -27,6 +28,11 @@ public static class ServerSetup
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 
+    builder.Services.Configure<AuthorizationLogOptions>(builder.Configuration.GetSection(AuthorizationLogOptions.Section));
+    builder.Services.AddSingleton<IAuthorizationChangeFactory, AuthorizationChangeFactory>();
+    builder.Services.AddSingleton<AuthorizationLogCleanup>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<AuthorizationLogCleanup>());
+
     return builder;
   }
 
@@ -41,6 +47,7 @@ public static class ServerSetup
     app.MapPasskeyEndpoints();
     app.MapExternalLoginEndpoints();
     app.MapDeviceEndpoints();
+    app.MapAuthorizationLogEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);

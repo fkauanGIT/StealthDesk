@@ -1,0 +1,11 @@
+@page "/authorization-logs"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantAuthorizationLogsRead)]
+
+<PageTitle>Authorization log · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Authorization log</h1>
+</header>
+<p class="sd-muted sd-page-lead">Every change to who can do what in this tenant: who made it, when, and how it looked before and after.</p>
+
+<TenantLog />

@@ -220,8 +220,12 @@ a:hover {
     border-bottom: 1px solid var(--sd-border);
   }
 
+  /* Links that don't fit on one line wrap instead of widening the page. */
   .sd-nav {
     flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -1168,4 +1172,65 @@ a.sd-btn:hover {
   width: var(--blazor-load-percentage, 0%);
   background: var(--sd-accent-text);
   transition: width 0.1s ease-out;
+}
+
+/* ---------- Authorization log ---------- */
+
+.sd-log-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-4);
+  margin-bottom: var(--sd-space-5);
+}
+
+.sd-log-table td:first-child {
+  width: 1%;
+}
+
+.sd-log-detail td {
+  background: var(--sd-raised);
+}
+
+.sd-log-detail-title {
+  margin: 0 0 var(--sd-space-2);
+  color: var(--sd-text-muted);
+  font-size: var(--sd-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sd-log-json {
+  margin: 0;
+  padding: var(--sd-space-3);
+  overflow-x: auto;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-sunken);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-xs);
+  white-space: pre-wrap;
+}
+
+.sd-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: var(--sd-space-3);
+  margin-top: var(--sd-space-4);
+}
+
+.sd-pager > .sd-muted {
+  margin-right: auto;
+  align-self: center;
+}
+
+.sd-pager-size .sd-field {
+  min-width: 120px;
+}
+
+.sd-page-lead {
+  max-width: 72ch;
+  margin: calc(-1 * var(--sd-space-3)) 0 var(--sd-space-5);
 }

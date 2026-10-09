@@ -37,10 +37,12 @@ public static class AccountEndpoints
       }
 
       var tenantName = await db.Tenants.Where(x => x.Id == user.TenantId).Select(x => x.Name).FirstOrDefaultAsync();
-      // Administrators are whoever may manage access, at the server or in their tenant.
       var principal = new Principal(PermissionPrincipalKind.User, user.Id, user.TenantId);
-      var server = await permissions.EvaluateAsync(principal, PermissionNames.ServerPermissionsWrite, Resource.Server, context.RequestAborted);
-      var tenant = await permissions.EvaluateAsync(principal, PermissionNames.TenantPermissionsWrite, Resource.Tenant(user.TenantId), context.RequestAborted);
+      var rules = await permissions.RulesAsync(principal, context.RequestAborted);
+      var held = PermissionCatalog.All
+        .Where(x => PermissionRules.Evaluate(rules, x.Name, x.PresetScope == PermissionScopeKind.Server ? Resource.Server : Resource.Tenant(user.TenantId)).Allowed)
+        .Select(x => x.Name)
+        .ToList();
       return Results.Ok(new CurrentUser
       {
         Id = user.Id,
@@ -50,8 +52,10 @@ public static class AccountEndpoints
         EmailConfirmed = user.EmailConfirmed,
         TwoFactorEnabled = user.TwoFactorEnabled,
         MustChangePassword = user.MustChangePassword,
-        IsServerAdministrator = server.Allowed,
-        IsTenantAdministrator = tenant.Allowed,
+        // Administrators are whoever may manage access, at the server or in their tenant.
+        IsServerAdministrator = held.Contains(PermissionNames.ServerPermissionsWrite),
+        IsTenantAdministrator = held.Contains(PermissionNames.TenantPermissionsWrite),
+        Permissions = held,
       });
     }).RequireAuthorization().OwnAccount();
 

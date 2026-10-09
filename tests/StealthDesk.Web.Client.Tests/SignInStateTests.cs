@@ -129,6 +129,42 @@ public class SignInStateTests : AccountTestContext
   }
 
   [Fact]
+  public void Layout_OffersTheLogs_OnlyToThoseWhoMayReadThem()
+  {
+    Api.RespondWith(Ana with { Permissions = [Contracts.Permissions.PermissionNames.TenantAuthorizationLogsRead] });
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => Assert.Single(layout.FindAll("a[href='authorization-logs']")));
+    Assert.Empty(layout.FindAll("a[href='server/authorization-logs']"));
+  }
+
+  [Fact]
+  public void Layout_WithoutPermissions_OffersOnlyTheDevices()
+  {
+    Api.RespondWith(Ana);
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => Assert.Single(layout.FindAll(".sd-user-name")));
+    Assert.Equal(["Devices"], layout.FindAll(".sd-nav-link").Select(x => x.TextContent.Trim()));
+  }
+
+  [Fact]
+  public async Task Permissions_BecomePoliciesTheUserMeets()
+  {
+    Api.RespondWith(Ana with { Permissions = [Contracts.Permissions.PermissionNames.ServerAuthorizationLogsRead] });
+    var user = (await Services.GetRequiredService<AuthenticationStateProvider>().GetAuthenticationStateAsync()).User;
+    var authorization = Services.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>();
+
+    var held = await authorization.AuthorizeAsync(user, null, Contracts.Permissions.PermissionPolicies.For(Contracts.Permissions.PermissionNames.ServerAuthorizationLogsRead));
+    var notHeld = await authorization.AuthorizeAsync(user, null, Contracts.Permissions.PermissionPolicies.For(Contracts.Permissions.PermissionNames.TenantAuthorizationLogsRead));
+
+    Assert.True(held.Succeeded);
+    Assert.False(notHeld.Succeeded);
+  }
+
+  [Fact]
   public void Layout_LinksTheUserToTheirAccountSettings()
   {
     Api.RespondWith(Ana);

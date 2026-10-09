@@ -1,0 +1,6 @@
+@inject NavigationManager Navigation
+
+@code {
+    // Shown instead of a page the signed-in user has no permission for: signing in again wouldn't help.
+    protected override void OnInitialized() => Navigation.NavigateTo("account/access-denied", replace: true);
+}
