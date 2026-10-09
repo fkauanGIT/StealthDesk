@@ -27,6 +27,14 @@ public class LayoutTests
       await app.Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
       await AssertFitsAsync(app, page.Replace('/', '-'));
     }
+
+    foreach (var (page, heading) in new[] { ("authorization-logs", "Authorization log"), ("server/authorization-logs", "Server authorization log") })
+    {
+      await app.GoAsync(page);
+      await Expect(app.Page.Locator(".sd-log-table")).ToBeVisibleAsync();
+      await Expect(app.Heading(heading)).ToBeVisibleAsync();
+      await AssertFitsAsync(app, page.Replace('/', '-'));
+    }
   }
 
   private static async Task AssertFitsAsync(UiApp app, string name)
