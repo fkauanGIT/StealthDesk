@@ -143,17 +143,11 @@ public static class UserEndpoints
 
     var email = string.IsNullOrWhiteSpace(request.Email) ? request.UserName : request.Email;
     var user = new UserRecord { UserName = email, Email = email, TenantId = tenant };
-    var created = string.IsNullOrEmpty(request.Password)
-      ? await users.CreateAsync(user)
-      : await users.CreateAsync(user, request.Password);
+    var created = await TenantMembers.CreateAsync(users, seeder, user, request.Password, presets, cancellationToken);
     if (!created.Succeeded)
     {
       return ManageEndpoints.ValidationProblem(created);
     }
-
-    // Someone with the right to add users vouches for the address.
-    await users.ConfirmEmailAsync(user, await users.GenerateEmailConfirmationTokenAsync(user));
-    await seeder.SeedAsync(user.Id, tenant, PermissionPresets.Baseline.Concat(presets), cancellationToken);
 
     var permissions = await db.PermissionAssignments
       .IgnoreQueryFilters()

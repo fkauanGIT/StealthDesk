@@ -38,6 +38,13 @@ public sealed class AccountEmails(IEmailTransport transport, IHttpContextAccesso
     return SendConfirmationLinkAsync(user, user.Email!, link);
   }
 
+  /// <summary>Sends an invitation into a tenant, with the link that lets the person choose their password.</summary>
+  public Task SendInviteAsync(string email, string inviteLink) =>
+    Send(email, $"You're invited to {Brand.Name}",
+      $"<p>You've been invited to {Brand.Name}. Open the invitation, enter this email address and choose a password:</p>"
+      + $"{Button(HtmlEncoder.Default.Encode(inviteLink), "Accept the invitation")}"
+      + "<p>If you weren't expecting this, you can ignore this message.</p>");
+
   private Task Send(string to, string subject, string body) =>
     transport.SendAsync(new EmailMessage(to, subject, Layout(body)));
 

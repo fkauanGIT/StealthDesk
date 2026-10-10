@@ -6,6 +6,7 @@ using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
+using StealthDesk.Web.Server.Invites;
 using StealthDesk.Web.Server.Users;
 
 namespace StealthDesk.Web.Server;
@@ -50,6 +51,7 @@ public static class ServerSetup
     app.MapDeviceEndpoints();
     app.MapAuthorizationLogEndpoints();
     app.MapUserEndpoints();
+    app.MapInviteEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);
