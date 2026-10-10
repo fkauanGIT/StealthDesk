@@ -127,6 +127,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
     {
       group.ToTable("user_groups");
       group.Property(x => x.Name).HasMaxLength(UserGroupRecord.NameMax);
+      group.Property(x => x.Description).HasMaxLength(UserGroupRecord.DescriptionMax);
       group.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
       group.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
       group.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);

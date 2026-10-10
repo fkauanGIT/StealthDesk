@@ -18,6 +18,11 @@ public static class Routes
   public static string User(Guid id) => $"{Users}/{id}";
   public static string UserPasswordReset(Guid id) => $"{Users}/{id}/reset-password";
 
+  /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
+  public const string UserGroups = "/api/v1/user-groups";
+  public static string UserGroup(Guid id) => $"{UserGroups}/{id}";
+  public static string UserGroupMembers(Guid id) => $"{UserGroups}/{id}/members";
+
   /// <summary>A tenant's pending invites (<c>?tenantId=</c>); accepting one needs no session.</summary>
   public const string Invites = "/api/v1/invites";
   public static string Invite(Guid id) => $"{Invites}/{id}";
