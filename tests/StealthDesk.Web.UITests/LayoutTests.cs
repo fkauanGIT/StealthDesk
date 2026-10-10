@@ -28,6 +28,10 @@ public class LayoutTests
       await AssertFitsAsync(app, page.Replace('/', '-'));
     }
 
+    await app.GoAsync("invites");
+    await Expect(app.Heading("Invites")).ToBeVisibleAsync();
+    await AssertFitsAsync(app, "invites");
+
     await app.GoAsync("users");
     await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(1);
     await AssertFitsAsync(app, "users");
