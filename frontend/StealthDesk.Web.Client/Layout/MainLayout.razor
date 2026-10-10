@@ -24,6 +24,12 @@
                     Users
                 </NavLink>
             </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUserGroupsRead))">
+                <NavLink class="sd-nav-link" href="user-groups">
+                    <SdIcon Name="IconName.Group" />
+                    User groups
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersWrite))">
                 <NavLink class="sd-nav-link" href="invites">
                     <SdIcon Name="IconName.Mail" />

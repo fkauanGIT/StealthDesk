@@ -5,6 +5,11 @@ public static class AuthorizationChangeActions
 {
   public const string PermissionAssignmentDeleted = "permission-assignment-deleted";
   public const string PermissionAssignmentsSeeded = "permission-assignments-seeded";
+  public const string UserGroupCreated = "user-group-created";
+  public const string UserGroupDeleted = "user-group-deleted";
+  public const string UserGroupMembersAdded = "user-group-members-added";
+  public const string UserGroupMembersRemoved = "user-group-members-removed";
+  public const string UserGroupUpdated = "user-group-updated";
 }
 
 /// <summary>Who made the change.</summary>
