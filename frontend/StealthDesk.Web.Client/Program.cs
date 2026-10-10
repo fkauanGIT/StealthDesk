@@ -22,6 +22,7 @@ builder.Services.AddScoped<SessionGuard>();
 builder.Services.AddScoped<IPasskeyBridge, PasskeyBridge>();
 builder.Services.AddScoped<AuthorizationLogApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Users.UserApi>();
+builder.Services.AddScoped<StealthDesk.Web.Client.Invites.InviteApi>();
 
 builder.Services.AddScoped<DeviceStore>();
 builder.Services.AddScoped<ILiveUpdates>(sp => new LiveUpdates(

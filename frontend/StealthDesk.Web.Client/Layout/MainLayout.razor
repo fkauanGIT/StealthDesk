@@ -24,6 +24,12 @@
                     Users
                 </NavLink>
             </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersWrite))">
+                <NavLink class="sd-nav-link" href="invites">
+                    <SdIcon Name="IconName.Mail" />
+                    Invites
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantAuthorizationLogsRead))">
                 <NavLink class="sd-nav-link" href="authorization-logs">
                     <SdIcon Name="IconName.History" />
