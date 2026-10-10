@@ -21,4 +21,5 @@ public enum IconName
   History,
   Copy,
   Users,
+  Group,
 }

@@ -1,0 +1,271 @@
+@page "/user-groups/{Id:guid}"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantUserGroupsRead)]
+@using StealthDesk.Contracts.UserGroups
+@using StealthDesk.Contracts.Users
+@using StealthDesk.Web.Client.UserGroups
+@using StealthDesk.Web.Client.Users
+@inject UserGroupApi Api
+@inject UserApi Users
+@inject SessionGuard Session
+
+<PageTitle>@(group?.Name ?? "User group") · StealthDesk</PageTitle>
+
+<a class="sd-back" href="user-groups">
+    <SdIcon Name="IconName.Back" Size="16" />
+    User groups
+</a>
+
+@if (notFound)
+{
+    <SdEmptyState Title="Group not found">It may have been deleted, or the link is wrong.</SdEmptyState>
+}
+else if (group is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading the group..." />
+    }
+    else
+    {
+        <SdAlert>@error</SdAlert>
+    }
+}
+else
+{
+    <header class="sd-page-header">
+        <h1 class="sd-page-title">@group.Name</h1>
+        <div class="sd-push sd-actions">
+            <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+            <AuthorizeView Policy="@WritePolicy">
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="() => editing = true">Edit</SdButton>
+            </AuthorizeView>
+            <AuthorizeView Policy="@AssignPolicy">
+                <SdButton OnClick="OpenAddAsync">Add members</SdButton>
+            </AuthorizeView>
+        </div>
+    </header>
+    @if (group.Description is not null)
+    {
+        <p class="sd-muted sd-page-lead" data-description>@group.Description</p>
+    }
+
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    @if (group.Members.Count == 0)
+    {
+        <SdEmptyState Title="No members yet">Users added here receive every permission granted to the group.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 560px">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Last sign-in</th>
+                        <AuthorizeView Policy="@AssignPolicy">
+                            <th><span class="sd-visually-hidden">Actions</span></th>
+                        </AuthorizeView>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var member in group.Members)
+                    {
+                        <tr @key="member.UserId" data-member="@member.UserName">
+                            <td>@member.UserName</td>
+                            <td class="sd-muted" style="white-space: nowrap">@(member.LastSignIn?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
+                            <AuthorizeView Policy="@AssignPolicy">
+                                <td><SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = member">Remove</SdButton></td>
+                            </AuthorizeView>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <UserGroupForm Open="editing" Title="Edit group" SubmitText="Save" Initial="new UserGroupRequest(group.Name, group.Description)"
+                   OnClose="() => editing = false" OnSubmit="SaveAsync" />
+
+    <SdDialog Open="removing is not null" Title="Remove this member?" OnClose="() => removing = null">
+        <ChildContent>
+            <p class="sd-muted">@removing?.UserName stops receiving the permissions granted to "@group.Name".</p>
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = null">Cancel</SdButton>
+            <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="RemoveAsync">Remove</SdButton>
+        </Footer>
+    </SdDialog>
+
+    <SdDialog Open="adding" Title="Add members" OnClose="() => adding = false">
+        <ChildContent>
+            @if (candidatesError is not null)
+            {
+                <SdAlert>@candidatesError</SdAlert>
+            }
+            else if (candidates is null)
+            {
+                <SdLoading Text="Loading users..." />
+            }
+            else if (candidates.Count == 0)
+            {
+                <p class="sd-muted">Every user of the tenant is already in this group.</p>
+            }
+            else
+            {
+                <div class="sd-member-picker">
+                    @foreach (var user in candidates)
+                    {
+                        <SdCheckbox Label="@(user.Email ?? user.UserName)" Checked="picked.Contains(user.Id)" CheckedChanged="on => Pick(user.Id, on)" />
+                    }
+                </div>
+            }
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => adding = false">Cancel</SdButton>
+            <SdButton Disabled="busy || picked.Count == 0" OnClick="AddAsync">@(picked.Count > 1 ? $"Add {picked.Count} users" : "Add")</SdButton>
+        </Footer>
+    </SdDialog>
+}
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.TenantUserGroupsWrite);
+    private static readonly string AssignPolicy = PermissionPolicies.For(PermissionNames.UserGroupAssignUsers);
+
+    private readonly HashSet<Guid> picked = [];
+    private UserGroupDetail? group;
+    private UserGroupMember? removing;
+    private IReadOnlyList<TenantUser>? candidates;
+    private string? candidatesError;
+    private string? error;
+    private bool notFound;
+    private bool editing;
+    private bool adding;
+    private bool busy;
+    private Guid tenantId;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.GetAsync(Id, tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        notFound = result.NotFound;
+        group = result.Value ?? group;
+        error = result.NotFound ? null : result.Error;
+    }
+
+    private async Task<string?> SaveAsync(UserGroupRequest request)
+    {
+        var result = await Api.UpdateAsync(Id, tenantId, request);
+        if (Expired(result.SessionExpired))
+        {
+            return null;
+        }
+
+        if (!result.Succeeded)
+        {
+            return result.Error;
+        }
+
+        group = result.Value;
+        editing = false;
+        // The form calls this as a plain delegate, which doesn't render this page on its own.
+        StateHasChanged();
+        return null;
+    }
+
+    // Adding needs the tenant's users to choose from, which needs the right to read them.
+    private async Task OpenAddAsync()
+    {
+        adding = true;
+        picked.Clear();
+        candidates = null;
+        candidatesError = null;
+        var (list, result) = await Users.ListAsync(tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        var members = group!.Members.Select(x => x.UserId).ToHashSet();
+        candidates = list?.Items.Where(x => !members.Contains(x.Id)).ToList();
+        candidatesError = result.Succeeded ? null : "The users of this tenant can't be listed with your account.";
+    }
+
+    private void Pick(Guid userId, bool on)
+    {
+        if (on)
+        {
+            picked.Add(userId);
+        }
+        else
+        {
+            picked.Remove(userId);
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        busy = true;
+        var result = await Api.AddMembersAsync(Id, tenantId, [.. picked]);
+        busy = false;
+        adding = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (removing is not { } member)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.RemoveMembersAsync(Id, tenantId, [member.UserId]);
+        busy = false;
+        removing = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

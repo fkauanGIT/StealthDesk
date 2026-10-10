@@ -1,0 +1,77 @@
+@using StealthDesk.Contracts.UserGroups
+
+@* The name and description of a group, to create one or change it. *@
+<SdDialog Open="Open" Title="@Title" OnClose="OnClose">
+    <ChildContent>
+        <form id="@_formId" class="sd-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            @if (error is not null)
+            {
+                <SdAlert>@error</SdAlert>
+            }
+            <SdTextField Label="Name" @bind-Value="name" Autocomplete="off" />
+            <SdTextField Label="Description" @bind-Value="description" Autocomplete="off" Hint="Optional. What the group is for." />
+        </form>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="OnClose">Cancel</SdButton>
+        <SdButton Disabled="busy" OnClick="SubmitAsync">@SubmitText</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private readonly string _formId = $"group-form-{Guid.NewGuid():N}";
+    private string? name;
+    private string? description;
+    private string? error;
+    private bool busy;
+    private bool wasOpen;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string SubmitText { get; set; } = string.Empty;
+
+    /// <summary>The values the form opens with, when changing a group.</summary>
+    [Parameter]
+    public UserGroupRequest? Initial { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>
+    /// Saves; answers why not, or null when it worked. A plain delegate, so it can answer: the page that passes it
+    /// renders itself after changing its state.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public Func<UserGroupRequest, Task<string?>> OnSubmit { get; set; } = _ => Task.FromResult<string?>(null);
+
+    // Each time it opens, it starts from the group's values.
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen)
+        {
+            name = Initial?.Name;
+            description = Initial?.Description;
+            error = null;
+        }
+
+        wasOpen = Open;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            error = "Enter a name for the group.";
+            return;
+        }
+
+        busy = true;
+        error = await OnSubmit(new UserGroupRequest(name, description));
+        busy = false;
+    }
+}

@@ -1257,3 +1257,13 @@ a.sd-btn:hover {
 .sd-invite-form > .sd-btn {
   margin-top: 26px;
 }
+
+/* ---------- User groups ---------- */
+
+.sd-member-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
