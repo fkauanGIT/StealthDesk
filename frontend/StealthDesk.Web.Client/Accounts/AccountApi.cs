@@ -57,6 +57,10 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> ResetPasswordAsync(string email, string resetCode, string newPassword) =>
     PostAsync($"{Routes.Auth}/resetPassword", new { email, resetCode, newPassword });
 
+  /// <summary>Accepts an invite from its link: the invited email and the password the person chooses.</summary>
+  public Task<AccountResult> AcceptInviteAsync(string activationCode, string email, string password) =>
+    PostAsync(Routes.AcceptInvite, new { activationCode, email, password });
+
   public Task<AccountResult> ResendConfirmationAsync(string email) =>
     PostAsync($"{Routes.Auth}/resendConfirmationEmail", new { email });
 

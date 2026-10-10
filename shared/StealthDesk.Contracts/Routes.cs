@@ -18,6 +18,14 @@ public static class Routes
   public static string User(Guid id) => $"{Users}/{id}";
   public static string UserPasswordReset(Guid id) => $"{Users}/{id}/reset-password";
 
+  /// <summary>A tenant's pending invites (<c>?tenantId=</c>); accepting one needs no session.</summary>
+  public const string Invites = "/api/v1/invites";
+  public static string Invite(Guid id) => $"{Invites}/{id}";
+  public const string AcceptInvite = "/api/invites/accept";
+
+  /// <summary>The web client's page an invite link opens, followed by the activation code.</summary>
+  public const string InviteConfirmationPage = "invite-confirmation";
+
   /// <summary>ASP.NET Core Identity's account endpoints: /register, /login, /refresh, /manage/info and the rest.</summary>
   public const string Auth = "/api/auth";
   public const string CurrentUser = "/api/auth/me";

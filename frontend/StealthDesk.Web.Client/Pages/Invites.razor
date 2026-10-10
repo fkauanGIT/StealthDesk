@@ -1,0 +1,221 @@
+@page "/invites"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantUsersWrite)]
+@using StealthDesk.Contracts.Invites
+@using StealthDesk.Web.Client.Invites
+@inject InviteApi Api
+@inject SessionGuard Session
+@inject IJSRuntime Js
+
+<PageTitle>Invites · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Invites</h1>
+    <div class="sd-search sd-push">
+        <SdIcon Name="IconName.Search" Size="16" />
+        <label for="invite-search" class="sd-visually-hidden">Search invites</label>
+        <input id="invite-search" type="search" placeholder="Search by email" value="@search"
+               @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+</header>
+<p class="sd-muted sd-page-lead">
+    Invite someone by email, then share their link. They open it, choose a password and join this tenant.
+    When the server sends email, the link is emailed to them too.
+</p>
+
+<form class="sd-invite-form" @onsubmit="InviteAsync" @onsubmit:preventDefault>
+    <SdTextField Label="Invite a new user" Type="email" Placeholder="name@company.com" Autocomplete="off"
+                 @bind-Value="email" Error="@inviteError" />
+    <SdButton Type="submit" Icon="IconName.Mail" Disabled="busy">@(busy ? "Inviting..." : "Invite")</SdButton>
+</form>
+
+@if (invited is not null)
+{
+    <SdAlert Tone="Tone.Info">
+        @invited.InviteeEmail is invited. Share their link:
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Copy" OnClick="() => CopyAsync(invited)">@(copied == invited.Id ? "Copied" : "Copy link")</SdButton>
+    </SdAlert>
+}
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (invites is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading invites..." />
+    }
+}
+else if (invites.Count == 0)
+{
+    <SdEmptyState Title="No pending invites">Invite someone above; they show up here until they accept.</SdEmptyState>
+}
+else
+{
+    var shown = invites.Where(x => string.IsNullOrWhiteSpace(search) || x.InviteeEmail.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    @if (shown.Count == 0)
+    {
+        <SdEmptyState Title="No invites match">Try another search.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 640px">
+                <thead>
+                    <tr>
+                        <th>Invited email</th>
+                        <th>Invited</th>
+                        <th>Link</th>
+                        <th><span class="sd-visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var invite in shown)
+                    {
+                        <tr @key="invite.Id" data-invite="@invite.InviteeEmail">
+                            <td>@invite.InviteeEmail</td>
+                            <td class="sd-muted" style="white-space: nowrap">@invite.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.Copy" OnClick="() => CopyAsync(invite)">
+                                    @(copied == invite.Id ? "Copied" : "Copy link")
+                                </SdButton>
+                            </td>
+                            <td><SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = invite">Delete</SdButton></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<SdDialog Open="deleting is not null" Title="Delete this invite?" OnClose="() => deleting = null">
+    <ChildContent>
+        <p class="sd-muted">The link for @deleting?.InviteeEmail stops working, and the account made for them is removed.</p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DeleteAsync">Delete</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private IReadOnlyList<TenantInvite>? invites;
+    private TenantInvite? deleting;
+    private TenantInvite? invited;
+    private Guid? copied;
+    private string? email;
+    private string search = string.Empty;
+    private string? error;
+    private string? inviteError;
+    private bool busy;
+    private Guid tenantId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.ListAsync(tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        invites = result.Value?.Items;
+        error = result.Error;
+    }
+
+    private async Task InviteAsync()
+    {
+        inviteError = null;
+        invited = null;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            inviteError = "Enter the email of the person to invite.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.CreateAsync(tenantId, email);
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            inviteError = result.Error;
+            return;
+        }
+
+        invited = result.Value;
+        email = null;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } invite)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync(invite.Id, tenantId);
+        busy = false;
+        deleting = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        if (invited?.Id == invite.Id)
+        {
+            invited = null;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task CopyAsync(TenantInvite invite)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", invite.InviteUrl);
+            copied = invite.Id;
+        }
+        catch (JSException)
+        {
+            error = "The browser didn't allow copying. Open the page over HTTPS or localhost and try again.";
+        }
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

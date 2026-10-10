@@ -1,0 +1,91 @@
+@page "/invite-confirmation"
+@page "/invite-confirmation/{Code}"
+@inject AccountApi Accounts
+
+<PageTitle>Accept the invitation · StealthDesk</PageTitle>
+
+<header class="sd-auth-header">
+    <h1 class="sd-auth-title">@(done ? "You've joined" : "Accept the invitation")</h1>
+    @if (!done)
+    {
+        <p class="sd-auth-subtitle">Enter the email you were invited with and choose your password.</p>
+    }
+</header>
+
+<AuthorizeView>
+    <Authorized>
+        <SdAlert Tone="Tone.Warning">Sign out to accept an invitation: it sets up a different account.</SdAlert>
+        <p class="sd-auth-footer"><a href="">Back to the devices</a></p>
+    </Authorized>
+    <NotAuthorized>
+        @if (string.IsNullOrWhiteSpace(Code))
+        {
+            <SdAlert>This link is incomplete. Ask whoever invited you to send it again.</SdAlert>
+        }
+        else if (done)
+        {
+            <SdAlert Tone="Tone.Info">Your account is ready. Sign in with your email and the password you chose.</SdAlert>
+            <p class="sd-auth-footer"><a href="account/sign-in">Sign in</a></p>
+        }
+        else
+        {
+            @if (error is not null)
+            {
+                <SdAlert>@error</SdAlert>
+            }
+
+            <form class="sd-form" @onsubmit="SubmitAsync">
+                <SdTextField Label="Email" Type="email" Autocomplete="username" @bind-Value="email" Error="@emailError" />
+                <SdTextField Label="Password" Type="password" Autocomplete="new-password" @bind-Value="password" Error="@passwordError"
+                             Hint="At least 8 characters, with upper and lower case letters and a digit." />
+                <SdTextField Label="Confirm password" Type="password" Autocomplete="new-password" @bind-Value="confirmation" Error="@confirmationError" />
+                <SdButton Type="submit" Block="true" Disabled="busy">@(busy ? "Joining..." : "Join")</SdButton>
+            </form>
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private string? email;
+    private string? password;
+    private string? confirmation;
+    private bool busy;
+    private bool done;
+    private string? error;
+    private string? emailError;
+    private string? passwordError;
+    private string? confirmationError;
+
+    [Parameter]
+    public string? Code { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        error = emailError = passwordError = confirmationError = null;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            emailError = "Enter the email you were invited with.";
+            return;
+        }
+
+        if (password != confirmation)
+        {
+            confirmationError = "The passwords don't match.";
+            return;
+        }
+
+        busy = true;
+        var result = await Accounts.AcceptInviteAsync(Code!, email, password ?? string.Empty);
+        busy = false;
+        if (result.Succeeded)
+        {
+            done = true;
+            return;
+        }
+
+        passwordError = FieldErrors.ForPassword(result);
+        error = result.IsNotFound
+            ? "This invitation doesn't exist, was already used, or isn't for this email."
+            : passwordError is null ? FieldErrors.Remaining(result) : null;
+    }
+}

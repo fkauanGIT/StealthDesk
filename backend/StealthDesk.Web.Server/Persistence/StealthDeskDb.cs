@@ -19,6 +19,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<PermissionAssignmentRecord> PermissionAssignments => Set<PermissionAssignmentRecord>();
   public DbSet<UserGroupRecord> UserGroups => Set<UserGroupRecord>();
   public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
+  public DbSet<TenantInviteRecord> TenantInvites => Set<TenantInviteRecord>();
 
   // No tenant filter: server-wide entries belong to no tenant, and every read names the tenant it wants.
   public DbSet<AuthorizationChangeRecord> AuthorizationChanges => Set<AuthorizationChangeRecord>();
@@ -94,6 +95,18 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       assignment.Property(x => x.ScopeKind).HasConversion<string>().HasMaxLength(20);
       assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId });
       assignment.HasIndex(x => x.OwningTenantId);
+    });
+
+    modelBuilder.Entity<TenantInviteRecord>(invite =>
+    {
+      invite.ToTable("tenant_invites");
+      invite.Property(x => x.InviteeEmail).HasMaxLength(TenantInviteRecord.EmailMax);
+      invite.Property(x => x.ActivationCode).HasMaxLength(TenantInviteRecord.ActivationCodeLength);
+      invite.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      invite.HasIndex(x => x.ActivationCode).IsUnique();
+      invite.HasIndex(x => x.InviteeEmail).IsUnique();
+      invite.HasIndex(x => x.TenantId);
+      invite.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });
 
     modelBuilder.Entity<AuthorizationChangeRecord>(change =>
