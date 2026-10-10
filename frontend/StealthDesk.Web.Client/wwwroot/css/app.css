@@ -965,7 +965,9 @@ a.sd-btn:hover {
 
 /* ---------- Table ---------- */
 
+/* Relative so that visually hidden headers, positioned absolutely, scroll with the table instead of widening the page. */
 .sd-table-wrap {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-lg);

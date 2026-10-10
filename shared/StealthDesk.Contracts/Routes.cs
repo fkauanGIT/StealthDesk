@@ -13,6 +13,11 @@ public static class Routes
   public const string AuthorizationLogs = "/api/v1/authorization-logs";
   public const string ServerAuthorizationLogs = "/api/v1/authorization-logs/server";
 
+  /// <summary>A tenant's users (<c>?tenantId=</c>).</summary>
+  public const string Users = "/api/v1/users";
+  public static string User(Guid id) => $"{Users}/{id}";
+  public static string UserPasswordReset(Guid id) => $"{Users}/{id}/reset-password";
+
   /// <summary>ASP.NET Core Identity's account endpoints: /register, /login, /refresh, /manage/info and the rest.</summary>
   public const string Auth = "/api/auth";
   public const string CurrentUser = "/api/auth/me";

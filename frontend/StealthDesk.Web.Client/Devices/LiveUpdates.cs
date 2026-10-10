@@ -48,6 +48,9 @@ public sealed class LiveUpdates(
 
   public LiveState State { get; private set; } = LiveState.Connecting;
 
+  /// <summary>Completes once the subscriptions asked for by the latest change of the store are in place.</summary>
+  public Task Subscribed { get; private set; } = Task.CompletedTask;
+
   public async Task StartAsync()
   {
     if (_connection is not null)
@@ -124,7 +127,7 @@ public sealed class LiveUpdates(
     _syncing.Dispose();
   }
 
-  private void OnStoreChanged() => _ = SyncSubscriptionsAsync();
+  private void OnStoreChanged() => Subscribed = SyncSubscriptionsAsync();
 
   // Makes the server's groups match the devices the store knows. Ids the server left out (not readable) count as
   // subscribed too, so they aren't asked for again on every change.

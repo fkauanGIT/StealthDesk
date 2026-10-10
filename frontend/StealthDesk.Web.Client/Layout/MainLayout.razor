@@ -18,6 +18,12 @@
                 <SdIcon Name="IconName.Device" />
                 Devices
             </NavLink>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersRead))">
+                <NavLink class="sd-nav-link" href="users">
+                    <SdIcon Name="IconName.Users" />
+                    Users
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantAuthorizationLogsRead))">
                 <NavLink class="sd-nav-link" href="authorization-logs">
                     <SdIcon Name="IconName.History" />

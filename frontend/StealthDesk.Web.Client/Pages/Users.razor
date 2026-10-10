@@ -1,0 +1,182 @@
+@page "/users"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantUsersRead)]
+@using StealthDesk.Contracts.Users
+@using StealthDesk.Web.Client.Users
+@inject UserApi Api
+@inject SessionGuard Session
+@inject IJSRuntime Js
+
+<PageTitle>Users · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Users</h1>
+    <div class="sd-search sd-push">
+        <SdIcon Name="IconName.Search" Size="16" />
+        <label for="user-search" class="sd-visually-hidden">Search users</label>
+        <input id="user-search" type="search" placeholder="Search by email or ID" value="@search"
+               @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+</header>
+<p class="sd-muted sd-page-lead">The people who can sign in to this tenant. New people join with an invite.</p>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (users is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading users..." />
+    }
+}
+else
+{
+    var shown = Visible(users).ToList();
+    @if (shown.Count == 0)
+    {
+        <SdEmptyState Title="No users match">Try another search.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 760px">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Permissions</th>
+                        <th>Created</th>
+                        <th>ID</th>
+                        <AuthorizeView Policy="@DeletePolicy">
+                            <th><span class="sd-visually-hidden">Actions</span></th>
+                        </AuthorizeView>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in shown)
+                    {
+                        <tr @key="user.Id" data-user="@user.Email">
+                            <td>
+                                <div class="sd-cell-title">
+                                    <span>@user.Email</span>
+                                    @if (user.UserName != user.Email)
+                                    {
+                                        <span class="sd-cell-sub">@user.UserName</span>
+                                    }
+                                </div>
+                            </td>
+                            <td data-cell="permissions">@user.Permissions.Count</td>
+                            <td class="sd-muted" style="white-space: nowrap">@user.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <span class="sd-mono sd-cell-sub" title="@user.Id">@user.Id.ToString()[..8]…</span>
+                                <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.Copy" AriaLabel="Copy the user's ID" OnClick="() => CopyAsync(user.Id)" />
+                            </td>
+                            <AuthorizeView Policy="@DeletePolicy">
+                                <td>
+                                    <SdButton Variant="ButtonVariant.Ghost" Disabled="user.Id == currentUserId"
+                                              title="@(user.Id == currentUserId ? "You can't delete yourself" : null)"
+                                              OnClick="() => deleting = user">Delete</SdButton>
+                                </td>
+                            </AuthorizeView>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<SdDialog Open="deleting is not null" Title="Delete this user?" OnClose="() => deleting = null">
+    <ChildContent>
+        <p class="sd-muted">@deleting?.Email will no longer be able to sign in. This can't be undone.</p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DeleteAsync">Delete</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly string DeletePolicy = PermissionPolicies.For(PermissionNames.TenantUsersDelete);
+
+    private IReadOnlyList<TenantUser>? users;
+    private TenantUser? deleting;
+    private string search = string.Empty;
+    private string? error;
+    private bool busy;
+    private Guid tenantId;
+    private Guid? currentUserId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        currentUserId = Guid.TryParse(user?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var (list, result) = await Api.ListAsync(tenantId);
+        if (result.SessionExpired)
+        {
+            Session.Expired();
+            return;
+        }
+
+        users = list?.Items;
+        error = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } user)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync(user.Id, tenantId);
+        busy = false;
+        deleting = null;
+        if (result.SessionExpired)
+        {
+            Session.Expired();
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task CopyAsync(Guid id)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", id.ToString());
+        }
+        catch (JSException)
+        {
+            // The browser refused (no permission or not a secure page); the ID is still shown in full on hover.
+        }
+    }
+
+    private IEnumerable<TenantUser> Visible(IEnumerable<TenantUser> all) =>
+        string.IsNullOrWhiteSpace(search)
+            ? all
+            : all.Where(x =>
+                (x.Email?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                || x.UserName.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || x.Id.ToString().Contains(search, StringComparison.OrdinalIgnoreCase));
+}
