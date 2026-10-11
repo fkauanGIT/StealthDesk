@@ -28,6 +28,16 @@ public class LayoutTests
       await AssertFitsAsync(app, page.Replace('/', '-'));
     }
 
+    await app.GoAsync("user-groups");
+    await app.ClickAsync("New group");
+    await app.FillAsync("Name", "Support");
+    await app.ClickAsync("Create");
+    await Expect(app.Heading("Support")).ToBeVisibleAsync();
+    await AssertFitsAsync(app, "user-group");
+    await app.GoAsync("user-groups");
+    await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(1);
+    await AssertFitsAsync(app, "user-groups");
+
     await app.GoAsync("invites");
     await Expect(app.Heading("Invites")).ToBeVisibleAsync();
     await AssertFitsAsync(app, "invites");

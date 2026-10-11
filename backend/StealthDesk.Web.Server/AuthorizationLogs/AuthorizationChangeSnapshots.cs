@@ -7,6 +7,11 @@ namespace StealthDesk.Web.Server.AuthorizationLogs;
 /// </summary>
 public sealed record PermissionSeedSummary(int Count, IReadOnlyList<string> Presets);
 
+public sealed record UserGroupSnapshot(string Name, string? Description);
+
+/// <summary>How many members were added or removed at once.</summary>
+public sealed record UserGroupMembershipChange(int Count);
+
 /// <summary>One assignment as it was, e.g. before it was removed.</summary>
 public sealed record PermissionAssignmentSnapshot(string Permission, PermissionEffect Effect, PermissionScopeKind ScopeKind, Guid? ScopeId)
 {

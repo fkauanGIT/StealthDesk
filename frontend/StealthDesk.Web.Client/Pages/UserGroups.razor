@@ -1,0 +1,211 @@
+@page "/user-groups"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantUserGroupsRead)]
+@using StealthDesk.Contracts.UserGroups
+@using StealthDesk.Web.Client.UserGroups
+@inject UserGroupApi Api
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>User groups · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">User groups</h1>
+    <div class="sd-search sd-push">
+        <SdIcon Name="IconName.Search" Size="16" />
+        <label for="group-search" class="sd-visually-hidden">Search groups</label>
+        <input id="group-search" type="search" placeholder="Search by name or description" value="@search"
+               @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+    <AuthorizeView Policy="@WritePolicy">
+        <SdButton OnClick="() => creating = true">New group</SdButton>
+    </AuthorizeView>
+</header>
+<p class="sd-muted sd-page-lead">Group users so permissions can be granted to all of them at once.</p>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (groups is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading groups..." />
+    }
+}
+else if (groups.Count == 0)
+{
+    <SdEmptyState Title="No groups yet">Create a group, add users to it, then grant it permissions.</SdEmptyState>
+}
+else
+{
+    var shown = groups.Where(Matches).ToList();
+    @if (shown.Count == 0)
+    {
+        <SdEmptyState Title="No groups match">Try another search.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 760px">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Users</th>
+                        <th>Created</th>
+                        <th>ID</th>
+                        <AuthorizeView Policy="@WritePolicy">
+                            <th><span class="sd-visually-hidden">Actions</span></th>
+                        </AuthorizeView>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var group in shown)
+                    {
+                        <tr @key="group.Id" data-group="@group.Name">
+                            <td>
+                                <div class="sd-cell-title">
+                                    <a href="user-groups/@group.Id">@group.Name</a>
+                                    @if (group.Description is not null)
+                                    {
+                                        <span class="sd-cell-sub">@group.Description</span>
+                                    }
+                                </div>
+                            </td>
+                            <td data-cell="members">@group.MemberCount</td>
+                            <td class="sd-muted" style="white-space: nowrap">@group.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <span class="sd-mono sd-cell-sub" title="@group.Id">@group.Id.ToString()[..8]…</span>
+                                <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.Copy" AriaLabel="Copy the group's ID" OnClick="() => CopyAsync(group.Id)" />
+                            </td>
+                            <AuthorizeView Policy="@WritePolicy">
+                                <td><SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = group">Delete</SdButton></td>
+                            </AuthorizeView>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<UserGroupForm Open="creating" Title="New group" SubmitText="Create" OnClose="() => creating = false" OnSubmit="CreateAsync" />
+
+<SdDialog Open="deleting is not null" Title="Delete this group?" OnClose="() => deleting = null">
+    <ChildContent>
+        <p class="sd-muted">"@deleting?.Name" and the permissions granted to it are removed. Its users stay, without what they received from it.</p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DeleteAsync">Delete</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.TenantUserGroupsWrite);
+
+    private IReadOnlyList<UserGroupSummary>? groups;
+    private UserGroupSummary? deleting;
+    private bool creating;
+    private string search = string.Empty;
+    private string? error;
+    private bool busy;
+    private Guid tenantId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.ListAsync(tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        groups = result.Value?.Items;
+        error = result.Error;
+    }
+
+    // The form shows the reason when it isn't null.
+    private async Task<string?> CreateAsync(UserGroupRequest request)
+    {
+        var result = await Api.CreateAsync(tenantId, request);
+        if (Expired(result.SessionExpired))
+        {
+            return null;
+        }
+
+        if (!result.Succeeded)
+        {
+            return result.Error;
+        }
+
+        creating = false;
+        Navigation.NavigateTo($"user-groups/{result.Value!.Id}");
+        return null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } group)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync(group.Id, tenantId);
+        busy = false;
+        deleting = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task CopyAsync(Guid id)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", id.ToString());
+        }
+        catch (JSException)
+        {
+            // The full ID is shown on hover.
+        }
+    }
+
+    private bool Matches(UserGroupSummary group) =>
+        string.IsNullOrWhiteSpace(search)
+        || group.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || (group.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false);
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}
