@@ -1,0 +1,121 @@
+@page "/permissions"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantPermissionsRead)]
+@using StealthDesk.Web.Client.Permissions
+@using StealthDesk.Web.Client.UserGroups
+@using StealthDesk.Web.Client.Users
+@inject UserApi Users
+@inject UserGroupApi Groups
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Permissions · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Permissions</h1>
+</header>
+<p class="sd-muted sd-page-lead">What a user or user group may do, where, and why. A deny always wins over an allow.</p>
+
+<div class="sd-permission-picker">
+    <SdSegmented TValue="PermissionPrincipalKind" Label="Grant to" Options="Kinds" Value="kind" ValueChanged="KindChangedAsync" />
+    @if (principals is null)
+    {
+        @if (pickerError is null)
+        {
+            <SdLoading Text="Loading..." />
+        }
+        else
+        {
+            <SdAlert>@pickerError</SdAlert>
+        }
+    }
+    else
+    {
+        <SdSelect Label="@(kind == PermissionPrincipalKind.User ? "User" : "User group")" Options="principals"
+                  Value="@principalId?.ToString()" ValueChanged="PrincipalChanged" />
+    }
+</div>
+
+@if (principalId is { } id)
+{
+    <PermissionAssignmentsPanel @key="(kind, id)" TenantId="tenantId" Kind="kind" PrincipalId="id" />
+}
+
+@code {
+    private static readonly IReadOnlyList<(PermissionPrincipalKind, string)> Kinds =
+        [(PermissionPrincipalKind.User, "User"), (PermissionPrincipalKind.UserGroup, "User group")];
+
+    private PermissionPrincipalKind kind = PermissionPrincipalKind.User;
+    private Guid? principalId;
+    private IReadOnlyList<SelectOption>? principals;
+    private string? pickerError;
+    private Guid tenantId;
+
+    /// <summary>Opened from a user or group: who to show first.</summary>
+    [SupplyParameterFromQuery(Name = "kind")]
+    public string? KindQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "id")]
+    public Guid? IdQuery { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        kind = Enum.TryParse<PermissionPrincipalKind>(KindQuery, out var asked) && asked is PermissionPrincipalKind.User or PermissionPrincipalKind.UserGroup
+            ? asked
+            : PermissionPrincipalKind.User;
+        principalId = IdQuery;
+        await LoadPrincipalsAsync();
+    }
+
+    private async Task KindChangedAsync(PermissionPrincipalKind value)
+    {
+        kind = value;
+        principalId = null;
+        await LoadPrincipalsAsync();
+    }
+
+    private void PrincipalChanged(string? value)
+    {
+        principalId = Guid.TryParse(value, out var id) ? id : null;
+        Navigation.NavigateTo($"permissions?kind={kind}&id={principalId}", replace: true);
+    }
+
+    // Picking someone needs to see them: the tenant's users or its groups.
+    private async Task LoadPrincipalsAsync()
+    {
+        principals = null;
+        pickerError = null;
+        List<SelectOption>? options = null;
+        bool expired;
+        if (kind == PermissionPrincipalKind.User)
+        {
+            var (list, result) = await Users.ListAsync(tenantId);
+            expired = result.SessionExpired;
+            options = list?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Email ?? x.UserName)).ToList();
+        }
+        else
+        {
+            var result = await Groups.ListAsync(tenantId);
+            expired = result.SessionExpired;
+            options = result.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name)).ToList();
+        }
+
+        if (expired)
+        {
+            Session.Expired();
+            return;
+        }
+
+        if (options is null)
+        {
+            pickerError = $"Your account can't list the tenant's {(kind == PermissionPrincipalKind.User ? "users" : "user groups")}.";
+            return;
+        }
+
+        principals = [new SelectOption(string.Empty, kind == PermissionPrincipalKind.User ? "Choose a user" : "Choose a user group"), .. options];
+    }
+}

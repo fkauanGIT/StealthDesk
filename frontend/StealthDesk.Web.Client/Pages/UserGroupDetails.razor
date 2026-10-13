@@ -36,6 +36,9 @@ else
         <h1 class="sd-page-title">@group.Name</h1>
         <div class="sd-push sd-actions">
             <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+            <AuthorizeView Policy="@PermissionsPolicy">
+                <a class="sd-btn sd-btn--secondary" href="permissions?kind=UserGroup&id=@group.Id">Permissions</a>
+            </AuthorizeView>
             <AuthorizeView Policy="@WritePolicy">
                 <SdButton Variant="ButtonVariant.Secondary" OnClick="() => editing = true">Edit</SdButton>
             </AuthorizeView>
@@ -134,6 +137,7 @@ else
 @code {
     private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.TenantUserGroupsWrite);
     private static readonly string AssignPolicy = PermissionPolicies.For(PermissionNames.UserGroupAssignUsers);
+    private static readonly string PermissionsPolicy = PermissionPolicies.For(PermissionNames.TenantPermissionsRead);
 
     private readonly HashSet<Guid> picked = [];
     private UserGroupDetail? group;

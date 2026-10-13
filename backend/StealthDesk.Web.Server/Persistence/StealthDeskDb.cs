@@ -95,6 +95,10 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       assignment.Property(x => x.ScopeKind).HasConversion<string>().HasMaxLength(20);
       assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId });
       assignment.HasIndex(x => x.OwningTenantId);
+      // One row per grant: two identical ones saved at once can't both land. A missing scope ID counts as equal.
+      assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId, x.Permission, x.Effect, x.ScopeKind, x.ScopeId })
+        .IsUnique()
+        .AreNullsDistinct(false);
     });
 
     modelBuilder.Entity<TenantInviteRecord>(invite =>

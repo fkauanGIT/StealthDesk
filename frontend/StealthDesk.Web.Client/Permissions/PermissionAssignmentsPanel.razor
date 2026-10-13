@@ -1,0 +1,394 @@
+@using System.Net.Http.Json
+@using StealthDesk.Contracts.Devices
+@using StealthDesk.Web.Client.UserGroups
+@inject PermissionApi Api
+@inject UserGroupApi Groups
+@inject HttpClient Http
+@inject SessionGuard Session
+@inject IAuthorizationService Authorization
+
+@* A principal's assignments: listed, granted, changed and removed, presets applied, and effective permissions checked. *@
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+@if (notice is not null)
+{
+    <SdAlert Tone="Tone.Info">@notice</SdAlert>
+}
+
+@if (canWrite && presets is { Count: > 0 })
+{
+    <SdCard Title="Apply presets">
+        <div class="sd-preset-picker">
+            @foreach (var preset in presets)
+            {
+                <SdCheckbox Label="@preset.Name" Checked="pickedPresets.Contains(preset.Name)" CheckedChanged="on => Toggle(pickedPresets, preset.Name, on)" />
+            }
+        </div>
+        <div class="sd-actions sd-preset-actions">
+            <SdSelect Label="Mode" Options="Modes" Value="@(replace ? "replace" : "merge")" ValueChanged="ModeChanged" />
+            <SdButton Disabled="busy || pickedPresets.Count == 0" OnClick="ApplyPresetsAsync">Apply</SdButton>
+        </div>
+        <p class="sd-muted sd-field-hint">Merge adds what's missing. Replace removes the tenant and server ones first, keeping grants on single devices and groups.</p>
+    </SdCard>
+}
+
+<div class="sd-section-header">
+    <h2 class="sd-section-title">Assignments</h2>
+    @if (canWrite)
+    {
+        <div class="sd-push sd-actions">
+            <SdButton Variant="ButtonVariant.Secondary" Disabled="busy || selected.Count == 0" OnClick="() => confirmingDelete = true">
+                @(selected.Count > 0 ? $"Delete {selected.Count}" : "Delete selected")
+            </SdButton>
+            <SdButton Disabled="catalog is null" OnClick="() => OpenForm(null)">Add permission</SdButton>
+        </div>
+    }
+</div>
+
+@if (assignments is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading permissions..." />
+    }
+}
+else if (assignments.Count == 0)
+{
+    <SdEmptyState Title="No permissions">Nothing is granted or denied to them directly.</SdEmptyState>
+}
+else
+{
+    <div class="sd-table-wrap">
+        <table class="sd-table" style="min-width: 840px">
+            <thead>
+                <tr>
+                    @if (canWrite)
+                    {
+                        <th><span class="sd-visually-hidden">Select</span></th>
+                    }
+                    <th>Permission</th>
+                    <th>Effect</th>
+                    <th>Scope</th>
+                    <th>Enabled</th>
+                    <th>Notes</th>
+                    @if (canWrite)
+                    {
+                        <th><span class="sd-visually-hidden">Actions</span></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var assignment in assignments)
+                {
+                    <tr @key="assignment.Id" data-assignment="@assignment.Permission" data-effect="@assignment.Effect">
+                        @if (canWrite)
+                        {
+                            <td>
+                                <SdCheckbox Label="" Checked="selected.Contains(assignment.Id)" CheckedChanged="on => Toggle(selected, assignment.Id, on)" />
+                            </td>
+                        }
+                        <td>
+                            <div class="sd-cell-title">
+                                <span>@DisplayName(assignment.Permission)</span>
+                                <span class="sd-cell-sub sd-mono">@assignment.Permission</span>
+                            </div>
+                        </td>
+                        <td>
+                            <SdStatus Tone="@(assignment.Effect == PermissionEffect.Deny ? Tone.Danger : Tone.Online)" Text="@assignment.Effect.ToString()" />
+                        </td>
+                        <td data-cell="scope">@ScopeText(assignment.ScopeKind, assignment.ScopeId)</td>
+                        <td>
+                            @if (canWrite)
+                            {
+                                <SdCheckbox Label="@(assignment.IsEnabled ? "On" : "Off")" Checked="assignment.IsEnabled" Disabled="busy" CheckedChanged="on => SetEnabledAsync(assignment, on)" />
+                            }
+                            else
+                            {
+                                @(assignment.IsEnabled ? "On" : "Off")
+                            }
+                        </td>
+                        <td class="sd-muted">@assignment.Notes</td>
+                        @if (canWrite)
+                        {
+                            <td><SdButton Variant="ButtonVariant.Ghost" OnClick="() => OpenForm(assignment)">Edit</SdButton></td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (catalog is not null)
+{
+    <SdCard Title="Check a permission">
+        <p class="sd-muted">Whether they hold a permission, counting their groups, and the rule that decides it.</p>
+        <div class="sd-grid" style="--sd-grid-min: 200px">
+            <SdSelect Label="Permission" Options="PermissionOptions" @bind-Value="checkPermission" />
+            <SdSelect Label="Where" Options="CheckScopeOptions" Value="@checkScope" ValueChanged="v => { checkScope = v; checkResult = null; }" />
+        </div>
+        <div class="sd-actions">
+            <SdButton Variant="ButtonVariant.Secondary" Disabled="string.IsNullOrEmpty(checkPermission)" OnClick="CheckAsync">Check</SdButton>
+        </div>
+        @if (checkResult is not null)
+        {
+            <SdAlert Tone="@(checkResult.IsAllowed ? Tone.Info : Tone.Warning)">
+                <strong>@(checkResult.IsAllowed ? "Allowed." : "Not allowed.")</strong> @checkResult.Reason
+            </SdAlert>
+        }
+    </SdCard>
+}
+
+<AssignmentForm Open="formOpen" Editing="editing" Catalog="catalog" Devices="devices" Groups="groups"
+                CanDeny="canDeny" CanManageServer="canManageServer" OnClose="() => formOpen = false" OnSubmit="SaveAsync" />
+
+<SdDialog Open="confirmingDelete" Title="Delete these permissions?" OnClose="() => confirmingDelete = false">
+    <ChildContent>
+        <p class="sd-muted">@selected.Count @(selected.Count == 1 ? "assignment is" : "assignments are") removed. They stop applying right away.</p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => confirmingDelete = false">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DeleteSelectedAsync">Delete</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly IReadOnlyList<SelectOption> Modes = [new("merge", "Merge"), new("replace", "Replace")];
+
+    private readonly HashSet<Guid> selected = [];
+    private readonly HashSet<string> pickedPresets = [];
+    private IReadOnlyList<PermissionAssignment>? assignments;
+    private IReadOnlyList<PermissionCatalogEntry>? catalog;
+    private IReadOnlyList<PermissionPresetEntry>? presets;
+    private IReadOnlyList<SelectOption> devices = [];
+    private IReadOnlyList<SelectOption> groups = [];
+    private PermissionAssignment? editing;
+    private EffectivePermission? checkResult;
+    private string? checkPermission;
+    private string? checkScope = PermissionScopeKind.Tenant.ToString();
+    private string? error;
+    private string? notice;
+    private bool replace;
+    private bool busy;
+    private bool formOpen;
+    private bool confirmingDelete;
+    private bool canWrite;
+    private bool canDeny;
+    private bool canManageServer;
+
+    [Parameter, EditorRequired]
+    public Guid TenantId { get; set; }
+
+    [Parameter, EditorRequired]
+    public PermissionPrincipalKind Kind { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid PrincipalId { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private IReadOnlyList<SelectOption> PermissionOptions =>
+        [new(string.Empty, "Choose a permission"), .. (catalog ?? []).Select(x => new SelectOption(x.Name, $"{x.Category} · {x.DisplayName}"))];
+
+    private IReadOnlyList<SelectOption> CheckScopeOptions =>
+    [
+        new(PermissionScopeKind.Tenant.ToString(), "This tenant"),
+        new(PermissionScopeKind.Server.ToString(), "The server"),
+        .. devices.Select(x => new SelectOption($"{PermissionScopeKind.Device}:{x.Value}", $"Device · {x.Text}")),
+        .. groups.Select(x => new SelectOption($"{PermissionScopeKind.UserGroup}:{x.Value}", $"User group · {x.Text}")),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (user is not null)
+        {
+            canWrite = await HoldsAsync(user, PermissionNames.TenantPermissionsWrite);
+            canDeny = await HoldsAsync(user, PermissionNames.TenantPermissionsDeny);
+            canManageServer = await HoldsAsync(user, PermissionNames.ServerPermissionsWrite);
+        }
+
+        var catalogResult = await Api.CatalogAsync();
+        var presetsResult = await Api.PresetsAsync();
+        if (Expired(catalogResult.SessionExpired || presetsResult.SessionExpired))
+        {
+            return;
+        }
+
+        catalog = catalogResult.Value?.Items;
+        presets = presetsResult.Value?.Items;
+        await LoadTargetsAsync();
+        await LoadAsync();
+    }
+
+    private async Task<bool> HoldsAsync(System.Security.Claims.ClaimsPrincipal user, string permission) =>
+        (await Authorization.AuthorizeAsync(user, null, PermissionPolicies.For(permission))).Succeeded;
+
+    // Devices and groups to scope a grant to; each list needs its own read permission, and without it that kind of
+    // scope just isn't offered.
+    private async Task LoadTargetsAsync()
+    {
+        try
+        {
+            using var response = await Http.GetAsync(Routes.Devices);
+            if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<List<DeviceSummary>>() is { } list)
+            {
+                devices = [.. list.Select(x => new SelectOption(x.Id.ToString(), x.Alias ?? x.Name))];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
+        {
+        }
+
+        if ((await Groups.ListAsync(TenantId)).Value is { } list2)
+        {
+            groups = [.. list2.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.ListAsync(TenantId, Kind, PrincipalId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        assignments = result.Value?.Items;
+        error = result.Error;
+        selected.IntersectWith(assignments?.Select(x => x.Id) ?? []);
+    }
+
+    private async Task<string?> SaveAsync(AssignmentDraft draft)
+    {
+        var result = editing is { } current
+            ? await Api.UpdateAsync(TenantId, current.Id, new UpdatePermissionAssignmentRequest(draft.Permission, draft.Effect, draft.ScopeKind, draft.ScopeId, draft.Notes, draft.IsEnabled))
+            : await Api.CreateAsync(TenantId, new CreatePermissionAssignmentRequest(Kind, PrincipalId, draft.Permission, draft.Effect, draft.ScopeKind, draft.ScopeId, draft.Notes, draft.IsEnabled));
+        if (Expired(result.SessionExpired))
+        {
+            return null;
+        }
+
+        if (!result.Succeeded)
+        {
+            return result.Error;
+        }
+
+        formOpen = false;
+        notice = null;
+        await LoadAsync();
+        // The form calls this as a plain delegate, which doesn't render this panel on its own.
+        StateHasChanged();
+        return null;
+    }
+
+    private async Task SetEnabledAsync(PermissionAssignment assignment, bool enabled)
+    {
+        busy = true;
+        var result = await Api.UpdateAsync(TenantId, assignment.Id,
+            new UpdatePermissionAssignmentRequest(assignment.Permission, assignment.Effect, assignment.ScopeKind, assignment.ScopeId, assignment.Notes, enabled));
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        error = result.Error;
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync(TenantId, [.. selected]);
+        busy = false;
+        confirmingDelete = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error = result.Error;
+    }
+
+    private async Task ApplyPresetsAsync()
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.ApplyPresetsAsync(TenantId, new ApplyPermissionPresetsRequest(Kind, PrincipalId, [.. pickedPresets], replace));
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error = result.Error;
+        notice = result.Succeeded ? $"{result.Value} {(result.Value == 1 ? "permission" : "permissions")} granted." : null;
+    }
+
+    private async Task CheckAsync()
+    {
+        var parts = (checkScope ?? string.Empty).Split(':');
+        if (!Enum.TryParse<PermissionScopeKind>(parts[0], out var scope))
+        {
+            return;
+        }
+
+        var result = await Api.CheckAsync(TenantId, Kind, PrincipalId, checkPermission!, scope, parts.Length > 1 && Guid.TryParse(parts[1], out var id) ? id : null);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        checkResult = result.Value;
+        error = result.Error;
+    }
+
+    private void ModeChanged(string? mode) => replace = mode == "replace";
+
+    private void OpenForm(PermissionAssignment? assignment)
+    {
+        editing = assignment;
+        formOpen = true;
+    }
+
+    private string DisplayName(string permission) => catalog?.FirstOrDefault(x => x.Name == permission)?.DisplayName ?? permission;
+
+    private string ScopeText(PermissionScopeKind scope, Guid? id) => scope switch
+    {
+        PermissionScopeKind.Server => "Server",
+        PermissionScopeKind.Tenant => "This tenant",
+        PermissionScopeKind.Device => $"Device · {devices.FirstOrDefault(x => x.Value == id.ToString())?.Text ?? id.ToString()}",
+        PermissionScopeKind.UserGroup => $"User group · {groups.FirstOrDefault(x => x.Value == id.ToString())?.Text ?? id.ToString()}",
+        _ => scope.ToString(),
+    };
+
+    private static void Toggle<T>(HashSet<T> set, T item, bool on)
+    {
+        if (on)
+        {
+            set.Add(item);
+        }
+        else
+        {
+            set.Remove(item);
+        }
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

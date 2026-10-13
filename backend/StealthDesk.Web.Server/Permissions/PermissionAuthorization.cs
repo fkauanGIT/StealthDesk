@@ -60,6 +60,7 @@ public static class PermissionSetup
     services.AddScoped<IPermissionEvaluator, PermissionEvaluator>();
     services.AddScoped<IAuthorizationHandler, PermissionRequirementHandler>();
     services.AddScoped<PermissionSeeder>();
+    services.AddScoped<PermissionAssignmentManager>();
     services.AddAuthorizationBuilder().AddPermissionPolicies();
     return services;
   }

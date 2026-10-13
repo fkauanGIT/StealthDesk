@@ -1,0 +1,151 @@
+@* Grants a permission, or changes one. It offers only what the caller may set; the server checks it again. *@
+<SdDialog Open="Open" Title="@(Editing is null ? "Add permission" : "Edit permission")" OnClose="OnClose">
+    <ChildContent>
+        <form class="sd-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            @if (error is not null)
+            {
+                <SdAlert>@error</SdAlert>
+            }
+            <SdSelect Label="Permission" Options="PermissionOptions" Value="@permission" ValueChanged="PermissionChanged" />
+            @if (Info is { } info)
+            {
+                <p class="sd-muted sd-field-hint" data-permission-description>@info.Description</p>
+            }
+            <SdSelect Label="Effect" Options="EffectOptions" Value="@effect.ToString()" ValueChanged="v => effect = Enum.Parse<PermissionEffect>(v!)" />
+            <SdSelect Label="Scope" Options="ScopeOptions" Value="@scope.ToString()" ValueChanged="ScopeChanged" />
+            @if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup)
+            {
+                <SdSelect Label="@(scope == PermissionScopeKind.Device ? "Device" : "User group")" Options="TargetOptions" Value="@scopeId" ValueChanged="v => scopeId = v" />
+            }
+            <SdTextField Label="Notes" @bind-Value="notes" Autocomplete="off" Hint="Optional. Why it's granted." />
+            <SdCheckbox Label="Enabled" @bind-Checked="enabled" />
+        </form>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="OnClose">Cancel</SdButton>
+        <SdButton Disabled="busy" OnClick="SubmitAsync">@(Editing is null ? "Add" : "Save")</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private string? permission;
+    private PermissionEffect effect = PermissionEffect.Allow;
+    private PermissionScopeKind scope = PermissionScopeKind.Tenant;
+    private string? scopeId;
+    private string? notes;
+    private bool enabled = true;
+    private string? error;
+    private bool busy;
+    private bool wasOpen;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>The assignment being changed; none to add one.</summary>
+    [Parameter]
+    public PermissionAssignment? Editing { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<PermissionCatalogEntry>? Catalog { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<SelectOption> Devices { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyList<SelectOption> Groups { get; set; } = [];
+
+    [Parameter]
+    public bool CanDeny { get; set; }
+
+    [Parameter]
+    public bool CanManageServer { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>Saves; answers why not, or null when it worked. The panel renders itself after saving.</summary>
+    [Parameter, EditorRequired]
+    public Func<AssignmentDraft, Task<string?>> OnSubmit { get; set; } = _ => Task.FromResult<string?>(null);
+
+    private PermissionCatalogEntry? Info => Catalog?.FirstOrDefault(x => x.Name == permission);
+
+    private IReadOnlyList<SelectOption> PermissionOptions =>
+        [new(string.Empty, "Choose a permission"), .. (Catalog ?? []).Select(x => new SelectOption(x.Name, $"{x.Category} · {x.DisplayName}"))];
+
+    // An existing deny stays offered so it can be changed back to an allow by those who may.
+    private IReadOnlyList<SelectOption> EffectOptions =>
+        CanDeny || effect == PermissionEffect.Deny
+            ? [new(nameof(PermissionEffect.Allow), "Allow"), new(nameof(PermissionEffect.Deny), "Deny")]
+            : [new(nameof(PermissionEffect.Allow), "Allow")];
+
+    private IReadOnlyList<SelectOption> ScopeOptions =>
+        [.. (Info?.Scopes ?? [PermissionScopeKind.Tenant])
+            .Where(x => x != PermissionScopeKind.Server || CanManageServer || scope == PermissionScopeKind.Server)
+            .Where(x => x != PermissionScopeKind.Device || Devices.Count > 0)
+            .Where(x => x != PermissionScopeKind.UserGroup || Groups.Count > 0)
+            .Select(x => new SelectOption(x.ToString(), x switch
+            {
+                PermissionScopeKind.Server => "The server",
+                PermissionScopeKind.Tenant => "This tenant",
+                PermissionScopeKind.Device => "One device",
+                PermissionScopeKind.UserGroup => "One user group",
+                _ => x.ToString(),
+            }))];
+
+    private IReadOnlyList<SelectOption> TargetOptions =>
+        [new(string.Empty, scope == PermissionScopeKind.Device ? "Choose a device" : "Choose a user group"), .. scope == PermissionScopeKind.Device ? Devices : Groups];
+
+    // Each time it opens, it starts from the assignment being changed, or blank.
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen)
+        {
+            permission = Editing?.Permission;
+            effect = Editing?.Effect ?? PermissionEffect.Allow;
+            scope = Editing?.ScopeKind ?? PermissionScopeKind.Tenant;
+            scopeId = Editing?.ScopeId?.ToString();
+            notes = Editing?.Notes;
+            enabled = Editing?.IsEnabled ?? true;
+            error = null;
+        }
+
+        wasOpen = Open;
+    }
+
+    private void PermissionChanged(string? value)
+    {
+        permission = string.IsNullOrEmpty(value) ? null : value;
+        // A scope the new permission can't have falls back to the broadest one it can.
+        if (Info is { } info && !info.Scopes.Contains(scope))
+        {
+            scope = info.Scopes.Contains(PermissionScopeKind.Tenant) ? PermissionScopeKind.Tenant : info.Scopes[^1];
+            scopeId = null;
+        }
+    }
+
+    private void ScopeChanged(string? value)
+    {
+        scope = Enum.Parse<PermissionScopeKind>(value!);
+        scopeId = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (permission is null)
+        {
+            error = "Choose a permission.";
+            return;
+        }
+
+        Guid? target = Guid.TryParse(scopeId, out var id) ? id : null;
+        if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup && target is null)
+        {
+            error = scope == PermissionScopeKind.Device ? "Choose a device." : "Choose a user group.";
+            return;
+        }
+
+        busy = true;
+        error = await OnSubmit(new AssignmentDraft(permission, effect, scope, target, notes, enabled));
+        busy = false;
+    }
+}
