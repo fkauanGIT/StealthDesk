@@ -38,6 +38,11 @@ public class LayoutTests
     await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(1);
     await AssertFitsAsync(app, "user-groups");
 
+    await app.GoAsync("permissions");
+    await app.Page.GetByLabel("User", new() { Exact = true }).SelectOptionAsync(new SelectOptionValue { Label = "admin@example.com" });
+    await Expect(app.Page.Locator("tbody tr").First).ToBeVisibleAsync();
+    await AssertFitsAsync(app, "permissions");
+
     await app.GoAsync("invites");
     await Expect(app.Heading("Invites")).ToBeVisibleAsync();
     await AssertFitsAsync(app, "invites");
