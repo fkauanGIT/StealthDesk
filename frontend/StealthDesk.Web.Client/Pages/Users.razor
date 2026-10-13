@@ -49,6 +49,9 @@ else
                         <th>Permissions</th>
                         <th>Created</th>
                         <th>ID</th>
+                        <AuthorizeView Policy="@PermissionsPolicy">
+                            <th><span class="sd-visually-hidden">Permissions</span></th>
+                        </AuthorizeView>
                         <AuthorizeView Policy="@DeletePolicy">
                             <th><span class="sd-visually-hidden">Actions</span></th>
                         </AuthorizeView>
@@ -73,6 +76,9 @@ else
                                 <span class="sd-mono sd-cell-sub" title="@user.Id">@user.Id.ToString()[..8]…</span>
                                 <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.Copy" AriaLabel="Copy the user's ID" OnClick="() => CopyAsync(user.Id)" />
                             </td>
+                            <AuthorizeView Policy="@PermissionsPolicy">
+                                <td><a class="sd-btn sd-btn--ghost" href="permissions?kind=User&id=@user.Id">Permissions</a></td>
+                            </AuthorizeView>
                             <AuthorizeView Policy="@DeletePolicy">
                                 <td>
                                     <SdButton Variant="ButtonVariant.Ghost" Disabled="user.Id == currentUserId"
@@ -100,6 +106,7 @@ else
 
 @code {
     private static readonly string DeletePolicy = PermissionPolicies.For(PermissionNames.TenantUsersDelete);
+    private static readonly string PermissionsPolicy = PermissionPolicies.For(PermissionNames.TenantPermissionsRead);
 
     private IReadOnlyList<TenantUser>? users;
     private TenantUser? deleting;

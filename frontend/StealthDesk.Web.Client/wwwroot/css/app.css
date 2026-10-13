@@ -1267,3 +1267,42 @@ a.sd-btn:hover {
   max-height: 320px;
   overflow-y: auto;
 }
+
+/* ---------- Permissions ---------- */
+
+.sd-permission-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sd-space-4);
+  margin-bottom: var(--sd-space-5);
+}
+
+.sd-permission-picker .sd-field {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.sd-preset-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-2) var(--sd-space-5);
+}
+
+.sd-preset-actions {
+  align-items: flex-end;
+  margin-top: var(--sd-space-4);
+}
+
+.sd-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  margin: var(--sd-space-6) 0 var(--sd-space-3);
+}
+
+.sd-section-title {
+  font-size: var(--sd-text-lg);
+  font-weight: 600;
+}
