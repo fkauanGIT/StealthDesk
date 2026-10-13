@@ -27,6 +27,12 @@ public static class Routes
   public const string ApplyPermissionPresets = "/api/v1/permission-assignments/presets/apply";
   public static string EffectivePermission(Guid principalId) => $"/api/v1/effective-permissions/{principalId}";
 
+  /// <summary>The signed-in user's personal access tokens, and another user's for administrators.</summary>
+  public const string PersonalAccessTokens = "/api/v1/personal-access-tokens";
+  public static string PersonalAccessToken(Guid id) => $"{PersonalAccessTokens}/{id}";
+  public static string UserPersonalAccessTokens(Guid userId) => $"{Users}/{userId}/personal-access-tokens";
+  public static string UserPersonalAccessToken(Guid userId, Guid id) => $"{Users}/{userId}/personal-access-tokens/{id}";
+
   /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
   public const string UserGroups = "/api/v1/user-groups";
   public static string UserGroup(Guid id) => $"{UserGroups}/{id}";

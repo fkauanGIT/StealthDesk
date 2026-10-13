@@ -1306,3 +1306,41 @@ a.sd-btn:hover {
   font-size: var(--sd-text-lg);
   font-weight: 600;
 }
+
+/* ---------- Access tokens ---------- */
+
+.sd-token-notes {
+  margin: 0;
+  padding-left: var(--sd-space-4);
+}
+
+.sd-token-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sd-space-3) var(--sd-space-4);
+  margin: var(--sd-space-5) 0;
+}
+
+.sd-token-form .sd-field {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+/* Long and unbroken: it wraps anywhere so the dialog never scrolls sideways. */
+.sd-secret {
+  display: block;
+  margin-top: var(--sd-space-3);
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-sunken);
+  font-family: var(--sd-font-mono);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.sd-row-actions {
+  white-space: nowrap;
+  text-align: right;
+}

@@ -1,3 +1,4 @@
+using StealthDesk.Contracts.PersonalAccessTokens;
 using StealthDesk.Contracts.Permissions;
 
 namespace StealthDesk.Web.Server.Permissions;
@@ -15,7 +16,7 @@ public interface IPermissionEvaluator
     CancellationToken cancellationToken = default);
 
   /// <summary>The rules that apply to the principal, for checks that become a database filter instead of one decision.</summary>
-  Task<IReadOnlyCollection<PermissionRule>> RulesAsync(Principal principal, CancellationToken cancellationToken = default);
+  Task<PermissionRuleSet> RulesAsync(Principal principal, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -39,9 +40,39 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
       .ToDictionary(x => x, x => PermissionRules.Evaluate(rules, x, resource), StringComparer.Ordinal);
   }
 
+  // A personal access token acts as its owner: inheriting, the owner's rules decide; restricted, the token's own
+  // grants decide and the owner must hold the same. A token that no longer exists grants nothing.
+  public async Task<PermissionRuleSet> RulesAsync(Principal principal, CancellationToken cancellationToken = default)
+  {
+    var owner = await OwnRulesAsync(principal, cancellationToken);
+    if (principal.TokenId is not { } tokenId)
+    {
+      return new PermissionRuleSet(owner);
+    }
+
+    var mode = await db.PersonalAccessTokens
+      .IgnoreQueryFilters()
+      .Where(x => x.Id == tokenId && x.UserId == principal.Id)
+      .Select(x => (PersonalAccessTokenMode?)x.Mode)
+      .FirstOrDefaultAsync(cancellationToken);
+    if (mode == PersonalAccessTokenMode.InheritOwner)
+    {
+      return new PermissionRuleSet(owner);
+    }
+
+    var granted = mode is null
+      ? []
+      : await db.PermissionAssignments
+        .IgnoreQueryFilters()
+        .AsNoTracking()
+        .Where(x => x.PrincipalKind == PermissionPrincipalKind.PersonalAccessToken && x.PrincipalId == tokenId && x.IsEnabled)
+        .ToListAsync(cancellationToken);
+    return new PermissionRuleSet([.. PermissionRules.Applicable(granted, principal.TenantId, RuleSource.Direct)], owner);
+  }
+
   // The principal's own assignments and, for a user, those of every group they are in. The tenant query filters
   // are bypassed: the rules apply the tenant boundary themselves, for any principal.
-  public async Task<IReadOnlyCollection<PermissionRule>> RulesAsync(Principal principal, CancellationToken cancellationToken = default)
+  private async Task<IReadOnlyCollection<PermissionRule>> OwnRulesAsync(Principal principal, CancellationToken cancellationToken)
   {
     var direct = await db.PermissionAssignments
       .IgnoreQueryFilters()
@@ -69,4 +100,5 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
     rules.AddRange(PermissionRules.Applicable(inherited, principal.TenantId, RuleSource.UserGroup));
     return rules;
   }
+
 }

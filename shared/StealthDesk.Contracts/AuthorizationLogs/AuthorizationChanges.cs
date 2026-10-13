@@ -7,6 +7,8 @@ public static class AuthorizationChangeActions
   public const string PermissionAssignmentDeleted = "permission-assignment-deleted";
   public const string PermissionAssignmentsSeeded = "permission-assignments-seeded";
   public const string PermissionAssignmentUpdated = "permission-assignment-updated";
+  public const string PersonalAccessTokenCreated = "personal-access-token-created";
+  public const string PersonalAccessTokenDeleted = "personal-access-token-deleted";
   public const string UserGroupCreated = "user-group-created";
   public const string UserGroupDeleted = "user-group-deleted";
   public const string UserGroupMembersAdded = "user-group-members-added";
@@ -29,6 +31,7 @@ public static class AuthorizationChangeActors
 public static class AuthorizationChangeTargets
 {
   public const string PermissionAssignment = "PermissionAssignment";
+  public const string PersonalAccessToken = "PersonalAccessToken";
   public const string User = "User";
   public const string UserGroup = "UserGroup";
 }

@@ -29,7 +29,23 @@ public sealed class DeviceAccessScope
     _deniedDevices = deniedDevices;
   }
 
-  public bool IsEmpty => !_everyTenant && _tenants.Length == 0 && _devices.Length == 0;
+  // A restricted token's devices must also be its owner's.
+  private DeviceAccessScope? _owner;
+
+  public bool IsEmpty => (!_everyTenant && _tenants.Length == 0 && _devices.Length == 0) || _owner?.IsEmpty == true;
+
+  /// <param name="tenantBoundary">The principal's tenant, which no device outside of is ever read; none for a server-wide principal.</param>
+  public static DeviceAccessScope From(PermissionRuleSet set, Guid? tenantBoundary)
+  {
+    var scope = From(set.Rules, tenantBoundary);
+    if (set.OwnerRules is null || ReferenceEquals(scope, None))
+    {
+      return scope;
+    }
+
+    scope._owner = From(set.OwnerRules, tenantBoundary);
+    return scope;
+  }
 
   /// <param name="tenantBoundary">The principal's tenant, which no device outside of is ever read; none for a server-wide principal.</param>
   public static DeviceAccessScope From(IEnumerable<PermissionRule> rules, Guid? tenantBoundary)
@@ -66,11 +82,12 @@ public sealed class DeviceAccessScope
     var deniedTenants = _deniedTenants;
     var deniedDevices = _deniedDevices;
 
-    return devices.Where(x =>
+    var own = devices.Where(x =>
       (tenantBoundary == null || x.TenantId == tenantBoundary)
       && (everyTenant || tenants.Contains(x.TenantId) || allowed.Contains(x.Id))
       && !deniedTenants.Contains(x.TenantId)
       && !deniedDevices.Contains(x.Id));
+    return _owner is null ? own : _owner.Apply(own);
   }
 
   private static Guid[] Ids(IEnumerable<PermissionRule> rules, PermissionScopeKind kind) =>

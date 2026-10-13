@@ -25,6 +25,8 @@ builder.Services.AddScoped<StealthDesk.Web.Client.Users.UserApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Invites.InviteApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.UserGroups.UserGroupApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Permissions.PermissionApi>();
+builder.Services.AddScoped<StealthDesk.Web.Client.PersonalAccessTokens.PersonalAccessTokenApi>();
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<DeviceStore>();
 builder.Services.AddScoped<ILiveUpdates>(sp => new LiveUpdates(

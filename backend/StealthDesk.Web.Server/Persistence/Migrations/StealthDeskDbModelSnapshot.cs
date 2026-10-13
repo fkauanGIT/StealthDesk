@@ -370,6 +370,46 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("permission_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.PersonalAccessTokenRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HashedSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("LastUsed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("personal_access_tokens", (string)null);
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantInviteRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -677,6 +717,17 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.Navigation("Disks");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.PersonalAccessTokenRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.UserRecord", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantInviteRecord", b =>

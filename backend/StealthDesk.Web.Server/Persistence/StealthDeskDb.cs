@@ -20,6 +20,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<UserGroupRecord> UserGroups => Set<UserGroupRecord>();
   public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
   public DbSet<TenantInviteRecord> TenantInvites => Set<TenantInviteRecord>();
+  public DbSet<PersonalAccessTokenRecord> PersonalAccessTokens => Set<PersonalAccessTokenRecord>();
 
   // No tenant filter: server-wide entries belong to no tenant, and every read names the tenant it wants.
   public DbSet<AuthorizationChangeRecord> AuthorizationChanges => Set<AuthorizationChangeRecord>();
@@ -99,6 +100,16 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       assignment.HasIndex(x => new { x.PrincipalKind, x.PrincipalId, x.Permission, x.Effect, x.ScopeKind, x.ScopeId })
         .IsUnique()
         .AreNullsDistinct(false);
+    });
+
+    modelBuilder.Entity<PersonalAccessTokenRecord>(token =>
+    {
+      token.ToTable("personal_access_tokens");
+      token.Property(x => x.Name).HasMaxLength(PersonalAccessTokenRecord.NameMax);
+      token.Property(x => x.HashedSecret).HasMaxLength(PersonalAccessTokenRecord.HashMax);
+      token.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+      token.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+      token.HasIndex(x => x.UserId);
     });
 
     modelBuilder.Entity<TenantInviteRecord>(invite =>

@@ -4,12 +4,19 @@ using StealthDesk.Web.Server.Accounts;
 
 namespace StealthDesk.Web.Server.Permissions;
 
-/// <summary>Who is asking: a user now, and service accounts and tokens as they arrive.</summary>
+/// <summary>Who is asking: a user (signed in, or through one of their personal access tokens), and service accounts as they arrive.</summary>
 /// <param name="TenantId">The tenant the principal belongs to; none for a server-wide principal.</param>
-public sealed record Principal(PermissionPrincipalKind Kind, Guid Id, Guid? TenantId)
+/// <param name="TokenId">The personal access token the user is acting through; none for a signed-in session.</param>
+public sealed record Principal(PermissionPrincipalKind Kind, Guid Id, Guid? TenantId, Guid? TokenId = null)
 {
   public const string KindClaim = "stealthdesk:principal:kind";
   public const string IdClaim = "stealthdesk:principal:id";
+
+  /// <summary>Set only by personal access token authentication, never by a sign-in.</summary>
+  public const string TokenClaim = "stealthdesk:principal:token";
+
+  /// <summary>Acting through a credential rather than a full session, so it may not mint a credential with more reach.</summary>
+  public bool IsCredential => TokenId is not null;
 
   /// <summary>The principal of a signed-in request, or null when its claims don't say who it is.</summary>
   public static Principal? From(ClaimsPrincipal user)
@@ -23,7 +30,8 @@ public sealed record Principal(PermissionPrincipalKind Kind, Guid Id, Guid? Tena
     var tenantId = user.GetTenantId();
 
     // Only a server-wide principal has no tenant; anyone else without one is refused.
-    return tenantId is null && kind is not PermissionPrincipalKind.ServiceAccount ? null : new Principal(kind, id, tenantId);
+    var tokenId = Guid.TryParse(user.FindFirstValue(TokenClaim), out var token) ? token : (Guid?)null;
+    return tenantId is null && kind is not PermissionPrincipalKind.ServiceAccount ? null : new Principal(kind, id, tenantId, tokenId);
   }
 
   /// <summary>

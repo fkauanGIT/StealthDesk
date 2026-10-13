@@ -160,6 +160,25 @@ public class PermissionRulesTests
     Assert.Equal(3, serverPrincipal.Count);
   }
 
+  [Fact]
+  public void ARestrictedToken_IsAllowedOnlyWhatItAndItsOwnerAreBothAllowed()
+  {
+    var device = Resource.Device(Device, Tenant);
+    var tokenAllows = new[] { Rule(PermissionNames.DeviceRead, PermissionScopeKind.Device, Device) };
+    var ownerAllows = new[] { Rule(PermissionNames.DeviceRead, PermissionScopeKind.Tenant, Tenant) };
+    var ownerDenies = new[] { ownerAllows[0], Rule(PermissionNames.DeviceRead, PermissionScopeKind.Device, Device, PermissionEffect.Deny, RuleSource.UserGroup) };
+
+    var both = PermissionRules.Evaluate(new PermissionRuleSet(tokenAllows, ownerAllows), PermissionNames.DeviceRead, device);
+    var ownerDenied = PermissionRules.Evaluate(new PermissionRuleSet(tokenAllows, ownerDenies), PermissionNames.DeviceRead, device);
+    var tokenLacks = PermissionRules.Evaluate(new PermissionRuleSet([], ownerAllows), PermissionNames.DeviceRead, device);
+
+    Assert.True(both.Allowed);
+    Assert.False(ownerDenied.Allowed);
+    Assert.Equal("The token's owner doesn't hold it: Denied by a user group assignment at Device scope.", ownerDenied.Reason);
+    Assert.False(tokenLacks.Allowed);
+    Assert.Equal("No assignment grants it.", tokenLacks.Reason);
+  }
+
   private static PermissionAssignmentRecord Assignment(
     string permission,
     PermissionScopeKind scope,

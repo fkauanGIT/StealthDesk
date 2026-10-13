@@ -96,6 +96,32 @@ public class DeviceAccessScopeTests
     }
   }
 
+  // A restricted token reads a device only when both its own rules and its owner's allow it.
+  [Theory]
+  [InlineData(1)]
+  [InlineData(2)]
+  [InlineData(3)]
+  public void ForAToken_AgreesWithTheEvaluator_OnRandomRules(int seed)
+  {
+    var random = new Random(seed);
+    for (var round = 0; round < 500; round++)
+    {
+      var set = new PermissionRuleSet(
+        [.. Enumerable.Range(0, random.Next(0, 5)).Select(_ => RandomRule(random))],
+        [.. Enumerable.Range(0, random.Next(0, 5)).Select(_ => RandomRule(random))]);
+      var visible = Visible(DeviceAccessScope.From(set, Tenant)).ToHashSet();
+
+      foreach (var device in Devices)
+      {
+        var expected = PermissionRules.Evaluate(set, PermissionNames.DeviceRead, Resource.Device(device)).Allowed && device.TenantId == Tenant;
+        Assert.True(
+          expected == visible.Contains(device),
+          $"Seed {seed}, round {round}: device {Array.IndexOf(Devices, device)} expected {(expected ? "visible" : "hidden")} with " +
+          $"token rules [{string.Join("; ", set.Rules.Select(Describe))}] and owner rules [{string.Join("; ", set.OwnerRules!.Select(Describe))}].");
+      }
+    }
+  }
+
   private static List<DeviceRecord> Visible(DeviceAccessScope scope) => [.. scope.Apply(Devices.AsQueryable())];
 
   private static PermissionRule Rule(PermissionEffect effect, PermissionScopeKind scope, Guid? scopeId, RuleSource source = RuleSource.Direct) =>
