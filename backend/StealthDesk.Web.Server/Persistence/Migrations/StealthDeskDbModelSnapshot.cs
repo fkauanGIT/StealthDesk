@@ -410,6 +410,94 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("personal_access_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountCredentialRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HashedSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("LastUsed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ServiceAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceAccountId");
+
+                    b.ToTable("service_account_credentials", (string)null);
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Server'");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Tenant'");
+
+                    b.ToTable("service_accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_service_accounts_kind_tenant", "(\"Kind\" = 'Server' AND \"TenantId\" IS NULL) OR (\"Kind\" = 'Tenant' AND \"TenantId\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantInviteRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -730,6 +818,27 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountCredentialRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.ServiceAccountRecord", "ServiceAccount")
+                        .WithMany("Credentials")
+                        .HasForeignKey("ServiceAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ServiceAccount");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantInviteRecord", b =>
                 {
                     b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
@@ -780,6 +889,11 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountRecord", b =>
+                {
+                    b.Navigation("Credentials");
                 });
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantRecord", b =>

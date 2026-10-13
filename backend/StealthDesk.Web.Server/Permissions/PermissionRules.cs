@@ -24,9 +24,13 @@ public sealed record PermissionRule(
 
 /// <summary>
 /// What a request is decided by. A restricted personal access token carries its owner's rules too: it may only do
-/// what it was granted and its owner can still do.
+/// what it was granted and its owner can still do. An unrestricted server service account is allowed everything,
+/// whatever its rules say.
 /// </summary>
-public sealed record PermissionRuleSet(IReadOnlyCollection<PermissionRule> Rules, IReadOnlyCollection<PermissionRule>? OwnerRules = null);
+public sealed record PermissionRuleSet(
+  IReadOnlyCollection<PermissionRule> Rules,
+  IReadOnlyCollection<PermissionRule>? OwnerRules = null,
+  bool Unrestricted = false);
 
 /// <summary>
 /// The decision itself, with no database: unknown permissions and missing rules are denied, a deny that reaches
@@ -43,6 +47,13 @@ public static class PermissionRules
 
   public static PermissionDecision Evaluate(PermissionRuleSet set, string permission, Resource resource)
   {
+    if (set.Unrestricted)
+    {
+      return PermissionCatalog.Find(permission) is null
+        ? PermissionDecision.Deny($"Unknown permission '{permission}'.")
+        : PermissionDecision.Allow("Allowed: an unrestricted server service account may do anything.");
+    }
+
     var decision = Evaluate(set.Rules, permission, resource);
     if (!decision.Allowed || set.OwnerRules is null)
     {

@@ -1,3 +1,4 @@
+using StealthDesk.Web.Server.ServiceAccounts;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
@@ -34,6 +35,12 @@ public static class ServerSetup
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<IPasswordHasher<PersonalAccessTokenRecord>, PasswordHasher<PersonalAccessTokenRecord>>();
     builder.Services.AddScoped<PersonalAccessTokenService>();
+    builder.Services.AddSingleton<IPasswordHasher<ServiceAccountCredentialRecord>, PasswordHasher<ServiceAccountCredentialRecord>>();
+    builder.Services.AddScoped<ServiceAccountService>();
+    builder.Services.Configure<ServiceAccountOptions>(builder.Configuration.GetSection(ServiceAccountOptions.Section));
+    builder.Services.Configure<ServiceAccountBootstrapOptions>(builder.Configuration.GetSection(ServiceAccountBootstrapOptions.Section));
+    builder.Services.AddSingleton<ServiceAccountCredentialCleanup>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ServiceAccountCredentialCleanup>());
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 
@@ -62,6 +69,7 @@ public static class ServerSetup
     app.MapUserGroupEndpoints();
     app.MapPermissionAssignmentEndpoints();
     app.MapPersonalAccessTokenEndpoints();
+    app.MapServiceAccountEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);

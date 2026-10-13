@@ -6,6 +6,7 @@ namespace StealthDesk.Web.Server.Permissions;
 public static class GrantScopes
 {
   /// <summary>Why the grant makes no sense, or null when it does.</summary>
+  /// <param name="toServerAccount">Granted to a server service account, the one principal that belongs to no tenant.</param>
   public static async Task<string?> RefusalAsync(
     StealthDeskDb db,
     string permission,
@@ -13,7 +14,8 @@ public static class GrantScopes
     PermissionScopeKind scope,
     Guid? scopeId,
     Guid tenant,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken,
+    bool toServerAccount = false)
   {
     if (PermissionCatalog.Find(permission) is not { } info)
     {
@@ -25,11 +27,11 @@ public static class GrantScopes
       return $"'{info.DisplayName}' can't be assigned at {scope} scope.";
     }
 
-    // A server-wide allow of something granted inside tenants would reach every tenant; only principals that
-    // belong to no tenant may hold one, and users, groups and their tokens always belong to one.
-    if (effect == PermissionEffect.Allow && scope == PermissionScopeKind.Server && info.AllowsTenantScope)
+    // A server-wide allow of something granted inside tenants would reach every tenant; only a server service
+    // account, which belongs to no tenant, may hold one.
+    if (effect == PermissionEffect.Allow && scope == PermissionScopeKind.Server && info.AllowsTenantScope && !toServerAccount)
     {
-      return "Server-scoped allows of tenant permissions can't be given to users, user groups or their tokens.";
+      return "Server-scoped allows of tenant permissions can only be given to server service accounts.";
     }
 
     return scope switch

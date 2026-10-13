@@ -22,6 +22,10 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<TenantInviteRecord> TenantInvites => Set<TenantInviteRecord>();
   public DbSet<PersonalAccessTokenRecord> PersonalAccessTokens => Set<PersonalAccessTokenRecord>();
 
+  // No tenant filter: server accounts belong to no tenant, and every read names the tenant it wants.
+  public DbSet<ServiceAccountRecord> ServiceAccounts => Set<ServiceAccountRecord>();
+  public DbSet<ServiceAccountCredentialRecord> ServiceAccountCredentials => Set<ServiceAccountCredentialRecord>();
+
   // No tenant filter: server-wide entries belong to no tenant, and every read names the tenant it wants.
   public DbSet<AuthorizationChangeRecord> AuthorizationChanges => Set<AuthorizationChangeRecord>();
 
@@ -110,6 +114,30 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       token.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
       token.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
       token.HasIndex(x => x.UserId);
+    });
+
+    modelBuilder.Entity<ServiceAccountRecord>(account =>
+    {
+      // A server account has no tenant and a tenant account always has one; names are unique among each.
+      account.ToTable("service_accounts", table => table.HasCheckConstraint(
+        "CK_service_accounts_kind_tenant",
+        "(\"Kind\" = 'Server' AND \"TenantId\" IS NULL) OR (\"Kind\" = 'Tenant' AND \"TenantId\" IS NOT NULL)"));
+      account.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+      account.Property(x => x.AccessMode).HasConversion<string>().HasMaxLength(20);
+      account.Property(x => x.Name).HasMaxLength(ServiceAccountRecord.NameMax);
+      account.Property(x => x.Description).HasMaxLength(ServiceAccountRecord.DescriptionMax);
+      account.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      account.HasIndex(x => new { x.TenantId, x.Name }).IsUnique().HasFilter("\"Kind\" = 'Tenant'");
+      account.HasIndex(x => x.Name).IsUnique().HasFilter("\"Kind\" = 'Server'");
+    });
+
+    modelBuilder.Entity<ServiceAccountCredentialRecord>(credential =>
+    {
+      credential.ToTable("service_account_credentials");
+      credential.Property(x => x.Name).HasMaxLength(ServiceAccountCredentialRecord.NameMax);
+      credential.Property(x => x.HashedSecret).HasMaxLength(ServiceAccountCredentialRecord.HashMax);
+      credential.HasOne(x => x.ServiceAccount).WithMany(x => x.Credentials).HasForeignKey(x => x.ServiceAccountId).OnDelete(DeleteBehavior.Cascade);
+      credential.HasIndex(x => x.ServiceAccountId);
     });
 
     modelBuilder.Entity<TenantInviteRecord>(invite =>

@@ -11,7 +11,8 @@ public sealed class PermissionRequirement(string permission) : IAuthorizationReq
 
 /// <summary>
 /// Connects ASP.NET Core authorization to the evaluator. A check may pass the resource (a <see cref="Resource"/>
-/// or a device); without one, a server permission is checked on the server and any other on the principal's tenant.
+/// or a device); without one, a server permission is checked on the server and any other on the principal's tenant,
+/// or, for a server-wide principal, on the tenant the request names (<c>?tenantId=</c>).
 /// </summary>
 public sealed class PermissionRequirementHandler(IPermissionEvaluator evaluator, IHttpContextAccessor http, ILogger<PermissionRequirementHandler> logger)
   : AuthorizationHandler<PermissionRequirement>
@@ -24,7 +25,7 @@ public sealed class PermissionRequirementHandler(IPermissionEvaluator evaluator,
       return;
     }
 
-    if (ResourceOf(context.Resource, requirement.Permission, principal) is not { } resource)
+    if (ResourceOf(context.Resource, requirement.Permission, principal, RequestedTenant()) is not { } resource)
     {
       context.Fail(new AuthorizationFailureReason(this, $"No resource to check '{requirement.Permission}' on."));
       return;
@@ -42,14 +43,17 @@ public sealed class PermissionRequirementHandler(IPermissionEvaluator evaluator,
   }
 
   // A device permission needs the device: checked without one, it fails closed instead of guessing.
-  private static Resource? ResourceOf(object? checkedResource, string permission, Principal principal) => checkedResource switch
+  private static Resource? ResourceOf(object? checkedResource, string permission, Principal principal, Guid requestedTenant) => checkedResource switch
   {
     Resource resource => resource,
     DeviceRecord device => Resource.Device(device),
     _ when PermissionCatalog.Find(permission) is { AllowsTenantScope: false } => Resource.Server,
-    _ when principal.TenantId is { } tenantId => Resource.Tenant(tenantId),
+    _ when principal.TenantFor(requestedTenant) is { } tenantId => Resource.Tenant(tenantId),
     _ => null,
   };
+
+  private Guid RequestedTenant() =>
+    Guid.TryParse(http.HttpContext?.Request.Query["tenantId"], out var tenantId) ? tenantId : Guid.Empty;
 }
 
 public static class PermissionSetup

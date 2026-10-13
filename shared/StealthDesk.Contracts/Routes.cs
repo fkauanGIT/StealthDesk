@@ -33,6 +33,14 @@ public static class Routes
   public static string UserPersonalAccessTokens(Guid userId) => $"{Users}/{userId}/personal-access-tokens";
   public static string UserPersonalAccessToken(Guid userId, Guid id) => $"{Users}/{userId}/personal-access-tokens/{id}";
 
+  /// <summary>A tenant's service accounts (<c>?tenantId=</c>), the server's, and their credentials.</summary>
+  public const string ServiceAccounts = "/api/v1/service-accounts";
+  public const string ServerServiceAccounts = "/api/v1/service-accounts/server";
+  public static string ServiceAccount(string accounts, Guid id) => $"{accounts}/{id}";
+  public static string ServiceAccountCredentials(string accounts, Guid id) => $"{accounts}/{id}/credentials";
+  public static string ServiceAccountCredential(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}";
+  public static string ServiceAccountCredentialPurge(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}/purge";
+
   /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
   public const string UserGroups = "/api/v1/user-groups";
   public static string UserGroup(Guid id) => $"{UserGroups}/{id}";

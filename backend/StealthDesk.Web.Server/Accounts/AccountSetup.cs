@@ -1,3 +1,5 @@
+using StealthDesk.Contracts.ServiceAccounts;
+using StealthDesk.Web.Server.ServiceAccounts;
 using StealthDesk.Contracts.PersonalAccessTokens;
 using StealthDesk.Web.Server.PersonalAccessTokens;
 using Microsoft.AspNetCore.Authentication;
@@ -51,15 +53,17 @@ public static class AccountSetup
       // No display name: Identity lists every scheme that has one as an external sign-in provider.
       .AddPolicyScheme(Scheme, displayName: null, options =>
       {
-        // Scripts send a personal access token; browsers carry the cookie.
+        // Scripts send a personal access token or a service account's key; browsers carry the cookie.
         options.ForwardDefaultSelector = context =>
           context.Request.Headers.ContainsKey(PersonalAccessTokenHeader.Name) ? PersonalAccessTokenAuthentication.SchemeName
+          : context.Request.Headers.ContainsKey(ServiceAccountHeader.Name) ? ServiceAccountAuthentication.SchemeName
           : accounts.EnableBearerLogin
             && context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
             ? IdentityConstants.BearerScheme
             : IdentityConstants.ApplicationScheme;
       })
-      .AddScheme<AuthenticationSchemeOptions, PersonalAccessTokenAuthentication>(PersonalAccessTokenAuthentication.SchemeName, displayName: null, _ => { });
+      .AddScheme<AuthenticationSchemeOptions, PersonalAccessTokenAuthentication>(PersonalAccessTokenAuthentication.SchemeName, displayName: null, _ => { })
+      .AddScheme<AuthenticationSchemeOptions, ServiceAccountAuthentication>(ServiceAccountAuthentication.SchemeName, displayName: null, _ => { });
 
     // A provider exists only when it is configured, so the sign-in page shows only the ones that work.
     if (!string.IsNullOrWhiteSpace(accounts.MicrosoftClientId) && !string.IsNullOrWhiteSpace(accounts.MicrosoftClientSecret))

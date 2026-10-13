@@ -1,3 +1,4 @@
+using StealthDesk.Web.Server.ServiceAccounts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Design;
 using Npgsql;
@@ -19,18 +20,19 @@ public static class DatabaseSetup
     {
       var name = configuration["InMemoryDatabaseName"];
       var databaseName = string.IsNullOrWhiteSpace(name) ? Guid.NewGuid().ToString("N") : name;
-      builder.Services.AddDbContext<StealthDeskDb>(options => options.UseInMemoryDatabase(databaseName));
+      builder.Services.AddDbContext<StealthDeskDb>(options => options.UseInMemoryDatabase(databaseName).AddInterceptors(ServiceAccountInvariant.Instance));
       return builder;
     }
 
     var connectionString = PostgresConnectionString(configuration);
-    builder.Services.AddDbContext<StealthDeskDb>(options => options.UseNpgsql(connectionString));
+    builder.Services.AddDbContext<StealthDeskDb>(options => options.UseNpgsql(connectionString).AddInterceptors(ServiceAccountInvariant.Instance));
     return builder;
   }
 
   /// <summary>
-  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory) and marks every device
-  /// offline. Tenants are created by registration, starting with the first user's.
+  /// Brings the schema up to date (migrations on PostgreSQL, a plain create in memory), marks every device offline
+  /// and creates the configured bootstrap server service account. Tenants are created by registration, starting
+  /// with the first user's.
   /// </summary>
   public static async Task PrepareDatabaseAsync(this WebApplication app)
   {
@@ -50,6 +52,16 @@ public static class DatabaseSetup
     if (cleared > 0)
     {
       app.Logger.LogInformation("Marked {Count} devices offline until their agents reconnect.", cleared);
+    }
+
+    var bootstrap = scope.ServiceProvider.GetRequiredService<IOptions<ServiceAccountBootstrapOptions>>().Value;
+    if (await scope.ServiceProvider.GetRequiredService<ServiceAccountService>().BootstrapAsync(bootstrap, CancellationToken.None))
+    {
+      // The credential's id, never its secret.
+      app.Logger.LogInformation(
+        "Created the bootstrap server service account {Name} with credential {CredentialId}.",
+        bootstrap.ServerServiceAccountName,
+        bootstrap.ServerServiceAccountCredentialId);
     }
   }
 

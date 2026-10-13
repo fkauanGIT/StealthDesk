@@ -179,6 +179,16 @@ public class PermissionRulesTests
     Assert.Equal("No assignment grants it.", tokenLacks.Reason);
   }
 
+  [Fact]
+  public void AnUnrestrictedSet_AllowsEveryKnownPermission_WhateverItsRulesDeny()
+  {
+    var set = new PermissionRuleSet([Rule(PermissionNames.DeviceRead, PermissionScopeKind.Server, null, PermissionEffect.Deny)], Unrestricted: true);
+
+    Assert.True(PermissionRules.Evaluate(set, PermissionNames.DeviceRead, Resource.Device(Device, OtherTenant)).Allowed);
+    Assert.True(PermissionRules.Evaluate(set, PermissionNames.ServerPermissionsWrite, Resource.Server).Allowed);
+    Assert.False(PermissionRules.Evaluate(set, "device.teleport", Resource.Server).Allowed);
+  }
+
   private static PermissionAssignmentRecord Assignment(
     string permission,
     PermissionScopeKind scope,
