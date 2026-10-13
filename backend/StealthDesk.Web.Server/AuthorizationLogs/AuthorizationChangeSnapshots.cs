@@ -12,9 +12,9 @@ public sealed record UserGroupSnapshot(string Name, string? Description);
 /// <summary>How many members were added or removed at once.</summary>
 public sealed record UserGroupMembershipChange(int Count);
 
-/// <summary>One assignment as it was, e.g. before it was removed.</summary>
-public sealed record PermissionAssignmentSnapshot(string Permission, PermissionEffect Effect, PermissionScopeKind ScopeKind, Guid? ScopeId)
+/// <summary>One assignment as it was, e.g. before it was changed or removed.</summary>
+public sealed record PermissionAssignmentSnapshot(string Permission, PermissionEffect Effect, PermissionScopeKind ScopeKind, Guid? ScopeId, bool IsEnabled)
 {
   public static PermissionAssignmentSnapshot Of(PermissionAssignmentRecord assignment) =>
-    new(assignment.Permission, assignment.Effect, assignment.ScopeKind, assignment.ScopeId);
+    new(assignment.Permission, assignment.Effect, assignment.ScopeKind, assignment.ScopeId, assignment.IsEnabled);
 }

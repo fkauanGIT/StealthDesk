@@ -3,8 +3,10 @@ namespace StealthDesk.Contracts.AuthorizationLogs;
 /// <summary>What an authorization change log entry records. Stored as readable text, to make raw queries easy.</summary>
 public static class AuthorizationChangeActions
 {
+  public const string PermissionAssignmentCreated = "permission-assignment-created";
   public const string PermissionAssignmentDeleted = "permission-assignment-deleted";
   public const string PermissionAssignmentsSeeded = "permission-assignments-seeded";
+  public const string PermissionAssignmentUpdated = "permission-assignment-updated";
   public const string UserGroupCreated = "user-group-created";
   public const string UserGroupDeleted = "user-group-deleted";
   public const string UserGroupMembersAdded = "user-group-members-added";

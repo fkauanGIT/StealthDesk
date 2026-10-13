@@ -362,6 +362,11 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
 
                     b.HasIndex("PrincipalKind", "PrincipalId");
 
+                    b.HasIndex("PrincipalKind", "PrincipalId", "Permission", "Effect", "ScopeKind", "ScopeId")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PrincipalKind", "PrincipalId", "Permission", "Effect", "ScopeKind", "ScopeId"), false);
+
                     b.ToTable("permission_assignments", (string)null);
                 });
 

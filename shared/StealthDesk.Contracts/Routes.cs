@@ -18,6 +18,15 @@ public static class Routes
   public static string User(Guid id) => $"{Users}/{id}";
   public static string UserPasswordReset(Guid id) => $"{Users}/{id}/reset-password";
 
+  /// <summary>Permission assignments (<c>?tenantId=</c>), the catalog and presets that grant them, and checks.</summary>
+  public const string PermissionAssignments = "/api/v1/permission-assignments";
+  public static string PermissionAssignment(Guid id) => $"{PermissionAssignments}/{id}";
+  public const string PermissionAssignmentsBatchDelete = "/api/v1/permission-assignments/batch-delete";
+  public const string PermissionCatalog = "/api/v1/permission-assignments/catalog";
+  public const string PermissionPresets = "/api/v1/permission-assignments/presets";
+  public const string ApplyPermissionPresets = "/api/v1/permission-assignments/presets/apply";
+  public static string EffectivePermission(Guid principalId) => $"/api/v1/effective-permissions/{principalId}";
+
   /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
   public const string UserGroups = "/api/v1/user-groups";
   public static string UserGroup(Guid id) => $"{UserGroups}/{id}";
