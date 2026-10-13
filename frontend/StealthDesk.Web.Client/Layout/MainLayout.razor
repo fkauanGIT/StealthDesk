@@ -36,6 +36,12 @@
                     Permissions
                 </NavLink>
             </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.PersonalAccessTokenSelfRead))">
+                <NavLink class="sd-nav-link" href="personal-access-tokens">
+                    <SdIcon Name="IconName.Lock" />
+                    Access tokens
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersWrite))">
                 <NavLink class="sd-nav-link" href="invites">
                     <SdIcon Name="IconName.Mail" />

@@ -1,0 +1,325 @@
+@page "/personal-access-tokens"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.PersonalAccessTokenSelfRead)]
+@using StealthDesk.Contracts.PersonalAccessTokens
+@using StealthDesk.Web.Client.PersonalAccessTokens
+@inject PersonalAccessTokenApi Api
+@inject SessionGuard Session
+@inject IJSRuntime Js
+@inject IAuthorizationService Authorization
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+<PageTitle>Access tokens · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Access tokens</h1>
+    <div class="sd-push">
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+    </div>
+</header>
+<SdAlert Tone="Tone.Info">
+    <ul class="sd-token-notes">
+        <li>Scripts authenticate by sending the token in the <code>@PersonalAccessTokenHeader.Name</code> header.</li>
+        <li><strong>Restricted</strong> tokens can only do what their permissions allow, and never more than you. Prefer them.</li>
+        <li><strong>Inherit owner</strong> tokens can do everything your account can do.</li>
+    </ul>
+</SdAlert>
+
+<AuthorizeView Policy="@WritePolicy">
+    <form class="sd-token-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <SdTextField Label="Token name" Placeholder="What will use it, e.g. Nightly backup" Autocomplete="off"
+                     @bind-Value="name" Error="@createError" />
+        <SdSegmented TValue="PersonalAccessTokenMode" Label="Permission mode" Options="Modes" @bind-Value="mode" />
+        <SdSelect Label="Expires" Options="Lifetimes" @bind-Value="lifetime" />
+        <SdButton Type="submit" Icon="IconName.Key" Disabled="busy">@(busy ? "Creating..." : "Create token")</SdButton>
+    </form>
+</AuthorizeView>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (tokens is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading tokens..." />
+    }
+}
+else if (tokens.Count == 0)
+{
+    <SdEmptyState Title="No access tokens">Create one above for a script or integration that talks to StealthDesk.</SdEmptyState>
+}
+else
+{
+    <div class="sd-table-wrap">
+        <table class="sd-table" style="min-width: 760px">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Mode</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Last used</th>
+                    <th>Permissions</th>
+                    <th><span class="sd-visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var token in tokens)
+                {
+                    <tr @key="token.Id" data-token="@token.Name">
+                        <td>@token.Name</td>
+                        <td>
+                            <SdStatus Tone="@(token.Mode == PersonalAccessTokenMode.Restricted ? Tone.Info : Tone.Warning)"
+                                      Text="@(token.Mode == PersonalAccessTokenMode.Restricted ? "Restricted" : "Inherit owner")" />
+                        </td>
+                        <td class="sd-muted" style="white-space: nowrap">@Date(token.CreatedAt)</td>
+                        <td style="white-space: nowrap" data-cell="expires">
+                            @if (token.ExpiresAt is not { } expires)
+                            {
+                                <span class="sd-muted">Never</span>
+                            }
+                            else if (expires <= Clock.GetUtcNow())
+                            {
+                                <SdStatus Tone="Tone.Danger" Text="Expired" />
+                            }
+                            else
+                            {
+                                <span class="sd-muted">@Date(expires)</span>
+                            }
+                        </td>
+                        <td class="sd-muted" style="white-space: nowrap">@(token.LastUsed is { } used ? Date(used) : "Never")</td>
+                        <td>@(token.Mode == PersonalAccessTokenMode.InheritOwner ? "Yours" : token.PermissionCount.ToString())</td>
+                        <td class="sd-row-actions">
+                            <AuthorizeView Policy="@PermissionsPolicy">
+                                @if (token.Mode == PersonalAccessTokenMode.Restricted)
+                                {
+                                    <a class="sd-btn sd-btn--ghost" href="@PermissionsLink(token.Id)">Edit permissions</a>
+                                }
+                            </AuthorizeView>
+                            <AuthorizeView Policy="@WritePolicy">
+                                <SdButton Variant="ButtonVariant.Ghost" OnClick="() => StartRename(token)">Rename</SdButton>
+                                <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = token">Delete</SdButton>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<SdDialog Open="created is not null" Title="Copy your new token" OnClose="CloseCreatedAsync">
+    <ChildContent>
+        <p class="sd-muted">
+            This is the only time <strong>@created?.Token.Name</strong> is shown. Store it somewhere safe, like a secrets
+            manager; if it's lost, delete the token and create another.
+        </p>
+        <code class="sd-secret" data-secret>@created?.PlainTextToken</code>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Copy" OnClick="CopyAsync">@(copied ? "Copied" : "Copy token")</SdButton>
+        <SdButton OnClick="CloseCreatedAsync">Done</SdButton>
+    </Footer>
+</SdDialog>
+
+<SdDialog Open="renaming is not null" Title="Rename token" OnClose="() => renaming = null">
+    <ChildContent>
+        <SdTextField Label="New name" Autocomplete="off" @bind-Value="newName" Error="@renameError" />
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => renaming = null">Cancel</SdButton>
+        <SdButton Disabled="busy" OnClick="RenameAsync">Rename</SdButton>
+    </Footer>
+</SdDialog>
+
+<SdDialog Open="deleting is not null" Title="Delete this token?" OnClose="() => deleting = null">
+    <ChildContent>
+        <p class="sd-muted">Anything still using <strong>@deleting?.Name</strong> stops working right away, and its permissions are removed.</p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="DeleteAsync">Delete</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.PersonalAccessTokenSelfWrite);
+    private static readonly string PermissionsPolicy = PermissionPolicies.For(PermissionNames.TenantPermissionsRead);
+
+    private static readonly IReadOnlyList<(PersonalAccessTokenMode, string)> Modes =
+        [(PersonalAccessTokenMode.Restricted, "Restricted"), (PersonalAccessTokenMode.InheritOwner, "Inherit owner")];
+
+    private static readonly IReadOnlyList<SelectOption> Lifetimes =
+        [.. CreatePersonalAccessTokenRequest.Lifetimes.Select(x => new SelectOption(x.ToString(), $"In {x} days")), new SelectOption(string.Empty, "Never")];
+
+    private IReadOnlyList<PersonalAccessTokenSummary>? tokens;
+    private CreatedPersonalAccessToken? created;
+    private PersonalAccessTokenSummary? renaming;
+    private PersonalAccessTokenSummary? deleting;
+    private string? name;
+    private string? newName;
+    private PersonalAccessTokenMode mode = PersonalAccessTokenMode.Restricted;
+    private string? lifetime = CreatePersonalAccessTokenRequest.DefaultLifetimeDays.ToString();
+    private string? error;
+    private string? createError;
+    private string? renameError;
+    private bool copied;
+    private bool busy;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.ListAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        tokens = result.Value?.Items;
+        error = result.Error;
+    }
+
+    private async Task CreateAsync()
+    {
+        createError = null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            createError = "Enter a name for the token.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.CreateAsync(new CreatePersonalAccessTokenRequest(
+            name.Trim(),
+            mode,
+            int.TryParse(lifetime, out var days) ? days : null));
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            createError = result.Error;
+            return;
+        }
+
+        created = result.Value;
+        copied = false;
+        name = null;
+        mode = PersonalAccessTokenMode.Restricted;
+        lifetime = CreatePersonalAccessTokenRequest.DefaultLifetimeDays.ToString();
+        await LoadAsync();
+    }
+
+    // A restricted token starts with no permissions; whoever may manage them is taken there next.
+    private async Task CloseCreatedAsync()
+    {
+        var token = created?.Token;
+        created = null;
+        if (token is { Mode: PersonalAccessTokenMode.Restricted } && AuthenticationState is not null
+            && (await Authorization.AuthorizeAsync((await AuthenticationState).User, PermissionsPolicy)).Succeeded)
+        {
+            Navigation.NavigateTo(PermissionsLink(token.Id));
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", created?.PlainTextToken);
+            copied = true;
+        }
+        catch (JSException)
+        {
+            error = "The browser didn't allow copying. Select the token and copy it yourself.";
+        }
+    }
+
+    private void StartRename(PersonalAccessTokenSummary token)
+    {
+        renaming = token;
+        newName = token.Name;
+        renameError = null;
+    }
+
+    private async Task RenameAsync()
+    {
+        if (renaming is not { } token)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            renameError = "Enter a name for the token.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.RenameAsync(token.Id, newName.Trim());
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            renameError = result.Error;
+            return;
+        }
+
+        renaming = null;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } token)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync(token.Id);
+        busy = false;
+        deleting = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private static string PermissionsLink(Guid id) => $"permissions?kind={PermissionPrincipalKind.PersonalAccessToken}&id={id}";
+
+    private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

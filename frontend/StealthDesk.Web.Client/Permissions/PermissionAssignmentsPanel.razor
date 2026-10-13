@@ -122,7 +122,8 @@ else
     </div>
 }
 
-@if (catalog is not null)
+@* The server checks what users and groups hold; a token's own reach also depends on its owner. *@
+@if (catalog is not null && Kind != PermissionPrincipalKind.PersonalAccessToken)
 {
     <SdCard Title="Check a permission">
         <p class="sd-muted">Whether they hold a permission, counting their groups, and the rule that decides it.</p>

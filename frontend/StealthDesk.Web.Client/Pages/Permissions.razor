@@ -1,10 +1,13 @@
 @page "/permissions"
 @attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantPermissionsRead)]
+@using StealthDesk.Contracts.PersonalAccessTokens
 @using StealthDesk.Web.Client.Permissions
+@using StealthDesk.Web.Client.PersonalAccessTokens
 @using StealthDesk.Web.Client.UserGroups
 @using StealthDesk.Web.Client.Users
 @inject UserApi Users
 @inject UserGroupApi Groups
+@inject PersonalAccessTokenApi Tokens
 @inject SessionGuard Session
 @inject NavigationManager Navigation
 
@@ -13,7 +16,7 @@
 <header class="sd-page-header">
     <h1 class="sd-page-title">Permissions</h1>
 </header>
-<p class="sd-muted sd-page-lead">What a user or user group may do, where, and why. A deny always wins over an allow.</p>
+<p class="sd-muted sd-page-lead">What a user, user group or one of your access tokens may do, where, and why. A deny always wins over an allow.</p>
 
 <div class="sd-permission-picker">
     <SdSegmented TValue="PermissionPrincipalKind" Label="Grant to" Options="Kinds" Value="kind" ValueChanged="KindChangedAsync" />
@@ -30,7 +33,7 @@
     }
     else
     {
-        <SdSelect Label="@(kind == PermissionPrincipalKind.User ? "User" : "User group")" Options="principals"
+        <SdSelect Label="@KindText(kind)" Options="principals"
                   Value="@principalId?.ToString()" ValueChanged="PrincipalChanged" />
     }
 </div>
@@ -42,7 +45,7 @@
 
 @code {
     private static readonly IReadOnlyList<(PermissionPrincipalKind, string)> Kinds =
-        [(PermissionPrincipalKind.User, "User"), (PermissionPrincipalKind.UserGroup, "User group")];
+        [(PermissionPrincipalKind.User, "User"), (PermissionPrincipalKind.UserGroup, "User group"), (PermissionPrincipalKind.PersonalAccessToken, "Access token")];
 
     private PermissionPrincipalKind kind = PermissionPrincipalKind.User;
     private Guid? principalId;
@@ -64,7 +67,7 @@
     {
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
         _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
-        kind = Enum.TryParse<PermissionPrincipalKind>(KindQuery, out var asked) && asked is PermissionPrincipalKind.User or PermissionPrincipalKind.UserGroup
+        kind = Enum.TryParse<PermissionPrincipalKind>(KindQuery, out var asked) && Kinds.Any(x => x.Item1 == asked)
             ? asked
             : PermissionPrincipalKind.User;
         principalId = IdQuery;
@@ -84,7 +87,7 @@
         Navigation.NavigateTo($"permissions?kind={kind}&id={principalId}", replace: true);
     }
 
-    // Picking someone needs to see them: the tenant's users or its groups.
+    // Picking someone needs to see them: the tenant's users or its groups, or the tokens of whoever is signed in.
     private async Task LoadPrincipalsAsync()
     {
         principals = null;
@@ -97,11 +100,17 @@
             expired = result.SessionExpired;
             options = list?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Email ?? x.UserName)).ToList();
         }
-        else
+        else if (kind == PermissionPrincipalKind.UserGroup)
         {
             var result = await Groups.ListAsync(tenantId);
             expired = result.SessionExpired;
             options = result.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name)).ToList();
+        }
+        else
+        {
+            var result = await Tokens.ListAsync();
+            expired = result.SessionExpired;
+            options = result.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), TokenText(x))).ToList();
         }
 
         if (expired)
@@ -112,10 +121,27 @@
 
         if (options is null)
         {
-            pickerError = $"Your account can't list the tenant's {(kind == PermissionPrincipalKind.User ? "users" : "user groups")}.";
+            pickerError = kind switch
+            {
+                PermissionPrincipalKind.User => "Your account can't list the tenant's users.",
+                PermissionPrincipalKind.UserGroup => "Your account can't list the tenant's user groups.",
+                _ => "Your account can't list its access tokens.",
+            };
             return;
         }
 
-        principals = [new SelectOption(string.Empty, kind == PermissionPrincipalKind.User ? "Choose a user" : "Choose a user group"), .. options];
+        var placeholder = kind switch
+        {
+            PermissionPrincipalKind.User => "Choose a user",
+            PermissionPrincipalKind.UserGroup => "Choose a user group",
+            _ => "Choose an access token",
+        };
+        principals = [new SelectOption(string.Empty, placeholder), .. options];
     }
+
+    private static string KindText(PermissionPrincipalKind value) => Kinds.First(x => x.Item1 == value).Item2;
+
+    // An inheriting token takes its owner's permissions, so anything granted to it has no effect.
+    private static string TokenText(PersonalAccessTokenSummary token) =>
+        token.Mode == PersonalAccessTokenMode.InheritOwner ? $"{token.Name} (inherits your permissions)" : token.Name;
 }
