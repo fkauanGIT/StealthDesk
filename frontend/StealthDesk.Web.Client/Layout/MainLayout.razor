@@ -42,6 +42,12 @@
                     Access tokens
                 </NavLink>
             </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServiceAccountRead))">
+                <NavLink class="sd-nav-link" href="service-accounts">
+                    <SdIcon Name="IconName.Key" />
+                    Service accounts
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersWrite))">
                 <NavLink class="sd-nav-link" href="invites">
                     <SdIcon Name="IconName.Mail" />
@@ -52,6 +58,12 @@
                 <NavLink class="sd-nav-link" href="authorization-logs">
                     <SdIcon Name="IconName.History" />
                     Authorization log
+                </NavLink>
+            </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServerServiceAccountsRead))">
+                <NavLink class="sd-nav-link" href="server/service-accounts" Match="NavLinkMatch.All">
+                    <SdIcon Name="IconName.Shield" />
+                    Server accounts
                 </NavLink>
             </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServerAuthorizationLogsRead))">

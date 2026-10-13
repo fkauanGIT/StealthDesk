@@ -1344,3 +1344,25 @@ a.sd-btn:hover {
   white-space: nowrap;
   text-align: right;
 }
+
+/* ---------- Service accounts ---------- */
+
+.sd-text-sm {
+  font-size: var(--sd-text-sm);
+}
+
+/* An account's keys, opened under its row. */
+.sd-subrow > td {
+  padding-top: 0;
+  background: var(--sd-sunken);
+}
+
+.sd-table--nested {
+  margin: var(--sd-space-2) 0;
+}
+
+.sd-table--nested th,
+.sd-table--nested td {
+  padding-top: var(--sd-space-2);
+  padding-bottom: var(--sd-space-2);
+}

@@ -3,11 +3,14 @@
 @using StealthDesk.Contracts.PersonalAccessTokens
 @using StealthDesk.Web.Client.Permissions
 @using StealthDesk.Web.Client.PersonalAccessTokens
+@using StealthDesk.Web.Client.ServiceAccounts
 @using StealthDesk.Web.Client.UserGroups
 @using StealthDesk.Web.Client.Users
 @inject UserApi Users
 @inject UserGroupApi Groups
 @inject PersonalAccessTokenApi Tokens
+@inject ServiceAccountApi ServiceAccounts
+@inject IAuthorizationService Authorization
 @inject SessionGuard Session
 @inject NavigationManager Navigation
 
@@ -16,7 +19,7 @@
 <header class="sd-page-header">
     <h1 class="sd-page-title">Permissions</h1>
 </header>
-<p class="sd-muted sd-page-lead">What a user, user group or one of your access tokens may do, where, and why. A deny always wins over an allow.</p>
+<p class="sd-muted sd-page-lead">What a user, user group, service account or one of your access tokens may do, where, and why. A deny always wins over an allow.</p>
 
 <div class="sd-permission-picker">
     <SdSegmented TValue="PermissionPrincipalKind" Label="Grant to" Options="Kinds" Value="kind" ValueChanged="KindChangedAsync" />
@@ -45,7 +48,12 @@
 
 @code {
     private static readonly IReadOnlyList<(PermissionPrincipalKind, string)> Kinds =
-        [(PermissionPrincipalKind.User, "User"), (PermissionPrincipalKind.UserGroup, "User group"), (PermissionPrincipalKind.PersonalAccessToken, "Access token")];
+        [
+            (PermissionPrincipalKind.User, "User"),
+            (PermissionPrincipalKind.UserGroup, "User group"),
+            (PermissionPrincipalKind.ServiceAccount, "Service account"),
+            (PermissionPrincipalKind.PersonalAccessToken, "Access token"),
+        ];
 
     private PermissionPrincipalKind kind = PermissionPrincipalKind.User;
     private Guid? principalId;
@@ -87,7 +95,8 @@
         Navigation.NavigateTo($"permissions?kind={kind}&id={principalId}", replace: true);
     }
 
-    // Picking someone needs to see them: the tenant's users or its groups, or the tokens of whoever is signed in.
+    // Picking someone needs to see them: the tenant's users, groups or service accounts (and the server's for whoever
+    // may see those), or the tokens of whoever is signed in.
     private async Task LoadPrincipalsAsync()
     {
         principals = null;
@@ -105,6 +114,18 @@
             var result = await Groups.ListAsync(tenantId);
             expired = result.SessionExpired;
             options = result.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name)).ToList();
+        }
+        else if (kind == PermissionPrincipalKind.ServiceAccount)
+        {
+            var result = await ServiceAccounts.ListAsync(tenantId);
+            expired = result.SessionExpired;
+            options = result.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name)).ToList();
+            if (options is not null && await HoldsAsync(PermissionNames.ServerServiceAccountsRead))
+            {
+                var server = await ServiceAccounts.ListAsync(null);
+                expired |= server.SessionExpired;
+                options.AddRange(server.Value?.Items.Select(x => new SelectOption(x.Id.ToString(), $"{x.Name} · server")) ?? []);
+            }
         }
         else
         {
@@ -125,6 +146,7 @@
             {
                 PermissionPrincipalKind.User => "Your account can't list the tenant's users.",
                 PermissionPrincipalKind.UserGroup => "Your account can't list the tenant's user groups.",
+                PermissionPrincipalKind.ServiceAccount => "Your account can't list the tenant's service accounts.",
                 _ => "Your account can't list its access tokens.",
             };
             return;
@@ -134,12 +156,17 @@
         {
             PermissionPrincipalKind.User => "Choose a user",
             PermissionPrincipalKind.UserGroup => "Choose a user group",
+            PermissionPrincipalKind.ServiceAccount => "Choose a service account",
             _ => "Choose an access token",
         };
         principals = [new SelectOption(string.Empty, placeholder), .. options];
     }
 
     private static string KindText(PermissionPrincipalKind value) => Kinds.First(x => x.Item1 == value).Item2;
+
+    private async Task<bool> HoldsAsync(string permission) =>
+        AuthenticationState is not null
+        && (await Authorization.AuthorizeAsync((await AuthenticationState).User, PermissionPolicies.For(permission))).Succeeded;
 
     // An inheriting token takes its owner's permissions, so anything granted to it has no effect.
     private static string TokenText(PersonalAccessTokenSummary token) =>

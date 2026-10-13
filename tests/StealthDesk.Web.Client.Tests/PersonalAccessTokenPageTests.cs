@@ -10,6 +10,7 @@ using StealthDesk.Contracts.UserGroups;
 using StealthDesk.Web.Client.Accounts;
 using StealthDesk.Web.Client.Permissions;
 using StealthDesk.Web.Client.PersonalAccessTokens;
+using StealthDesk.Web.Client.ServiceAccounts;
 using StealthDesk.Web.Client.UserGroups;
 using StealthDesk.Web.Client.Users;
 
@@ -28,6 +29,7 @@ public class PersonalAccessTokenPageTests : AccountTestContext
   {
     Services.AddSingleton<SessionGuard>();
     Services.AddSingleton<PersonalAccessTokenApi>();
+    Services.AddSingleton<ServiceAccountApi>();
     Services.AddSingleton<PermissionApi>();
     Services.AddSingleton<UserGroupApi>();
     Services.AddSingleton<UserApi>();
