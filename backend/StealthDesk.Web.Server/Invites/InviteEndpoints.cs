@@ -8,6 +8,7 @@ using StealthDesk.Web.Server.Accounts;
 using StealthDesk.Web.Server.AuthorizationLogs;
 using StealthDesk.Web.Server.Email;
 using StealthDesk.Web.Server.Permissions;
+using StealthDesk.Web.Server.PersonalAccessTokens;
 using StealthDesk.Web.Server.Users;
 
 namespace StealthDesk.Web.Server.Invites;
@@ -190,9 +191,13 @@ public static class InviteEndpoints
 
     // The account starts over in the tenant: whatever it was granted before is removed, each removal logged, and
     // the baseline granted again below.
+    // Its tokens go too: one would otherwise carry the account's old access, or inherit the new tenant's.
+    var tokens = await db.PersonalAccessTokens.IgnoreQueryFilters().Where(x => x.UserId == user.Id).ToListAsync(cancellationToken);
+    var tokenIds = tokens.Select(x => x.Id).ToList();
     var stale = await db.PermissionAssignments
       .IgnoreQueryFilters()
-      .Where(x => x.PrincipalKind == PermissionPrincipalKind.User && x.PrincipalId == user.Id)
+      .Where(x => (x.PrincipalKind == PermissionPrincipalKind.User && x.PrincipalId == user.Id)
+        || (x.PrincipalKind == PermissionPrincipalKind.PersonalAccessToken && tokenIds.Contains(x.PrincipalId)))
       .ToListAsync(cancellationToken);
     foreach (var assignment in stale)
     {
@@ -205,7 +210,19 @@ public static class InviteEndpoints
         before: PermissionAssignmentSnapshot.Of(assignment)));
     }
 
+    foreach (var token in tokens)
+    {
+      db.AuthorizationChanges.Add(changes.Create(
+        AuthorizationChangeActions.PersonalAccessTokenDeleted,
+        actor: null,
+        AuthorizationChangeTargets.PersonalAccessToken,
+        token.Id,
+        invite.TenantId,
+        before: new PersonalAccessTokenSnapshot(token.Name, token.Mode, token.ExpiresAt, stale.Count(x => x.PrincipalId == token.Id))));
+    }
+
     db.PermissionAssignments.RemoveRange(stale);
+    db.PersonalAccessTokens.RemoveRange(tokens);
     db.UserGroupMembers.RemoveRange(await db.UserGroupMembers.IgnoreQueryFilters().Where(x => x.UserId == user.Id).ToListAsync(cancellationToken));
     db.TenantInvites.Remove(invite);
     await db.SaveChangesAsync(cancellationToken);

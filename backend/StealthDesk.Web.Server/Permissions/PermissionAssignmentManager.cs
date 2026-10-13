@@ -39,7 +39,7 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
       return Forbidden(refusal);
     }
 
-    if ((NotesRefusal(request.Notes) ?? await ScopeRefusalAsync(request.Permission, request.Effect, request.ScopeKind, request.ScopeId, tenant, cancellationToken)) is { } invalid)
+    if ((NotesRefusal(request.Notes) ?? await ScopeRefusalAsync(request.PrincipalKind, request.PrincipalId, request.Permission, request.Effect, request.ScopeKind, request.ScopeId, tenant, cancellationToken)) is { } invalid)
     {
       return Results.Problem(invalid, statusCode: StatusCodes.Status400BadRequest);
     }
@@ -80,7 +80,7 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
       return Forbidden(refusal);
     }
 
-    if ((NotesRefusal(request.Notes) ?? await ScopeRefusalAsync(request.Permission, request.Effect, request.ScopeKind, request.ScopeId, tenant, cancellationToken)) is { } invalid)
+    if ((NotesRefusal(request.Notes) ?? await ScopeRefusalAsync(assignment.PrincipalKind, assignment.PrincipalId, request.Permission, request.Effect, request.ScopeKind, request.ScopeId, tenant, cancellationToken)) is { } invalid)
     {
       return Results.Problem(invalid, statusCode: StatusCodes.Status400BadRequest);
     }
@@ -191,6 +191,11 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
       {
         return Forbidden(refusal);
       }
+
+      if (await ScopeRefusalAsync(assignment.PrincipalKind, assignment.PrincipalId, assignment.Permission, assignment.Effect, assignment.ScopeKind, assignment.ScopeId, tenant, cancellationToken) is { } invalid)
+      {
+        return Results.Problem(invalid, statusCode: StatusCodes.Status400BadRequest);
+      }
     }
 
     var existing = await Assignments()
@@ -239,6 +244,12 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     Guid? scopeId,
     CancellationToken cancellationToken)
   {
+    // A token is checked as its owner sees it through it, which this check doesn't model.
+    if (kind is not (PermissionPrincipalKind.User or PermissionPrincipalKind.UserGroup))
+    {
+      return Results.Problem("Only users and user groups can be checked.", statusCode: StatusCodes.Status400BadRequest);
+    }
+
     // Another tenant's principal is indistinguishable from one that doesn't exist.
     if (!await PrincipalExistsAsync(kind, principalId, tenant, cancellationToken))
     {
@@ -298,34 +309,33 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
   private static bool Visible(PermissionAssignmentRecord assignment, Guid tenant, Authority authority) =>
     assignment.OwningTenantId == tenant || (assignment.OwningTenantId is null && (authority.ReadsServer || authority.ManagesServer));
 
-  private async Task<string?> ScopeRefusalAsync(string permission, PermissionEffect effect, PermissionScopeKind scope, Guid? scopeId, Guid tenant, CancellationToken cancellationToken)
+  // The grant must make sense where it's asked for; to a token, it must also be within what the token's owner can do.
+  private async Task<string?> ScopeRefusalAsync(
+    PermissionPrincipalKind kind,
+    Guid principalId,
+    string permission,
+    PermissionEffect effect,
+    PermissionScopeKind scope,
+    Guid? scopeId,
+    Guid tenant,
+    CancellationToken cancellationToken)
   {
-    if (PermissionCatalog.Find(permission) is not { } info)
+    if (await GrantScopes.RefusalAsync(db, permission, effect, scope, scopeId, tenant, cancellationToken) is { } refusal)
     {
-      return $"Unknown permission: {permission}.";
+      return refusal;
     }
 
-    if (!info.Scopes.Contains(scope))
+    if (kind != PermissionPrincipalKind.PersonalAccessToken)
     {
-      return $"'{info.DisplayName}' can't be assigned at {scope} scope.";
+      return null;
     }
 
-    // A server-wide allow of something granted inside tenants would reach every tenant; only principals that
-    // belong to no tenant may hold one, and users and groups always belong to one.
-    if (effect == PermissionEffect.Allow && scope == PermissionScopeKind.Server && info.AllowsTenantScope)
-    {
-      return "Server-scoped allows of tenant permissions can't be given to users or user groups.";
-    }
-
-    return scope switch
-    {
-      PermissionScopeKind.Device when scopeId is not { } device || !await db.Devices.IgnoreQueryFilters().AnyAsync(x => x.Id == device && x.TenantId == tenant, cancellationToken)
-        => "Choose a device of this tenant.",
-      PermissionScopeKind.UserGroup when scopeId is not { } group || !await db.UserGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == group && x.TenantId == tenant, cancellationToken)
-        => "Choose a user group of this tenant.",
-      _ => null,
-    };
+    var owner = await db.PersonalAccessTokens.IgnoreQueryFilters().Where(x => x.Id == principalId).Select(x => (Guid?)x.UserId).FirstOrDefaultAsync(cancellationToken);
+    return owner is { } ownerId
+      ? await GrantScopes.BeyondOwnerAsync(evaluator, ownerId, tenant, permission, effect, scope, scopeId, cancellationToken)
+      : "Token not found.";
   }
+
 
   private static string? NotesRefusal(string? notes) =>
     notes?.Length > CreatePermissionAssignmentRequest.NotesMax ? $"Notes can't be longer than {CreatePermissionAssignmentRequest.NotesMax} characters." : null;
@@ -334,6 +344,7 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
   {
     PermissionPrincipalKind.User => db.Users.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.TenantId == tenant, cancellationToken),
     PermissionPrincipalKind.UserGroup => db.UserGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.TenantId == tenant, cancellationToken),
+    PermissionPrincipalKind.PersonalAccessToken => db.PersonalAccessTokens.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.User!.TenantId == tenant, cancellationToken),
     _ => Task.FromResult(false),
   };
 

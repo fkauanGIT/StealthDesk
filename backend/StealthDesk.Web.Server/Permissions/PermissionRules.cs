@@ -23,6 +23,12 @@ public sealed record PermissionRule(
 }
 
 /// <summary>
+/// What a request is decided by. A restricted personal access token carries its owner's rules too: it may only do
+/// what it was granted and its owner can still do.
+/// </summary>
+public sealed record PermissionRuleSet(IReadOnlyCollection<PermissionRule> Rules, IReadOnlyCollection<PermissionRule>? OwnerRules = null);
+
+/// <summary>
 /// The decision itself, with no database: unknown permissions and missing rules are denied, a deny that reaches
 /// the resource wins over any allow, and an allow must be at a scope the permission can be granted at.
 /// </summary>
@@ -34,6 +40,18 @@ public static class PermissionRules
     assignments
       .Where(x => x.IsEnabled && BelongsTo(x, tenantId) && !OverreachesTenant(x, tenantId))
       .Select(x => PermissionRule.From(x, source));
+
+  public static PermissionDecision Evaluate(PermissionRuleSet set, string permission, Resource resource)
+  {
+    var decision = Evaluate(set.Rules, permission, resource);
+    if (!decision.Allowed || set.OwnerRules is null)
+    {
+      return decision;
+    }
+
+    var owner = Evaluate(set.OwnerRules, permission, resource);
+    return owner.Allowed ? decision : PermissionDecision.Deny($"The token's owner doesn't hold it: {owner.Reason}");
+  }
 
   public static PermissionDecision Evaluate(IReadOnlyCollection<PermissionRule> rules, string permission, Resource resource)
   {
