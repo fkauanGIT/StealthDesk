@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@inject AccountApi Accounts
+@inject ThemeState Theme
 
 <div class="sd-auth">
     <main class="sd-auth-card">
@@ -9,3 +11,18 @@
         @Body
     </main>
 </div>
+
+@code {
+    // Before signing in there is no account theme: this browser's last one, or the server's default.
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Theme.UseBrowserThemeAsync((await Accounts.GetSettingsAsync()).DefaultTheme);
+        }
+        catch (HttpRequestException)
+        {
+            // The remembered theme from index.html stays.
+        }
+    }
+}

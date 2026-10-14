@@ -19,6 +19,9 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
   /// <summary>One per permission the user holds on their tenant or the server; see <see cref="PermissionPolicyProvider"/>.</summary>
   public const string PermissionClaim = "stealthdesk:permission";
 
+  /// <summary>The theme kept with the user's account.</summary>
+  public const string ThemeClaim = "stealthdesk:theme";
+
   private static readonly AuthenticationState SignedOut = new(new ClaimsPrincipal(new ClaimsIdentity()));
 
   private Task<AuthenticationState>? _state;
@@ -59,6 +62,7 @@ public sealed class ServerAuthenticationState(AccountApi api) : AuthenticationSt
       new(ClaimTypes.Name, user.Email),
       new(ClaimTypes.Email, user.Email),
       new(TenantIdClaim, user.TenantId.ToString()),
+      new(ThemeClaim, user.Theme.ToString()),
     };
 
     if (user.IsServerAdministrator)

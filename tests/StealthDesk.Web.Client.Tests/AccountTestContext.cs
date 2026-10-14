@@ -21,10 +21,15 @@ public abstract class AccountTestContext : BunitContext
     Services.AddSingleton<ServerAuthenticationState>();
     Services.AddSingleton<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerAuthenticationState>());
     Services.AddSingleton<IPasskeyBridge>(Passkeys);
+    Services.AddSingleton<IThemeBridge>(Theme);
+    Services.AddSingleton<ThemeState>();
   }
 
   /// <summary>Passkeys as the browser offers them; unsupported unless a test says otherwise.</summary>
   private protected FakePasskeys Passkeys { get; } = new();
+
+  /// <summary>The page's theme; nothing remembered unless a test says otherwise.</summary>
+  private protected FakeTheme Theme { get; } = new();
 
   private protected FakeApi Api { get; } = new();
 

@@ -20,6 +20,8 @@ builder.Services.AddScoped<ServerAuthenticationState>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerAuthenticationState>());
 builder.Services.AddScoped<SessionGuard>();
 builder.Services.AddScoped<IPasskeyBridge, PasskeyBridge>();
+builder.Services.AddScoped<IThemeBridge, ThemeBridge>();
+builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped<AuthorizationLogApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Users.UserApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Invites.InviteApi>();

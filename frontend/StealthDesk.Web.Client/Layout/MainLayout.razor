@@ -6,6 +6,7 @@
 @inject AccountApi Accounts
 @inject ServerAuthenticationState AuthState
 @inject NavigationManager Navigation
+@inject ThemeState Theme
 
 <div class="sd-shell">
     <nav class="sd-sidebar" aria-label="Main">
@@ -77,6 +78,7 @@
         <AuthorizeView>
             <Authorized>
                 <RequirePasswordChange User="context.User" />
+                <ThemePicker Compact />
                 <div class="sd-user">
                     <a class="sd-user-link" href="account/manage" title="Account settings">
                         <span class="sd-avatar" aria-hidden="true">@Initials(context.User.Identity?.Name)</span>
@@ -97,7 +99,18 @@
 </div>
 
 @code {
-    protected override void OnInitialized() => Store.SessionExpired += OnSessionExpired;
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.SessionExpired += OnSessionExpired;
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (Enum.TryParse<ThemeMode>(user?.FindFirst(ServerAuthenticationState.ThemeClaim)?.Value, out var theme))
+        {
+            await Theme.UseAccountThemeAsync(theme);
+        }
+    }
 
     public void Dispose() => Store.SessionExpired -= OnSessionExpired;
 
