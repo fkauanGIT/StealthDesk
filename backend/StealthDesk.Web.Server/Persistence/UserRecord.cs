@@ -1,3 +1,4 @@
+using StealthDesk.Contracts.Accounts;
 using Microsoft.AspNetCore.Identity;
 
 namespace StealthDesk.Web.Server.Persistence;
@@ -16,6 +17,9 @@ public class UserRecord : IdentityUser<Guid>
 
   /// <summary>Set for accounts created with a temporary password; cleared once the user picks their own.</summary>
   public bool MustChangePassword { get; set; }
+
+  /// <summary>How the web client looks for this user, wherever they sign in.</summary>
+  public ThemeMode Theme { get; set; }
 }
 
 public enum AccountType

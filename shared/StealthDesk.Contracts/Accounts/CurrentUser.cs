@@ -13,6 +13,8 @@ public sealed record CurrentUser
   public bool IsServerAdministrator { get; init; }
   public bool IsTenantAdministrator { get; init; }
 
+  public ThemeMode Theme { get; init; }
+
   /// <summary>
   /// The permissions the user holds on their tenant, or on the server for those that only exist there. They decide
   /// what the web client offers; the server still checks every request, and permissions on single devices or groups

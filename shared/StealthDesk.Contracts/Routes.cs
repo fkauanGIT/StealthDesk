@@ -64,6 +64,7 @@ public static class Routes
   public const string Account = "/api/account";
   public const string AccountProfile = "/api/account/profile";
   public const string AccountPassword = "/api/account/password";
+  public const string AccountTheme = "/api/account/theme";
   public const string AccountPasswordSet = "/api/account/password/set";
   public const string AccountPersonalData = "/api/account/personal-data";
   public const string AccountDeletion = "/api/account/delete";
