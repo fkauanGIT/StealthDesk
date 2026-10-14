@@ -9,6 +9,9 @@ public sealed class ServerHost : WebApplicationFactory<Program>
 {
   private readonly Dictionary<string, string?> _settings;
   private readonly List<Action<IServiceCollection>> _services = [];
+  private bool _started;
+  private string? _pool;
+  private bool _released;
 
   private ServerHost(Dictionary<string, string?> settings)
   {
@@ -68,8 +71,50 @@ public sealed class ServerHost : WebApplicationFactory<Program>
     With("Email:DisableSending", "false")
       .WithServices(services => services.AddSingleton<StealthDesk.Web.Server.Email.IEmailTransport>(emails));
 
+  /// <summary>
+  /// Closes this server's pooled connections as it stops. Pools outlive the server and keep idle connections for
+  /// minutes; across a whole run they would exhaust the test database's connections.
+  /// </summary>
+  public override async ValueTask DisposeAsync()
+  {
+    RememberPool();
+    await base.DisposeAsync();
+    ClearPool();
+  }
+
+  protected override void Dispose(bool disposing)
+  {
+    if (disposing)
+    {
+      RememberPool();
+    }
+
+    base.Dispose(disposing);
+    ClearPool();
+  }
+
+  // Read while the server still runs: disposing one way also runs the other, after the services are gone.
+  private void RememberPool()
+  {
+    if (!_released && _pool is null && _started && _settings.GetValueOrDefault("UseInMemoryDatabase") != "true")
+    {
+      using var scope = Services.CreateScope();
+      _pool = scope.ServiceProvider.GetRequiredService<StealthDeskDb>().Database.GetConnectionString();
+    }
+  }
+
+  private void ClearPool()
+  {
+    _released = true;
+    if (Interlocked.Exchange(ref _pool, null) is { } connectionString)
+    {
+      Npgsql.NpgsqlConnection.ClearPool(new Npgsql.NpgsqlConnection(connectionString));
+    }
+  }
+
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
+    _started = true;
     builder.UseEnvironment("Development");
     foreach (var (key, value) in _settings)
     {
