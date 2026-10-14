@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.PersonalAccessTokens;
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.ServiceAccounts;
 
 namespace StealthDesk.Web.Server.Permissions;
 
@@ -44,6 +45,13 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
   // grants decide and the owner must hold the same. A token that no longer exists grants nothing.
   public async Task<PermissionRuleSet> RulesAsync(Principal principal, CancellationToken cancellationToken = default)
   {
+    // Only a server account, and only one created unrestricted, skips the rules.
+    if (principal is { Kind: PermissionPrincipalKind.ServiceAccount, TenantId: null }
+      && await db.ServiceAccounts.AnyAsync(x => x.Id == principal.Id && x.Kind == ServiceAccountKind.Server && x.AccessMode == ServiceAccountAccessMode.Unrestricted, cancellationToken))
+    {
+      return new PermissionRuleSet([], Unrestricted: true);
+    }
+
     var owner = await OwnRulesAsync(principal, cancellationToken);
     if (principal.TokenId is not { } tokenId)
     {

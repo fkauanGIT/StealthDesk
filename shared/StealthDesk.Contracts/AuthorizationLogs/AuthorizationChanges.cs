@@ -9,6 +9,12 @@ public static class AuthorizationChangeActions
   public const string PermissionAssignmentUpdated = "permission-assignment-updated";
   public const string PersonalAccessTokenCreated = "personal-access-token-created";
   public const string PersonalAccessTokenDeleted = "personal-access-token-deleted";
+  public const string ServiceAccountCreated = "service-account-created";
+  public const string ServiceAccountCredentialCreated = "service-account-credential-created";
+  public const string ServiceAccountCredentialDeleted = "service-account-credential-deleted";
+  public const string ServiceAccountCredentialRevoked = "service-account-credential-revoked";
+  public const string ServiceAccountDeleted = "service-account-deleted";
+  public const string ServiceAccountUpdated = "service-account-updated";
   public const string UserGroupCreated = "user-group-created";
   public const string UserGroupDeleted = "user-group-deleted";
   public const string UserGroupMembersAdded = "user-group-members-added";
@@ -32,6 +38,8 @@ public static class AuthorizationChangeTargets
 {
   public const string PermissionAssignment = "PermissionAssignment";
   public const string PersonalAccessToken = "PersonalAccessToken";
+  public const string ServiceAccount = "ServiceAccount";
+  public const string ServiceAccountCredential = "ServiceAccountCredential";
   public const string User = "User";
   public const string UserGroup = "UserGroup";
 }

@@ -1,4 +1,5 @@
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.ServiceAccounts;
 
 namespace StealthDesk.Web.Server.AuthorizationLogs;
 
@@ -17,4 +18,16 @@ public sealed record PermissionAssignmentSnapshot(string Permission, PermissionE
 {
   public static PermissionAssignmentSnapshot Of(PermissionAssignmentRecord assignment) =>
     new(assignment.Permission, assignment.Effect, assignment.ScopeKind, assignment.ScopeId, assignment.IsEnabled);
+}
+
+public sealed record ServiceAccountSnapshot(string Name, ServiceAccountKind Kind, string? Description, bool IsEnabled, ServiceAccountAccessMode AccessMode)
+{
+  public static ServiceAccountSnapshot Of(ServiceAccountRecord account) =>
+    new(account.Name, account.Kind, account.Description, account.IsEnabled, account.AccessMode);
+}
+
+public sealed record ServiceAccountCredentialSnapshot(string Name, Guid ServiceAccountId, DateTimeOffset? ExpiresAt)
+{
+  public static ServiceAccountCredentialSnapshot Of(ServiceAccountCredentialRecord credential) =>
+    new(credential.Name, credential.ServiceAccountId, credential.ExpiresAt);
 }

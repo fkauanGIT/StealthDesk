@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.AuthorizationLogs;
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.ServiceAccounts;
 using StealthDesk.Web.Server.AuthorizationLogs;
 
 namespace StealthDesk.Web.Server.Permissions;
@@ -34,7 +35,8 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     }
 
     var authority = await AuthorityAsync(actor, tenant, cancellationToken);
-    if (WriteRefusal(request.Effect, request.ScopeKind, authority) is { } refusal)
+    if ((await ServerAccountRefusalAsync(request.PrincipalKind, request.PrincipalId, authority, cancellationToken)
+          ?? WriteRefusal(request.Effect, request.ScopeKind, authority)) is { } refusal)
     {
       return Forbidden(refusal);
     }
@@ -75,7 +77,9 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     }
 
     // Both what the assignment was and what it becomes must be the caller's to manage.
-    if ((WriteRefusal(assignment.Effect, assignment.ScopeKind, authority) ?? WriteRefusal(request.Effect, request.ScopeKind, authority)) is { } refusal)
+    if ((await ServerAccountRefusalAsync(assignment.PrincipalKind, assignment.PrincipalId, authority, cancellationToken)
+          ?? WriteRefusal(assignment.Effect, assignment.ScopeKind, authority)
+          ?? WriteRefusal(request.Effect, request.ScopeKind, authority)) is { } refusal)
     {
       return Forbidden(refusal);
     }
@@ -140,7 +144,8 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
 
     foreach (var assignment in visible)
     {
-      if (WriteRefusal(assignment.Effect, assignment.ScopeKind, authority) is { } refusal)
+      if ((await ServerAccountRefusalAsync(assignment.PrincipalKind, assignment.PrincipalId, authority, cancellationToken)
+            ?? WriteRefusal(assignment.Effect, assignment.ScopeKind, authority)) is { } refusal)
       {
         return Forbidden(refusal);
       }
@@ -182,6 +187,11 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     }
 
     var authority = await AuthorityAsync(actor, tenant, cancellationToken);
+    if (await ServerAccountRefusalAsync(request.PrincipalKind, request.PrincipalId, authority, cancellationToken) is { } serverRefusal)
+    {
+      return Forbidden(serverRefusal);
+    }
+
     var wanted = permissions
       .Select(x => NewAssignment(actor, tenant, request.PrincipalKind, request.PrincipalId, x, PermissionEffect.Allow, PermissionCatalog.Find(x)!.PresetScope, null, null, true))
       .ToList();
@@ -245,9 +255,9 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     CancellationToken cancellationToken)
   {
     // A token is checked as its owner sees it through it, which this check doesn't model.
-    if (kind is not (PermissionPrincipalKind.User or PermissionPrincipalKind.UserGroup))
+    if (kind is not (PermissionPrincipalKind.User or PermissionPrincipalKind.UserGroup or PermissionPrincipalKind.ServiceAccount))
     {
-      return Results.Problem("Only users and user groups can be checked.", statusCode: StatusCodes.Status400BadRequest);
+      return Results.Problem("Only users, user groups and service accounts can be checked.", statusCode: StatusCodes.Status400BadRequest);
     }
 
     // Another tenant's principal is indistinguishable from one that doesn't exist.
@@ -271,7 +281,9 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
       return Results.Problem("Choose a server, tenant, device or user group of this tenant to check.", statusCode: StatusCodes.Status400BadRequest);
     }
 
-    var decision = await evaluator.EvaluateAsync(new Principal(kind, principalId, tenant), permission, resource, cancellationToken);
+    // A server account belongs to no tenant; the check sees it as it signs in.
+    var principalTenant = kind == PermissionPrincipalKind.ServiceAccount && await IsServerAccountAsync(principalId, cancellationToken) ? (Guid?)null : tenant;
+    var decision = await evaluator.EvaluateAsync(new Principal(kind, principalId, principalTenant), permission, resource, cancellationToken);
     return Results.Ok(new EffectivePermission(decision.Allowed, decision.Reason));
   }
 
@@ -320,7 +332,8 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     Guid tenant,
     CancellationToken cancellationToken)
   {
-    if (await GrantScopes.RefusalAsync(db, permission, effect, scope, scopeId, tenant, cancellationToken) is { } refusal)
+    var toServerAccount = kind == PermissionPrincipalKind.ServiceAccount && await IsServerAccountAsync(principalId, cancellationToken);
+    if (await GrantScopes.RefusalAsync(db, permission, effect, scope, scopeId, tenant, cancellationToken, toServerAccount) is { } refusal)
     {
       return refusal;
     }
@@ -345,8 +358,20 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
     PermissionPrincipalKind.User => db.Users.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.TenantId == tenant, cancellationToken),
     PermissionPrincipalKind.UserGroup => db.UserGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.TenantId == tenant, cancellationToken),
     PermissionPrincipalKind.PersonalAccessToken => db.PersonalAccessTokens.IgnoreQueryFilters().AnyAsync(x => x.Id == id && x.User!.TenantId == tenant, cancellationToken),
+    // The tenant's own accounts, and the server's, which work in every tenant.
+    PermissionPrincipalKind.ServiceAccount => db.ServiceAccounts.AnyAsync(
+      x => x.Id == id && (x.Kind == ServiceAccountKind.Server || (x.Kind == ServiceAccountKind.Tenant && x.TenantId == tenant)), cancellationToken),
     _ => Task.FromResult(false),
   };
+
+  private Task<bool> IsServerAccountAsync(Guid id, CancellationToken cancellationToken) =>
+    db.ServiceAccounts.AnyAsync(x => x.Id == id && x.Kind == ServiceAccountKind.Server, cancellationToken);
+
+  // A server account reaches every tenant, so only who manages the server's permissions may change what it holds.
+  private async Task<string?> ServerAccountRefusalAsync(PermissionPrincipalKind kind, Guid id, Authority authority, CancellationToken cancellationToken) =>
+    kind == PermissionPrincipalKind.ServiceAccount && !authority.ManagesServer && await IsServerAccountAsync(id, cancellationToken)
+      ? $"The '{PermissionNames.ServerPermissionsWrite}' permission is required to manage a server service account's assignments."
+      : null;
 
   /// <summary>
   /// Replays the caller's own assignments with a change applied and refuses it when they would lose a permission

@@ -96,6 +96,14 @@ public class DeviceAccessScopeTests
     }
   }
 
+  [Fact]
+  public void AnUnrestrictedSet_ReadsEveryTenantsDevices()
+  {
+    var scope = DeviceAccessScope.From(new PermissionRuleSet([], Unrestricted: true), tenantBoundary: null);
+
+    Assert.Equal(Devices, Visible(scope));
+  }
+
   // A restricted token reads a device only when both its own rules and its owner's allow it.
   [Theory]
   [InlineData(1)]

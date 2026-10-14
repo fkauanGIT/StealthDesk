@@ -12,6 +12,9 @@ public sealed class DeviceAccessScope
 {
   public static DeviceAccessScope None { get; } = new(null, false, [], [], [], []);
 
+  /// <summary>Every device of every tenant.</summary>
+  public static DeviceAccessScope Everything { get; } = new(null, true, [], [], [], []);
+
   private readonly Guid? _tenantBoundary;
   private readonly bool _everyTenant;
   private readonly Guid[] _tenants;
@@ -37,6 +40,11 @@ public sealed class DeviceAccessScope
   /// <param name="tenantBoundary">The principal's tenant, which no device outside of is ever read; none for a server-wide principal.</param>
   public static DeviceAccessScope From(PermissionRuleSet set, Guid? tenantBoundary)
   {
+    if (set.Unrestricted)
+    {
+      return Everything;
+    }
+
     var scope = From(set.Rules, tenantBoundary);
     if (set.OwnerRules is null || ReferenceEquals(scope, None))
     {
