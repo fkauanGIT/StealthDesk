@@ -57,15 +57,17 @@ public sealed class AccountEmails(IEmailTransport transport, IHttpContextAccesso
     return HtmlEncoder.Default.Encode(QueryHelpers.AddQueryString(url, query.ToDictionary(x => x.Name, x => (string?)x.Value)));
   }
 
+  // Mail apps don't read the web client's tokens: the light theme's colors are written out here.
+
   /// <param name="href">Already HTML-encoded.</param>
   private static string Button(string href, string text)
   {
-    return $"<p><a href=\"{href}\" style=\"display:inline-block;padding:12px 20px;border-radius:8px;"
-      + $"background:#6C47FF;color:#FFFFFF;text-decoration:none;font-weight:600\">{text}</a></p>"
-      + $"<p style=\"color:#6A6675;font-size:13px\">Or open this address: {href}</p>";
+    return $"<p><a href=\"{href}\" style=\"display:inline-block;padding:12px 24px;border-radius:999px;"
+      + $"background:#0D0D0D;color:#FFFFFF;text-decoration:none;font-weight:600\">{text}</a></p>"
+      + $"<p style=\"color:#6B675F;font-size:13px\">Or open this address: {href}</p>";
   }
 
   private static string Layout(string body) =>
-    "<div style=\"font-family:'Segoe UI',Arial,sans-serif;font-size:15px;color:#16141C;max-width:520px\">"
+    "<div style=\"font-family:'Segoe UI',Arial,sans-serif;font-size:15px;color:#0D0D0D;max-width:520px\">"
     + $"<p style=\"font-size:18px;font-weight:700\">{Brand.Name}</p>{body}</div>";
 }

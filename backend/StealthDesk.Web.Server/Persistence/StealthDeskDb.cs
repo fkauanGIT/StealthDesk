@@ -83,6 +83,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
     {
       user.ToTable("users");
       user.Property(x => x.AccountType).HasConversion<string>().HasMaxLength(20);
+      user.Property(x => x.Theme).HasConversion<string>().HasMaxLength(10);
       user.HasIndex(x => x.TenantId);
       user.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });

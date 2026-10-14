@@ -49,6 +49,23 @@ public static class ManageEndpoints
       return Results.Ok(await ProfileAsync(users, user));
     });
 
+    account.MapPut("/theme", async (ThemeUpdate update, ClaimsPrincipal principal, UserManager<UserRecord> users) =>
+    {
+      if (!Enum.IsDefined(update.Theme))
+      {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["InvalidTheme"] = ["Choose auto, light or dark."] });
+      }
+
+      if (await users.GetUserAsync(principal) is not { } user)
+      {
+        return Results.Unauthorized();
+      }
+
+      user.Theme = update.Theme;
+      var result = await users.UpdateAsync(user);
+      return result.Succeeded ? Results.NoContent() : ValidationProblem(result);
+    });
+
     account.MapPost("/password", async (PasswordChange change, HttpContext context, SignInManager<UserRecord> signIn) =>
     {
       var users = signIn.UserManager;

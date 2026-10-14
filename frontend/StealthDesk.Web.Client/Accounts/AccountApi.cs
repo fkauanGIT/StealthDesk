@@ -68,6 +68,10 @@ public sealed class AccountApi(HttpClient http)
   public async Task<AccountProfile?> GetProfileAsync(CancellationToken cancellationToken = default) =>
     await GetOrNullAsync<AccountProfile>(Routes.AccountProfile, cancellationToken);
 
+  /// <summary>Keeps the chosen theme with the signed-in user's account.</summary>
+  public Task<AccountResult> SetThemeAsync(ThemeMode theme) =>
+    SendAsync(HttpMethod.Put, Routes.AccountTheme, new ThemeUpdate(theme));
+
   public Task<AccountResult> UpdateProfileAsync(string? phoneNumber) =>
     SendAsync(HttpMethod.Put, Routes.AccountProfile, new ProfileUpdate { PhoneNumber = phoneNumber });
 

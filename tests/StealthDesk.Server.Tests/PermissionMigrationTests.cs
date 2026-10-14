@@ -18,9 +18,11 @@ public class PermissionMigrationTests
   public async Task Markers_BecomeAssignments_AndComeBackWhenUndone()
   {
     using var server = await ServerHost.OnPostgresAsync();
+    // Accounts are made with today's schema, then taken back to before permissions to be marked the old way.
+    var admin = await CreateUserAsync(server, "admin@example.com");
+    var member = await CreateUserAsync(server, "member@example.com");
     await MigrateAsync(server, BeforePermissions);
-    var admin = await CreateMarkedAsync(server, "admin@example.com", ServerMarker, TenantMarker);
-    var member = await CreateMarkedAsync(server, "member@example.com");
+    await MarkAsync(server, admin, ServerMarker, TenantMarker);
 
     await MigrateAsync(server, null);
     var adminRows = await RowsAsync(server, admin.Id);
@@ -54,19 +56,15 @@ public class PermissionMigrationTests
     await db.GetService<IMigrator>().MigrateAsync(target, TestContext.Current.CancellationToken);
   }
 
-  private static async Task<UserRecord> CreateMarkedAsync(ServerHost server, string email, params string[] markers)
-  {
-    var tenantId = await TestTenants.CreateAsync(server, email);
-    var user = await TestAccounts.CreateUserAsync(server, email, tenantId);
-    await using var scope = server.Services.CreateAsyncScope();
-    var users = scope.ServiceProvider.GetRequiredService<UserManager<UserRecord>>();
-    foreach (var marker in markers)
-    {
-      await users.AddClaimAsync((await users.FindByIdAsync(user.Id.ToString()))!, new Claim(marker, "true"));
-    }
+  private static async Task<UserRecord> CreateUserAsync(ServerHost server, string email) =>
+    await TestAccounts.CreateUserAsync(server, email, await TestTenants.CreateAsync(server, email));
 
-    return user;
-  }
+  // Straight into the claims table: the user manager reads every column users have today, which an older schema lacks.
+  private static Task MarkAsync(ServerHost server, UserRecord user, params string[] markers) => server.WithDbAsync(db =>
+  {
+    db.UserClaims.AddRange(markers.Select(x => new IdentityUserClaim<Guid> { UserId = user.Id, ClaimType = x, ClaimValue = "true" }));
+    return db.SaveChangesAsync();
+  });
 
   private static Task<List<(string Permission, PermissionScopeKind ScopeKind, Guid? ScopeId)>> RowsAsync(ServerHost server, Guid userId) =>
     server.WithDbAsync(async db =>

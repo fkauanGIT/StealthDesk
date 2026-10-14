@@ -1,0 +1,39 @@
+@implements IDisposable
+@inject ThemeState Theme
+
+@* Auto, light or dark: shown at once and kept with the account. *@
+
+<div class="@(Compact ? "sd-theme-picker sd-theme-picker--compact" : "sd-theme-picker")">
+    <SdSegmented TValue="ThemeMode" Label="Theme" Options="Modes" Value="Theme.Mode" ValueChanged="ChooseAsync" />
+    @if (error is not null)
+    {
+        <p class="sd-field-error" role="alert">@error</p>
+    }
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(ThemeMode, string)> Modes =
+        [(ThemeMode.Auto, "Auto"), (ThemeMode.Light, "Light"), (ThemeMode.Dark, "Dark")];
+
+    private string? error;
+
+    /// <summary>Fills the width it is given, as in the menu.</summary>
+    [Parameter]
+    public bool Compact { get; set; }
+
+    protected override void OnInitialized() => Theme.Changed += OnChanged;
+
+    public void Dispose() => Theme.Changed -= OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ChooseAsync(ThemeMode mode)
+    {
+        error = null;
+        var result = await Theme.ChooseAsync(mode);
+        if (!result.Succeeded)
+        {
+            error = result.Error ?? "The theme couldn't be saved. Try again.";
+        }
+    }
+}

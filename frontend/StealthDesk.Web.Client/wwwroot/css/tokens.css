@@ -1,6 +1,7 @@
 /*
   StealthDesk design tokens. Every color, size and font the web client uses comes from here, so a theme is
-  this file and nothing else. Dark is the default; [data-theme="light"] on <html> switches to light.
+  this file and nothing else. Dark is the default; [data-theme="light"] on <html> switches to light, set by
+  js/theme.js from the user's choice before the first paint.
 */
 
 @font-face {
@@ -30,43 +31,49 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces, from the page background up to raised elements. */
-  --sd-ground: #0F0E13;
-  --sd-sunken: #13121A;
-  --sd-surface: #17161D;
-  --sd-raised: #1E1C25;
-  --sd-border: #26242E;
-  --sd-border-strong: #3D3A47;
+  /* Surfaces, from the page background up to raised elements: neutral graphite, no tint. */
+  --sd-ground: #0E0E0F;
+  --sd-sunken: #121213;
+  --sd-surface: #18181A;
+  --sd-raised: #212124;
+  --sd-sidebar: #121213;
+  --sd-border: #29292D;
+  --sd-border-strong: #3E3E43;
 
   /* Text. */
-  --sd-text: #F2F1F5;
-  --sd-text-secondary: #CAC7D2;
-  --sd-text-muted: #918D9C;
-  --sd-text-disabled: #6E6A78;
+  --sd-text: #F3F2EF;
+  --sd-text-secondary: #CBC9C4;
+  --sd-text-muted: #8F8D88;
+  --sd-text-disabled: #696762;
 
-  /* The one accent: primary actions, links, focus, selection. */
-  --sd-accent: #6C47FF;
-  --sd-accent-hover: #7B5AFF;
-  --sd-accent-text: #B39AFF;
-  --sd-accent-soft: #241D3A;
-  --sd-on-accent: #FFFFFF;
-  --sd-focus: #B39AFF;
+  /* The one accent: primary actions, links, focus, selection. Sober: light on dark. */
+  --sd-accent: #F3F2EF;
+  --sd-accent-hover: #FFFFFF;
+  --sd-accent-text: #F3F2EF;
+  --sd-accent-soft: #2A2A2D;
+  --sd-on-accent: #0D0D0D;
+  --sd-focus: #F3F2EF;
+
+  /* The current page in the menu, and the chosen option of a segmented control. */
+  --sd-selected: #F3F2EF;
+  --sd-on-selected: #0D0D0D;
 
   /* Status: always paired with text, never color alone. */
   --sd-online: #3ECF8E;
   --sd-online-text: #6FE0AC;
   --sd-online-soft: #0F2A1E;
-  --sd-offline: #6E6A78;
-  --sd-offline-text: #ADA9B6;
-  --sd-offline-soft: #1E1C25;
+  --sd-offline: #6E6C68;
+  --sd-offline-text: #ADABA6;
+  --sd-offline-soft: #212124;
   --sd-warning: #F5A524;
   --sd-warning-text: #F7C267;
   --sd-warning-soft: #33240A;
   --sd-danger: #F0544A;
-  --sd-danger-strong: #D93F36;
+  --sd-danger-strong: #D33A31;
   --sd-danger-text: #F5A39D;
   --sd-danger-soft: #2A1414;
   --sd-danger-border: #5C2522;
+  --sd-on-danger: #FFFFFF;
 
   /* Type. */
   --sd-font: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
@@ -76,8 +83,8 @@
   --sd-text-md: 0.875rem;
   --sd-text-lg: 1rem;
   --sd-text-xl: 1.375rem;
-  --sd-text-2xl: 1.75rem;
-  --sd-text-3xl: 2rem;
+  --sd-text-2xl: 1.875rem;
+  --sd-text-3xl: 2.125rem;
 
   /* Space, on a 4 px grid. */
   --sd-space-1: 4px;
@@ -89,51 +96,63 @@
   --sd-space-8: 32px;
   --sd-space-12: 48px;
 
-  /* Shape and depth. */
+  /* Shape and depth. Buttons and choices are pills; cards lift off the page where the theme has light. */
   --sd-radius-sm: 6px;
   --sd-radius-md: 8px;
-  --sd-radius-lg: 12px;
-  --sd-radius-xl: 16px;
+  --sd-radius-lg: 14px;
+  --sd-radius-xl: 20px;
   --sd-radius-pill: 999px;
-  --sd-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --sd-radius-control: var(--sd-radius-pill);
+  --sd-shadow-card: none;
+  --sd-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --sd-scrim: rgba(5, 5, 6, 0.65);
   --sd-control-height: 44px;
 }
 
+/* Warm off-white page, white cards with soft shadows, near-black for what matters, color kept for status. */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --sd-ground: #F7F6FA;
-  --sd-sunken: #EFEEF4;
+  --sd-ground: #F4F1EB;
+  --sd-sunken: #ECE8E0;
   --sd-surface: #FFFFFF;
-  --sd-raised: #F2F1F7;
-  --sd-border: #E3E1EA;
-  --sd-border-strong: #C9C6D3;
+  --sd-raised: #F4F1EB;
+  --sd-sidebar: #FFFFFF;
+  --sd-border: #E6E1D7;
+  --sd-border-strong: #CEC7BA;
 
-  --sd-text: #16141C;
-  --sd-text-secondary: #3B3842;
-  --sd-text-muted: #6A6675;
-  --sd-text-disabled: #A29EAD;
+  --sd-text: #0D0D0D;
+  --sd-text-secondary: #3A3833;
+  --sd-text-muted: #6B675F;
+  --sd-text-disabled: #A6A196;
 
-  --sd-accent: #5B35F0;
-  --sd-accent-hover: #4C27E0;
-  --sd-accent-text: #5B35F0;
-  --sd-accent-soft: #ECE7FF;
-  --sd-focus: #5B35F0;
+  --sd-accent: #0D0D0D;
+  --sd-accent-hover: #2B2B2B;
+  --sd-accent-text: #0D0D0D;
+  --sd-accent-soft: #ECE8E0;
+  --sd-on-accent: #FFFFFF;
+  --sd-focus: #0D0D0D;
+
+  --sd-selected: #0D0D0D;
+  --sd-on-selected: #FFFFFF;
 
   --sd-online: #1F9D63;
   --sd-online-text: #13724A;
-  --sd-online-soft: #E2F6EC;
-  --sd-offline: #8A8694;
-  --sd-offline-text: #55515F;
-  --sd-offline-soft: #EFEEF4;
+  --sd-online-soft: #E2F4E9;
+  --sd-offline: #8A867D;
+  --sd-offline-text: #55524B;
+  --sd-offline-soft: #ECE8E0;
   --sd-warning: #C27C0E;
   --sd-warning-text: #8A5800;
-  --sd-warning-soft: #FCF0DB;
+  --sd-warning-soft: #FBEFD9;
   --sd-danger: #D93F36;
   --sd-danger-strong: #C2332B;
   --sd-danger-text: #A1251E;
-  --sd-danger-soft: #FCE9E8;
-  --sd-danger-border: #F2B8B4;
+  --sd-danger-soft: #FBE8E6;
+  --sd-danger-border: #F0B6B1;
+  --sd-on-danger: #FFFFFF;
 
-  --sd-shadow-overlay: 0 24px 64px rgba(22, 20, 28, 0.18);
+  --sd-shadow-card: 0 1px 2px rgba(13, 13, 13, 0.04), 0 8px 24px rgba(13, 13, 13, 0.06);
+  --sd-shadow-overlay: 0 24px 64px rgba(13, 13, 13, 0.16);
+  --sd-scrim: rgba(13, 13, 13, 0.35);
 }

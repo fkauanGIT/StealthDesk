@@ -1,3 +1,4 @@
+using StealthDesk.Contracts.Accounts;
 namespace StealthDesk.Web.Server.Accounts;
 
 /// <summary>Account rules, from the "Accounts" configuration section.</summary>
@@ -26,6 +27,9 @@ public sealed class AccountOptions
   /// administrator. Independent of <see cref="EnablePublicRegistration"/>.
   /// </summary>
   public bool DisableFirstUserSelfRegistration { get; set; }
+
+  /// <summary>How the sign-in pages look before anyone signs in; each user then picks their own.</summary>
+  public ThemeMode DefaultTheme { get; set; }
 
   /// <summary>A passkey sign-in keeps the session after the browser closes, like "remember me".</summary>
   public bool PersistPasskeySignIn { get; set; }

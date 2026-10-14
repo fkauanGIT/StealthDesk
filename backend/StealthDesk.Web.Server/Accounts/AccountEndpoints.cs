@@ -21,11 +21,12 @@ public static class AccountEndpoints
         ? new NoPermissionAttribute(NoPermissionAttribute.OwnAccount)
         : new AllowAnonymousAttribute()));
 
-    auth.MapGet("/settings", async (IRegistration registration, SignInManager<UserRecord> signIn, CancellationToken cancellationToken) =>
+    auth.MapGet("/settings", async (IRegistration registration, SignInManager<UserRecord> signIn, IOptionsMonitor<AccountOptions> options, CancellationToken cancellationToken) =>
       new AccountSettings
       {
         RegistrationOpen = await registration.IsOpenAsync(cancellationToken),
         ExternalProviders = await ExternalLoginEndpoints.ProvidersAsync(signIn),
+        DefaultTheme = options.CurrentValue.DefaultTheme,
       }).AllowAnonymous();
 
     auth.MapGet("/me", async (HttpContext context, UserManager<UserRecord> users, StealthDeskDb db, IPermissionEvaluator permissions) =>
@@ -55,6 +56,7 @@ public static class AccountEndpoints
         // Administrators are whoever may manage access, at the server or in their tenant.
         IsServerAdministrator = held.Contains(PermissionNames.ServerPermissionsWrite),
         IsTenantAdministrator = held.Contains(PermissionNames.TenantPermissionsWrite),
+        Theme = user.Theme,
         Permissions = held,
       });
     }).RequireAuthorization().OwnAccount();

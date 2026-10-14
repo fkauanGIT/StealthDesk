@@ -9,6 +9,16 @@
     <base href="/" />
     <link rel="preload" id="webassembly" />
     <link rel="preload" href="fonts/SpaceGrotesk-400-700.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+        // The remembered theme, applied before anything is drawn so a page never flashes the other one.
+        // js/theme.js keeps it current once the app runs.
+        (function () {
+            var mode = 'auto';
+            try { mode = localStorage.getItem('stealthdesk:theme') || 'auto'; } catch (e) { }
+            var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        })();
+    </script>
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
