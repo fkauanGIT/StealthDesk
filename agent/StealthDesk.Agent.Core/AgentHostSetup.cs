@@ -17,7 +17,14 @@ namespace StealthDesk.Agent.Core;
 /// <param name="InstanceName">Separates several agents on one machine; null for the default instance.</param>
 /// <param name="ServerUrl">Overrides <c>Agent:ServerUrl</c> from configuration.</param>
 /// <param name="UseSettingsFile">Reads the instance's settings file (identity and key). Off in tests.</param>
-public sealed record AgentStartup(string? InstanceName = null, Uri? ServerUrl = null, bool UseSettingsFile = true);
+/// <param name="InstallerKey">Overrides <c>Agent:InstallerKey</c>: the key that lets a new device join.</param>
+/// <param name="DeviceId">The id a new device asks for; one it already saved wins.</param>
+public sealed record AgentStartup(
+  string? InstanceName = null,
+  Uri? ServerUrl = null,
+  bool UseSettingsFile = true,
+  string? InstallerKey = null,
+  Guid? DeviceId = null);
 
 public static class AgentHostSetup
 {
@@ -29,13 +36,23 @@ public static class AgentHostSetup
   {
     var paths = new AgentPaths(startup.InstanceName, AgentBuild.IsDebug);
 
+    var overrides = new Dictionary<string, string?>();
     if (startup.ServerUrl is not null)
     {
-      builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-      {
-        [$"{AgentSettings.Section}:{nameof(AgentSettings.ServerUrl)}"] = startup.ServerUrl.ToString(),
-      });
+      overrides[$"{AgentSettings.Section}:{nameof(AgentSettings.ServerUrl)}"] = startup.ServerUrl.ToString();
     }
+
+    if (!string.IsNullOrWhiteSpace(startup.InstallerKey))
+    {
+      overrides[$"{AgentSettings.Section}:{nameof(AgentSettings.InstallerKey)}"] = startup.InstallerKey.Trim();
+    }
+
+    if (startup.DeviceId is { } requestedId && requestedId != Guid.Empty)
+    {
+      overrides[$"{AgentSettings.Section}:{nameof(AgentSettings.DeviceId)}"] = requestedId.ToString();
+    }
+
+    builder.Configuration.AddInMemoryCollection(overrides);
 
     // Last source wins: what the agent saved about itself overrides the defaults shipped next to it.
     if (startup.UseSettingsFile)

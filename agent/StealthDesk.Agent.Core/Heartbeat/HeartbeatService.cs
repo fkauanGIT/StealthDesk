@@ -22,7 +22,8 @@ public interface IHeartbeat
 
 /// <summary>
 /// Tells the server "this device is alive, and this is its state" on a fixed interval.
-/// The first report also establishes the device's identity: the key pair is created once and kept.
+/// The first report also establishes the device's identity: the key pair is created once and kept, and the installer
+/// key, when there is one, goes along until the server accepts a report.
 /// </summary>
 public sealed class HeartbeatService(
   IRealtimeChannel<IAgentGateway> channel,
@@ -35,6 +36,9 @@ public sealed class HeartbeatService(
 {
   // Connect, reconnect and the timer can all ask for a report at once; they go out one at a time.
   private readonly SemaphoreSlim _sending = new(1, 1);
+
+  // Once a report is accepted the device is known and signs with its own key: the installer key isn't needed again.
+  private bool _accepted;
 
   public async Task SendNowAsync(CancellationToken cancellationToken = default)
   {
@@ -52,6 +56,7 @@ public sealed class HeartbeatService(
       {
         DeviceId = identity.DeviceId,
         TenantId = identity.TenantId,
+        InstallerKey = _accepted || string.IsNullOrWhiteSpace(identity.InstallerKey) ? null : identity.InstallerKey,
       };
 
       var privateKey = await EnsurePrivateKeyAsync(identity, cancellationToken);
@@ -62,6 +67,8 @@ public sealed class HeartbeatService(
         logger.LogWarning("The server refused the heartbeat: {Reason}", reply.Error);
         return;
       }
+
+      _accepted = true;
 
       if (receipt.DeviceId != identity.DeviceId || receipt.TenantId != identity.TenantId)
       {
