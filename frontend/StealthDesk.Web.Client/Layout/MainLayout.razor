@@ -19,6 +19,18 @@
                 <SdIcon Name="IconName.Device" />
                 Devices
             </NavLink>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.AgentInstall))">
+                <NavLink class="sd-nav-link" href="deploy">
+                    <SdIcon Name="IconName.Download" />
+                    Deploy
+                </NavLink>
+            </AuthorizeView>
+            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.InstallerKeyRead))">
+                <NavLink class="sd-nav-link" href="installer-keys">
+                    <SdIcon Name="IconName.Key" />
+                    Installer keys
+                </NavLink>
+            </AuthorizeView>
             <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersRead))">
                 <NavLink class="sd-nav-link" href="users">
                     <SdIcon Name="IconName.Users" />

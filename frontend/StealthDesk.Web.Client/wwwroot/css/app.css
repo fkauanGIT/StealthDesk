@@ -1341,6 +1341,19 @@ a.sd-btn:hover {
   max-width: 360px;
 }
 
+/* The Deploy page's steps: one field per row, never wider than a reading line. */
+.sd-deploy-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-3);
+  max-width: 520px;
+  margin-top: var(--sd-space-4);
+}
+
+.sd-secret + .sd-actions {
+  margin-top: var(--sd-space-4);
+}
+
 /* Long and unbroken: it wraps anywhere so the dialog never scrolls sideways. */
 .sd-secret {
   display: block;
