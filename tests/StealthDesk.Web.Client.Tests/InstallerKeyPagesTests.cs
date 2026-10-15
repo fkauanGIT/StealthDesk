@@ -6,6 +6,7 @@ using StealthDesk.Contracts.Accounts;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.InstallerKeys;
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.TenantSettings;
 using StealthDesk.Web.Client.Accounts;
 using StealthDesk.Web.Client.InstallerKeys;
 
@@ -23,6 +24,7 @@ public class InstallerKeyPagesTests : AccountTestContext
   {
     Services.AddSingleton<SessionGuard>();
     Services.AddSingleton<InstallerKeyApi>();
+    Services.AddSingleton<StealthDesk.Web.Client.TenantSettings.TenantSettingApi>();
     Services.AddSingleton<StealthDesk.Web.Client.Devices.DeviceStore>();
     Services.AddSingleton<TimeProvider>(new FixedClock(Now));
     JSInterop.Mode = JSRuntimeMode.Loose;
@@ -50,6 +52,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     var key = Key("Front desk", InstallerKeyType.UsageBased, allowed: 3, expires: Now.AddHours(24));
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
     Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions(null));
     var page = RenderPage<Pages.Deploy>();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
 
@@ -62,11 +65,11 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.WaitForAssertion(() => Assert.Equal(
       $@".\StealthDesk.Agent.exe run --server http://localhost --installer-key {key.Id}:shown-once",
       page.Find("[data-command]").TextContent));
-    Assert.Equal($"POST {Routes.InstallerKeys}", Api.Requests[2]);
-    Assert.Contains($"\"type\":{(int)InstallerKeyType.UsageBased}", Api.Bodies[2]);
-    Assert.Contains("\"name\":\"Front desk\"", Api.Bodies[2]);
-    Assert.Contains("\"allowedUses\":3", Api.Bodies[2]);
-    Assert.Contains("\"expiresAt\":null", Api.Bodies[2]);
+    Assert.Equal($"POST {Routes.InstallerKeys}", Api.Requests[3]);
+    Assert.Contains($"\"type\":{(int)InstallerKeyType.UsageBased}", Api.Bodies[3]);
+    Assert.Contains("\"name\":\"Front desk\"", Api.Bodies[3]);
+    Assert.Contains("\"allowedUses\":3", Api.Bodies[3]);
+    Assert.Contains("\"expiresAt\":null", Api.Bodies[3]);
     Assert.Equal($"{key.Id}:shown-once", page.Find("[data-key]").TextContent);
     Assert.Contains("3 agents in all", page.Markup);
 
@@ -86,6 +89,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     var joined = new DeviceSummary { Id = Guid.NewGuid(), Name = "FRONT-DESK", IsOnline = true, LastSeen = Now };
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
     Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions(null));
     var page = RenderPage<Pages.Deploy>();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
     Assert.Equal("Choose a key", page.Find(".sd-progress li.current").TextContent.Trim());
@@ -107,17 +111,40 @@ public class InstallerKeyPagesTests : AccountTestContext
   }
 
   [Fact]
+  public void Deploy_NamesTheInstanceTheTenantAsksFor_InBothCommands()
+  {
+    var key = Key("Lab");
+    Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
+    Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions("office"));
+    var page = RenderPage<Pages.Deploy>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
+    page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Persistent").Click();
+    Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
+    page.Find("form.sd-deploy-form").Submit();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-command]")));
+
+    Fill(page, "Device ID (optional)", "3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+
+    Assert.Equal($"GET {Routes.DeploymentOptions}", Api.Requests[2]);
+    Assert.EndsWith("--device-id 3f2504e0-4f89-11d3-9a0c-0305e82c3301 --instance office", page.Find("[data-command]").TextContent);
+    Assert.EndsWith("--instance office", page.Find("[data-source-command]").TextContent);
+  }
+
+  [Fact]
   public void Deploy_ATimeBasedKey_SendsWhenItExpires_AndAnUnusableNumberOfUsesIsCaught()
   {
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
     Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions(null));
     var page = RenderPage<Pages.Deploy>();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
 
     Fill(page, "Uses", "0");
     page.Find("form.sd-deploy-form").Submit();
     page.WaitForAssertion(() => Assert.Contains("at least 1", page.Markup));
-    Assert.Equal(2, Api.Requests.Count);
+    Assert.DoesNotContain(Api.Requests, x => x.StartsWith("POST", StringComparison.Ordinal));
 
     page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Time-based").Click();
     Fill(page, "Expires", "2026-10-20T09:30");
@@ -127,9 +154,9 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.Find("form.sd-deploy-form").Submit();
 
     page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-command]")));
-    Assert.Contains($"\"type\":{(int)InstallerKeyType.TimeBased}", Api.Bodies[2]);
-    Assert.Contains("\"expiresAt\":\"2026-10-20T09:30:00", Api.Bodies[2]);
-    Assert.Contains("\"allowedUses\":null", Api.Bodies[2]);
+    Assert.Contains($"\"type\":{(int)InstallerKeyType.TimeBased}", Api.Bodies[3]);
+    Assert.Contains("\"expiresAt\":\"2026-10-20T09:30:00", Api.Bodies[3]);
+    Assert.Contains("\"allowedUses\":null", Api.Bodies[3]);
   }
 
   [Fact]
@@ -138,6 +165,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     var key = Key("Lab");
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
     Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions(null));
     var page = RenderPage<Pages.Deploy>();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
     page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Persistent").Click();
@@ -160,6 +188,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     var other = Key("Office");
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead));
     Api.RespondWith(new InstallerKeyList { Items = [key, other] });
+    Api.RespondWith(new DeploymentOptions(null));
     var page = RenderPage<Pages.Deploy>();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("select")));
 

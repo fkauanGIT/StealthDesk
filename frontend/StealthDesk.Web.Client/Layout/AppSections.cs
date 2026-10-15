@@ -43,6 +43,7 @@ public static class AppSections
       new("Installer keys", "installer-keys", For(PermissionNames.InstallerKeyRead)),
     ]),
     new("Activity", IconName.History, [new("Activity", "authorization-logs", For(PermissionNames.TenantAuthorizationLogsRead))]),
+    new("Settings", IconName.Settings, [new("Tenant", "settings", For(PermissionNames.TenantSettingsRead))]),
     new("Server", IconName.Shield,
     [
       new("Server accounts", "server/service-accounts", For(PermissionNames.ServerServiceAccountsRead)),

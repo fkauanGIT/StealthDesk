@@ -30,6 +30,7 @@ builder.Services.AddScoped<StealthDesk.Web.Client.Permissions.PermissionApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.PersonalAccessTokens.PersonalAccessTokenApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.ServiceAccounts.ServiceAccountApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.InstallerKeys.InstallerKeyApi>();
+builder.Services.AddScoped<StealthDesk.Web.Client.TenantSettings.TenantSettingApi>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<DeviceStore>();

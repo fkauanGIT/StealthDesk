@@ -1,0 +1,178 @@
+@page "/settings"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantSettingsRead)]
+@using StealthDesk.Contracts.Agents
+@using StealthDesk.Contracts.TenantSettings
+@using StealthDesk.Web.Client.TenantSettings
+@inject TenantSettingApi Api
+@inject SessionGuard Session
+@inject NavigationManager Navigation
+
+<PageTitle>Settings · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Tenant settings</h1>
+</header>
+<p class="sd-muted sd-page-lead">How this tenant works. A setting left on the server's default follows it if the server changes it.</p>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (settings is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading settings..." />
+    }
+}
+else
+{
+    <SdCard Title="Agent instances">
+        <p class="sd-muted">
+            A machine can run agents of several servers side by side when each has its own instance name. Install
+            commands for this tenant can name one for you.
+        </p>
+        @if (!canWrite)
+        {
+            <p data-preview><strong>@Preview</strong></p>
+            <p class="sd-muted">Only someone who manages the tenant's settings can change this.</p>
+        }
+        else
+        {
+        <form class="sd-deploy-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <SdSegmented TValue="string" Label="Name an instance in install commands" Options="AppendOptions" @bind-Value="append" />
+            <SdTextField Label="Instance name" Autocomplete="off"
+                         Placeholder="@NamePlaceholder" Hint="Letters, digits, '-' and '_'. Leave it empty for the default." @bind-Value="name" />
+            <p class="sd-field-hint" data-preview>@Preview</p>
+            @if (saveError is not null)
+            {
+                <SdAlert>@saveError</SdAlert>
+            }
+            @if (saved)
+            {
+                <SdAlert Tone="Tone.Info">Settings saved.</SdAlert>
+            }
+            <div class="sd-actions">
+                <SdButton Type="submit" Disabled="busy">@(busy ? "Saving..." : "Save")</SdButton>
+            </div>
+        </form>
+        }
+    </SdCard>
+}
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.TenantSettingsWrite);
+
+    private IReadOnlyList<TenantSetting>? settings;
+    private string append = string.Empty;
+    private string? name;
+    private bool canWrite;
+    private bool busy;
+    private bool saved;
+    private string? error;
+    private string? saveError;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    [Inject]
+    private IAuthorizationService Authorization { get; set; } = default!;
+
+    private IReadOnlyList<(string, string)> AppendOptions =>
+    [
+        (string.Empty, $"Server default ({OnOff(Default(TenantSettingNames.AppendInstanceName))})"),
+        ("true", "On"),
+        ("false", "Off"),
+    ];
+
+    private string? HostName => InstanceNames.FromHost(new Uri(Navigation.BaseUri).Host);
+
+    private string NamePlaceholder => Default(TenantSettingNames.InstanceName) is { } fallback
+        ? $"Server default: {fallback}"
+        : $"Made from the server's address: {HostName}";
+
+    private string Preview
+    {
+        get
+        {
+            var on = (append.Length > 0 ? append : Default(TenantSettingNames.AppendInstanceName)) == "true";
+            var instance = string.IsNullOrWhiteSpace(name) ? Default(TenantSettingNames.InstanceName) ?? HostName : name.Trim();
+            return on && instance is not null
+                ? $"Install commands will add --instance {instance}."
+                : "Install commands won't name an instance.";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationState is not null)
+        {
+            canWrite = (await Authorization.AuthorizeAsync((await AuthenticationState).User, WritePolicy)).Succeeded;
+        }
+
+        var result = await Api.ListAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        error = result.Error;
+        Show(result.Value?.Items);
+    }
+
+    private async Task SaveAsync()
+    {
+        saveError = null;
+        saved = false;
+        if (InstanceNames.Validate(name) is { } invalid)
+        {
+            saveError = invalid;
+            return;
+        }
+
+        busy = true;
+        var result = await Api.SaveAsync(new Dictionary<string, string?>
+        {
+            [TenantSettingNames.AppendInstanceName] = append,
+            [TenantSettingNames.InstanceName] = name,
+        });
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            saveError = result.Error;
+            return;
+        }
+
+        Show(result.Value?.Items);
+        saved = true;
+    }
+
+    private void Show(IReadOnlyList<TenantSetting>? items)
+    {
+        settings = items;
+        append = Own(TenantSettingNames.AppendInstanceName) ?? string.Empty;
+        name = Own(TenantSettingNames.InstanceName);
+    }
+
+    private string? Own(string setting) => settings?.FirstOrDefault(x => x.Name == setting)?.Value;
+
+    private string? Default(string setting) => settings?.FirstOrDefault(x => x.Name == setting)?.DefaultValue;
+
+    private static string OnOff(string? value) => value == "true" ? "on" : "off";
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}
