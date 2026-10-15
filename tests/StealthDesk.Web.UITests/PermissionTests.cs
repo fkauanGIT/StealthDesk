@@ -18,7 +18,7 @@ public class PermissionTests
     })).Status);
 
     // A group with the technician in it.
-    await app.ClickLinkAsync("User groups");
+    await app.OpenAsync("People & access", "Groups");
     await app.ClickAsync("New group");
     await app.FillAsync("Name", "Support");
     await app.ClickAsync("Create");
@@ -47,12 +47,12 @@ public class PermissionTests
     await app.SignOutAsync();
 
     await app.SignInAsync("tech@example.com", Password);
-    await Expect(app.Page.GetByRole(AriaRole.Link, new() { Name = "Users" })).ToBeVisibleAsync();
+    await Expect(app.Area("People & access")).ToBeVisibleAsync();
     await app.SignOutAsync();
 
     // A direct deny wins over what the group gives.
     await app.SignInAsync("admin@example.com", Password);
-    await app.ClickLinkAsync("Permissions");
+    await app.OpenAsync("People & access", "Permissions");
     await app.Page.GetByLabel("User", new() { Exact = true }).SelectOptionAsync(new SelectOptionValue { Label = "tech@example.com" });
     await app.ClickAsync("Add permission");
     await Dialog(app).GetByLabel("Permission", new() { Exact = true }).SelectOptionAsync("tenant.users.read");
@@ -63,12 +63,12 @@ public class PermissionTests
 
     await app.SignInAsync("tech@example.com", Password);
     await Expect(app.Heading("Devices")).ToBeVisibleAsync();
-    await Expect(app.Page.GetByRole(AriaRole.Link, new() { Name = "Users" })).ToHaveCountAsync(0);
+    await Expect(app.Area("People & access")).ToHaveCountAsync(0);
     await app.SignOutAsync();
 
     // Nobody locks themselves out.
     await app.SignInAsync("admin@example.com", Password);
-    await app.ClickLinkAsync("Permissions");
+    await app.OpenAsync("People & access", "Permissions");
     await app.Page.GetByLabel("User", new() { Exact = true }).SelectOptionAsync(new SelectOptionValue { Label = "admin@example.com" });
     var own = app.Page.Locator("tr[data-assignment='tenant.permissions.write']");
     await own.Locator("input[type=checkbox]").First.CheckAsync();

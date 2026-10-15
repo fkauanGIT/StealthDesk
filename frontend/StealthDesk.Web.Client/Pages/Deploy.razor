@@ -1,4 +1,6 @@
+@page "/devices/add"
 @page "/deploy"
+@implements IDisposable
 @attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.AgentInstall)]
 @using StealthDesk.Contracts.InstallerKeys
 @using StealthDesk.Web.Client.InstallerKeys
@@ -8,12 +10,23 @@
 @inject IAuthorizationService Authorization
 @inject NavigationManager Navigation
 @inject TimeProvider Clock
+@inject DeviceStore Devices
 
-<PageTitle>Deploy · StealthDesk</PageTitle>
+<PageTitle>Add a device · StealthDesk</PageTitle>
 
+<a class="sd-back" href="">
+    <SdIcon Name="IconName.Back" Size="16" />
+    Devices
+</a>
 <header class="sd-page-header">
-    <h1 class="sd-page-title">Deploy an agent</h1>
+    <h1 class="sd-page-title">Add a device</h1>
 </header>
+
+<ol class="sd-progress" aria-label="Steps">
+    <li class="@StepClass(1)" aria-current="@(Step == 1 ? "step" : null)">Choose a key</li>
+    <li class="@StepClass(2)" aria-current="@(Step == 2 ? "step" : null)">Run the agent</li>
+    <li class="@StepClass(3)" aria-current="@(Step == 3 ? "step" : null)">Device joins</li>
+</ol>
 
 @if (error is not null)
 {
@@ -78,8 +91,8 @@
 }
 else
 {
-    <SdCard Title="Install the agent">
-        <p class="sd-muted">Run this in PowerShell on the machine, from the agent's folder. The device appears once it reports.</p>
+    <SdCard Title="Run the agent">
+        <p class="sd-muted">Run this in PowerShell on the machine, from the installed agent's folder.</p>
         @if (keyInUse is { } key)
         {
             <SdAlert Tone="Tone.Info">@Limits(key)</SdAlert>
@@ -93,12 +106,35 @@ else
             <SdButton Icon="IconName.Copy" Disabled="DeviceIdError is not null" OnClick="CopyAsync">@(copied ? "Copied" : "Copy command")</SdButton>
             <SdButton Variant="ButtonVariant.Secondary" OnClick="StartOver">Use another key</SdButton>
         </div>
+        <details class="sd-disclosure">
+            <summary>Running the agent from its source code instead</summary>
+            <p class="sd-muted">From the repository folder; development agents already point at the local server.</p>
+            <code class="sd-secret" data-source-command>@SourceCommand</code>
+        </details>
         @if (justCreated)
         {
             <SdAlert Tone="Tone.Warning">
                 Save the key now if you'll install more agents with it later: it is never shown again.
                 <code class="sd-secret" data-key>@fullKey</code>
             </SdAlert>
+        }
+    </SdCard>
+
+    <SdCard Title="Device joins">
+        @if (joined is { } device)
+        {
+            <div class="sd-joined" role="status" data-joined>
+                <DeviceStatus IsOnline="device.IsOnline" />
+                <span><strong>@device.Name</strong> joined.</span>
+                <a class="sd-btn sd-btn--primary" href="@($"devices/{device.Id}")">Open device</a>
+            </div>
+        }
+        else
+        {
+            <div class="sd-waiting" role="status" data-waiting>
+                <span class="sd-pulse" aria-hidden="true"></span>
+                Waiting for the device to report. It shows up here as soon as the agent connects.
+            </div>
         }
     </SdCard>
 }
@@ -129,6 +165,10 @@ else
     private InstallerKey? keyInUse;
     private string? deviceId;
     private bool canCreate;
+    private DeviceSummary? joined;
+    private HashSet<Guid> knownBefore = [];
+    private DateTimeOffset watchingSince;
+    private CancellationTokenSource? watching;
     private bool justCreated;
     private bool copied;
     private bool busy;
@@ -151,6 +191,14 @@ else
 
     private string? DeviceIdError =>
         string.IsNullOrWhiteSpace(deviceId) || Guid.TryParse(deviceId.Trim(), out var id) && id != Guid.Empty ? null : "Enter a device ID like 3f2504e0-4f89-11d3-9a0c-0305e82c3301, or leave it empty.";
+
+    private int Step => fullKey is null ? 1 : joined is null ? 2 : 3;
+
+    private string? StepClass(int step) => step < Step ? "done" : step == Step ? "current" : null;
+
+    private Guid? RequestedId => Guid.TryParse(deviceId?.Trim(), out var id) && id != Guid.Empty ? id : null;
+
+    private string SourceCommand => InstallerKeyText.SourceCommand(fullKey!, RequestedId);
 
     private string Command => InstallerKeyText.AgentCommand(
         new Uri(Navigation.BaseUri),
@@ -226,6 +274,7 @@ else
         }
 
         fullKey = created.FullKey;
+        await WatchAsync();
         keyInUse = created.Key;
         justCreated = true;
         copied = false;
@@ -256,6 +305,7 @@ else
         }
 
         fullKey = value;
+        _ = WatchAsync();
         keyInUse = key;
         justCreated = false;
         copied = false;
@@ -264,6 +314,8 @@ else
 
     private async Task StartOver()
     {
+        StopWatching();
+        joined = null;
         fullKey = null;
         keyInUse = null;
         deviceId = null;
@@ -293,6 +345,49 @@ else
     };
 
     private static string Date(DateTimeOffset? value) => value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "it is revoked";
+
+    // The page waits for the device the command brings: one it hadn't seen before, or the one asked for by id
+    // reporting after the command was shown. Asked every few seconds; new devices aren't pushed to a page yet.
+    private async Task WatchAsync()
+    {
+        StopWatching();
+        watching = new CancellationTokenSource();
+        var token = watching.Token;
+        watchingSince = Clock.GetUtcNow();
+        await Devices.LoadAsync();
+        knownBefore = [.. Devices.Devices?.Select(x => x.Id) ?? []];
+        _ = PollAsync(token);
+    }
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3), Clock);
+        try
+        {
+            while (joined is null && await timer.WaitForNextTickAsync(token))
+            {
+                await Devices.LoadAsync();
+                joined = Devices.Devices?.FirstOrDefault(x =>
+                    !knownBefore.Contains(x.Id) || (x.Id == RequestedId && x.IsOnline && x.LastSeen >= watchingSince));
+                if (joined is not null)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void StopWatching()
+    {
+        watching?.Cancel();
+        watching?.Dispose();
+        watching = null;
+    }
+
+    public void Dispose() => StopWatching();
 
     private bool Expired(bool sessionExpired)
     {

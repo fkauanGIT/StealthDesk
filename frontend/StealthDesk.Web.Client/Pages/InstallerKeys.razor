@@ -12,7 +12,7 @@
     <div class="sd-push">
         <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
         <AuthorizeView Policy="@InstallPolicy">
-            <a class="sd-btn sd-btn--primary" href="deploy">Deploy an agent</a>
+            <a class="sd-btn sd-btn--primary" href="devices/add">Add a device</a>
         </AuthorizeView>
     </div>
 </header>
@@ -35,7 +35,7 @@
 }
 else if (keys.Count == 0)
 {
-    <SdEmptyState Title="No installer keys">Create one on the Deploy page to install an agent.</SdEmptyState>
+    <SdEmptyState Title="No installer keys">Adding a device makes one.</SdEmptyState>
 }
 else
 {

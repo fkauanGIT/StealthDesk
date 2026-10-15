@@ -15,7 +15,7 @@ public class InviteTests
     await using var app = await UiApp.StartAsync();
     await app.RegisterAsync("admin@example.com", Password);
 
-    await app.ClickLinkAsync("Invites");
+    await app.OpenAsync("People & access", "Invites");
     await Expect(app.Heading("Invites")).ToBeVisibleAsync();
     await app.FillAsync("Invite a new user", "joao@example.com");
     await app.ClickAsync("Invite");
@@ -49,14 +49,13 @@ public class InviteTests
     await Expect(app.Heading("Devices")).ToBeVisibleAsync();
     await Expect(app.Page.Locator(".sd-user-name")).ToHaveTextAsync("joao@example.com");
     // The baseline only: nothing to administer yet.
-    await Expect(app.Page.GetByRole(AriaRole.Link, new() { Name = "Users" })).ToHaveCountAsync(0);
-    await Expect(app.Page.GetByRole(AriaRole.Link, new() { Name = "Invites" })).ToHaveCountAsync(0);
+    await Expect(app.Area("People & access")).ToHaveCountAsync(0);
     await app.SignOutAsync();
 
     await app.SignInAsync("admin@example.com", Password);
-    await app.ClickLinkAsync("Users");
+    await app.OpenAsync("People & access", "People");
     await Expect(app.Page.Locator("tr[data-user='joao@example.com']")).ToBeVisibleAsync();
-    await app.ClickLinkAsync("Invites");
+    await app.OpenAsync("People & access", "Invites");
     await Expect(app.Page.GetByText("No pending invites")).ToBeVisibleAsync();
   }
 

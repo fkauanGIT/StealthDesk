@@ -78,6 +78,22 @@ public sealed partial class UiApp : IAsyncDisposable
   public Task ClickLinkAsync(string link) =>
     Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = link, Exact = true }).ClickAsync();
 
+  /// <summary>An area of the main menu.</summary>
+  public ILocator Area(string name) =>
+    Page.GetByRole(AriaRole.Navigation, new PageGetByRoleOptions { Name = "Main" })
+      .GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = name, Exact = true });
+
+  /// <summary>Opens an area from the main menu and, when given, one of its tabs.</summary>
+  public async Task OpenAsync(string area, string? tab = null)
+  {
+    await Area(area).ClickAsync();
+    await Expect(Area(area)).ToHaveAttributeAsync("aria-current", "page");
+    if (tab is not null && await Page.Locator(".sd-tabs").CountAsync() > 0)
+    {
+      await Page.Locator(".sd-tabs").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = tab, Exact = true }).ClickAsync();
+    }
+  }
+
   public ILocator Heading(string text) =>
     Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = text, Exact = true });
 

@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using StealthDesk.Contracts;
 using StealthDesk.Contracts.Devices;
+using StealthDesk.Contracts.Permissions;
 using StealthDesk.Web.Client.Devices;
 using StealthDesk.Web.Client.Pages;
 
@@ -10,9 +12,12 @@ public class HomeTests : BunitContext
 {
   private readonly FakeApi _api = new();
   private readonly FakeLiveUpdates _live = new();
+  private readonly Bunit.TestDoubles.BunitAuthorizationContext _auth;
 
   public HomeTests()
   {
+    _auth = AddAuthorization();
+    _auth.SetAuthorized("tech@example.com");
     Services.AddSingleton(_api.CreateClient());
     Services.AddSingleton<DeviceStore>();
     Services.AddSingleton<ILiveUpdates>(_live);
@@ -38,6 +43,34 @@ public class HomeTests : BunitContext
 
     page.WaitForAssertion(() => Assert.Contains("No devices yet", page.Markup));
     Assert.Empty(page.FindAll("table"));
+  }
+
+  [Fact]
+  public void NoDevices_GuidesTheFirstSteps_ThisUserMayTake()
+  {
+    _auth.SetPolicies(PermissionPolicies.For(PermissionNames.AgentInstall), PermissionPolicies.For(PermissionNames.TenantUsersWrite));
+    _api.RespondWith(Array.Empty<DeviceSummary>());
+
+    var page = Render<Home>();
+
+    page.WaitForAssertion(() => Assert.Contains("Get started", page.Markup));
+    Assert.Equal(["Add your first device", "Bring in your team"], page.FindAll(".sd-first-steps-list strong").Select(x => x.TextContent));
+    Assert.Equal(2, page.FindAll("a[href='devices/add']").Count);
+    Assert.Single(page.FindAll("a[href=invites]"));
+    Assert.Empty(page.FindAll("a[href=permissions]"));
+  }
+
+  [Fact]
+  public void WithoutInstallingAgents_NoOneIsOfferedToAddADevice_ButCanStillInvite()
+  {
+    _auth.SetPolicies(PermissionPolicies.For(PermissionNames.TenantUsersWrite));
+    _api.RespondWith(Array.Empty<DeviceSummary>());
+
+    var page = Render<Home>();
+
+    page.WaitForAssertion(() => Assert.Contains("Ask someone who can install agents", page.Markup));
+    Assert.Empty(page.FindAll("a[href='devices/add']"));
+    Assert.Single(page.FindAll("a[href=invites]"));
   }
 
   [Fact]

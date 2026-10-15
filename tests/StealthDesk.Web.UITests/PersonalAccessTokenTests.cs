@@ -17,7 +17,7 @@ public class PersonalAccessTokenTests
     await using var app = await UiApp.StartAsync();
     await app.RegisterAsync("admin@example.com", Password);
 
-    await app.ClickLinkAsync("Access tokens");
+    await app.OpenAsync("Integrations", "Access tokens");
     await Expect(app.Heading("Access tokens")).ToBeVisibleAsync();
     await app.FillAsync("Token name", "Inventory script");
     await app.ClickAsync("Create token");
@@ -44,7 +44,7 @@ public class PersonalAccessTokenTests
     Assert.Equal(HttpStatusCode.OK, users.StatusCode);
     Assert.Equal(HttpStatusCode.Forbidden, assignments.StatusCode);
 
-    await app.ClickLinkAsync("Access tokens");
+    await app.OpenAsync("Integrations", "Access tokens");
     var row = app.Page.Locator("tr[data-token='Inventory script']");
     await Expect(row).ToContainTextAsync("1");
     await Expect(row.Locator("[data-cell=expires]")).Not.ToContainTextAsync("Never");

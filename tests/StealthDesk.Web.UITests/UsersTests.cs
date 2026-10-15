@@ -20,7 +20,7 @@ public class UsersTests
     });
     Assert.Equal(201, created.Status);
 
-    await app.ClickLinkAsync("Users");
+    await app.OpenAsync("People & access", "People");
     await Expect(app.Heading("Users")).ToBeVisibleAsync();
     await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(2);
     await Expect(Row(app, "admin@example.com").GetByRole(AriaRole.Button, new() { Name = "Delete" })).ToBeDisabledAsync();
