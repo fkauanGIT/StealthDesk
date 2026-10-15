@@ -41,6 +41,11 @@ public static class Routes
   public static string ServiceAccountCredential(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}";
   public static string ServiceAccountCredentialPurge(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}/purge";
 
+  /// <summary>A tenant's settings (<c>?tenantId=</c>), and what install commands use from them.</summary>
+  public const string TenantSettings = "/api/v1/tenant-settings";
+  public static string TenantSetting(string name) => $"{TenantSettings}/{Uri.EscapeDataString(name)}";
+  public const string DeploymentOptions = "/api/v1/deployment-options";
+
   /// <summary>A tenant's installer keys (<c>?tenantId=</c>), and the installs made with each.</summary>
   public const string InstallerKeys = "/api/v1/installer-keys";
   public static string InstallerKey(Guid id) => $"{InstallerKeys}/{id}";

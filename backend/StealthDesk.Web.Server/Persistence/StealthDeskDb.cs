@@ -23,6 +23,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<PersonalAccessTokenRecord> PersonalAccessTokens => Set<PersonalAccessTokenRecord>();
   public DbSet<InstallerKeyRecord> InstallerKeys => Set<InstallerKeyRecord>();
   public DbSet<InstallerKeyUsageRecord> InstallerKeyUsages => Set<InstallerKeyUsageRecord>();
+  public DbSet<TenantSettingRecord> TenantSettings => Set<TenantSettingRecord>();
 
   // No tenant filter: server accounts belong to no tenant, and every read names the tenant it wants.
   public DbSet<ServiceAccountRecord> ServiceAccounts => Set<ServiceAccountRecord>();
@@ -141,6 +142,16 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       credential.Property(x => x.HashedSecret).HasMaxLength(ServiceAccountCredentialRecord.HashMax);
       credential.HasOne(x => x.ServiceAccount).WithMany(x => x.Credentials).HasForeignKey(x => x.ServiceAccountId).OnDelete(DeleteBehavior.Cascade);
       credential.HasIndex(x => x.ServiceAccountId);
+    });
+
+    modelBuilder.Entity<TenantSettingRecord>(setting =>
+    {
+      setting.ToTable("tenant_settings");
+      setting.Property(x => x.Name).HasMaxLength(TenantSettingRecord.NameMax);
+      setting.Property(x => x.Value).HasMaxLength(TenantSettingRecord.ValueMax);
+      setting.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      setting.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+      setting.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });
 
     modelBuilder.Entity<InstallerKeyRecord>(key =>

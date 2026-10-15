@@ -147,6 +147,18 @@ dotnet user-secrets set "Accounts:GitHubClientSecret" "<client secret>" --projec
 A first sign-in with a provider follows the registration rules above, creating an account without a password.
 Providers can be linked and unlinked in the account settings, as long as the account keeps a way to sign in.
 
+### Tenant settings
+
+Each tenant can change a few settings on the **Settings** page (or `/api/v1/tenant-settings`); one it hasn't set
+follows the server's default, from the `TenantDefaults` section:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `AppendInstanceName` | `false` | Install commands name an agent instance (`--instance`), so agents of several servers can share a machine. |
+| `InstanceName` | empty | The instance they name; empty makes one from the server's address (`desk.example.com` becomes `desk-example-com`). |
+
+The server refuses to start with an instance name an agent wouldn't accept.
+
 ### Email
 
 Account emails (confirm the address, reset the password, confirm a new email) go out by SMTP, configured in the
@@ -216,6 +228,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
 | `/api/v1/devices` | HTTP | Lists the devices of the signed-in user's tenant; 401 when signed out. |
 | `/api/v1/devices/{id}` | HTTP | Returns one of the tenant's devices, or 404 for an unknown device or one of another tenant. |
+| `/api/v1/tenant-settings` | HTTP | The tenant's settings: list (`GET`), one (`GET /{name}`), change one (`PUT /{name}`) or several (`PUT`), back to the default (`DELETE /{name}`). |
+| `/api/v1/deployment-options` | HTTP | The agent instance install commands name for the tenant, for those who install agents. |
 | `/api/v1/installer-keys` | HTTP | The tenant's installer keys: list (`GET`), create (`POST`), rename (`PUT /{id}`), revoke (`DELETE /{id}`) and installs (`GET /{id}/usages`). Without `installer-key.manage-all`, only your own. |
 | `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
 | `/api/auth/register` | HTTP | Registers following the account rules above; 404 while registration is closed. |

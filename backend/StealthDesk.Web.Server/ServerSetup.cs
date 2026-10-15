@@ -8,7 +8,9 @@ using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
+using StealthDesk.Contracts.Agents;
 using StealthDesk.Web.Server.InstallerKeys;
+using StealthDesk.Web.Server.TenantSettings;
 using StealthDesk.Web.Server.Invites;
 using StealthDesk.Web.Server.UserGroups;
 using StealthDesk.Web.Server.Permissions;
@@ -48,6 +50,11 @@ public static class ServerSetup
     builder.Services.Configure<InstallerKeyOptions>(builder.Configuration.GetSection(InstallerKeyOptions.Section));
     builder.Services.AddSingleton<InstallerKeyUsageCleanup>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<InstallerKeyUsageCleanup>());
+    builder.Services.AddScoped<TenantSettingService>();
+    builder.Services.AddOptions<TenantDefaultsOptions>()
+      .Bind(builder.Configuration.GetSection(TenantDefaultsOptions.Section))
+      .Validate(x => InstanceNames.Validate(x.InstanceName) is null, $"{TenantDefaultsOptions.Section}:{nameof(TenantDefaultsOptions.InstanceName)} isn't a valid agent instance name.")
+      .ValidateOnStart();
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 
@@ -78,6 +85,7 @@ public static class ServerSetup
     app.MapPersonalAccessTokenEndpoints();
     app.MapServiceAccountEndpoints();
     app.MapInstallerKeyEndpoints();
+    app.MapTenantSettingEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);
