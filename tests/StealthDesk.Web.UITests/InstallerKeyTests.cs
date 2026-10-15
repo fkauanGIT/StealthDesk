@@ -16,8 +16,8 @@ public class InstallerKeyTests
     await using var app = await UiApp.StartAsync();
     await app.RegisterAsync("admin@example.com", Password);
 
-    await app.ClickLinkAsync("Deploy");
-    await Expect(app.Heading("Deploy an agent")).ToBeVisibleAsync();
+    await app.ClickLinkAsync("Add device");
+    await Expect(app.Heading("Add a device")).ToBeVisibleAsync();
     await app.FillAsync("Name (optional)", "Front desk");
     await app.FillAsync("Uses", "2");
     await app.ScreenshotAsync("deploy-new-key");

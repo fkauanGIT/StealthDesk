@@ -1123,6 +1123,176 @@ a.sd-btn:hover {
   font-size: var(--sd-text-md);
 }
 
+/* ---------- First steps ---------- */
+
+.sd-first-steps-list {
+  display: grid;
+  gap: var(--sd-space-4);
+  margin: var(--sd-space-5) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: first-step;
+}
+
+.sd-first-steps-list li {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: var(--sd-space-1) var(--sd-space-4);
+  padding: var(--sd-space-4);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  counter-increment: first-step;
+}
+
+.sd-first-steps-list li::before {
+  content: counter(first-step);
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sd-selected);
+  color: var(--sd-on-selected);
+  font-weight: 700;
+}
+
+.sd-first-steps-list li > strong {
+  grid-column: 2;
+}
+
+.sd-first-steps-list li > span {
+  grid-column: 2;
+}
+
+.sd-first-steps-list li > .sd-btn,
+.sd-first-steps-list li > span:last-child:not(:nth-of-type(1)) {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+@media (max-width: 640px) {
+  .sd-first-steps-list li {
+    grid-template-columns: 32px 1fr;
+  }
+
+  .sd-first-steps-list li > .sd-btn {
+    grid-column: 2;
+    grid-row: auto;
+    justify-self: start;
+  }
+}
+
+/* ---------- Add a device ---------- */
+
+/* Where the wizard is: done steps are checked off, the current one stands out. */
+.sd-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-2);
+  margin: 0 0 var(--sd-space-6);
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.sd-progress li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-2) var(--sd-space-4) var(--sd-space-2) var(--sd-space-2);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+  color: var(--sd-text-muted);
+  font-size: var(--sd-text-md);
+  counter-increment: step;
+}
+
+.sd-progress li::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sd-sunken);
+  font-weight: 700;
+  font-size: var(--sd-text-xs);
+}
+
+.sd-progress li.current {
+  border-color: var(--sd-selected);
+  background: var(--sd-selected);
+  color: var(--sd-on-selected);
+  font-weight: 600;
+}
+
+.sd-progress li.current::before {
+  background: var(--sd-on-selected);
+  color: var(--sd-selected);
+}
+
+.sd-progress li.done {
+  color: var(--sd-text);
+}
+
+.sd-progress li.done::before {
+  content: "\2713";
+  background: var(--sd-online-soft);
+  color: var(--sd-online-text);
+}
+
+.sd-content > .sd-card + .sd-card {
+  margin-top: var(--sd-space-5);
+}
+
+.sd-disclosure {
+  margin-top: var(--sd-space-5);
+}
+
+.sd-disclosure summary {
+  cursor: pointer;
+  color: var(--sd-text-secondary);
+  font-weight: 500;
+}
+
+.sd-waiting,
+.sd-joined {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+}
+
+.sd-waiting {
+  color: var(--sd-text-secondary);
+}
+
+.sd-joined .sd-btn {
+  margin-left: auto;
+}
+
+/* Breathes while the page waits; still for those who'd rather not see motion. */
+.sd-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sd-accent);
+  animation: sd-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sd-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-pulse {
+    animation: none;
+  }
+}
+
 /* ---------- Blazor host ---------- */
 
 #blazor-error-ui {

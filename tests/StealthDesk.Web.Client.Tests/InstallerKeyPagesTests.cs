@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using StealthDesk.Contracts;
 using StealthDesk.Contracts.Accounts;
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.InstallerKeys;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Web.Client.Accounts;
@@ -22,6 +23,7 @@ public class InstallerKeyPagesTests : AccountTestContext
   {
     Services.AddSingleton<SessionGuard>();
     Services.AddSingleton<InstallerKeyApi>();
+    Services.AddSingleton<StealthDesk.Web.Client.Devices.DeviceStore>();
     Services.AddSingleton<TimeProvider>(new FixedClock(Now));
     JSInterop.Mode = JSRuntimeMode.Loose;
   }
@@ -54,6 +56,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     Fill(page, "Name (optional)", "Front desk");
     Fill(page, "Uses", "3");
     Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:shown-once"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
     page.Find("form.sd-deploy-form").Submit();
 
     page.WaitForAssertion(() => Assert.Equal(
@@ -76,6 +79,34 @@ public class InstallerKeyPagesTests : AccountTestContext
   }
 
   [Fact]
+  public void AddingADevice_WaitsForIt_AndSaysWhenItJoins()
+  {
+    var key = Key("Lab");
+    var known = new DeviceSummary { Id = Guid.NewGuid(), Name = "OLD-PC", IsOnline = true, LastSeen = Now.AddDays(-1) };
+    var joined = new DeviceSummary { Id = Guid.NewGuid(), Name = "FRONT-DESK", IsOnline = true, LastSeen = Now };
+    Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
+    Api.RespondWith(new InstallerKeyList());
+    var page = RenderPage<Pages.Deploy>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
+    Assert.Equal("Choose a key", page.Find(".sd-progress li.current").TextContent.Trim());
+
+    page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Persistent").Click();
+    Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(new[] { known });
+    page.Find("form.sd-deploy-form").Submit();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-waiting]")));
+    Assert.Equal("Run the agent", page.Find(".sd-progress li.current").TextContent.Trim());
+    Assert.Equal($"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {key.Id}:x", page.Find("[data-source-command]").TextContent);
+
+    Api.RespondWith(new[] { known, joined });
+
+    page.WaitForAssertion(() => Assert.Contains("FRONT-DESK", page.Find("[data-joined]").TextContent), TimeSpan.FromSeconds(10));
+    Assert.Equal($"devices/{joined.Id}", page.Find("[data-joined] a").GetAttribute("href"));
+    Assert.Equal("Device joins", page.Find(".sd-progress li.current").TextContent.Trim());
+    Assert.Equal(2, page.FindAll(".sd-progress li.done").Count);
+  }
+
+  [Fact]
   public void Deploy_ATimeBasedKey_SendsWhenItExpires_AndAnUnusableNumberOfUsesIsCaught()
   {
     Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
@@ -92,6 +123,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     Fill(page, "Expires", "2026-10-20T09:30");
     var key = Key(null, InstallerKeyType.TimeBased, expires: Now.AddDays(6));
     Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
     page.Find("form.sd-deploy-form").Submit();
 
     page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-command]")));
@@ -110,6 +142,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
     page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Persistent").Click();
     Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
     page.Find("form.sd-deploy-form").Submit();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-command]")));
 
@@ -136,11 +169,12 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.WaitForAssertion(() => Assert.Contains("isn't the one selected", page.Markup));
 
     Fill(page, "Key or secret", "kept-secret");
+    Api.RespondWith(Array.Empty<DeviceSummary>());
     page.Find("form.sd-deploy-form").Submit();
 
     page.WaitForAssertion(() => Assert.EndsWith($"--installer-key {key.Id}:kept-secret", page.Find("[data-command]").TextContent));
     Assert.Empty(page.FindAll("[data-key]"));
-    Assert.Equal(2, Api.Requests.Count);
+    Assert.DoesNotContain(Api.Requests, x => x.StartsWith("POST", StringComparison.Ordinal));
   }
 
   [Fact]
@@ -168,7 +202,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     Assert.Contains("Never", persistent.TextContent);
     Assert.Equal("7", persistent.QuerySelector("[data-cell=uses]")!.TextContent.Trim());
     Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() is "Rename" or "Revoke");
-    Assert.Empty(page.FindAll("a[href=deploy]"));
+    Assert.Empty(page.FindAll("a[href='devices/add']"));
   }
 
   [Fact]
@@ -180,7 +214,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     Api.RespondWith(new InstallerKeyList { Items = [key] });
     var page = RenderPage<Pages.InstallerKeys>();
     page.WaitForAssertion(() => Assert.Single(page.FindAll("tbody tr")));
-    Assert.NotNull(page.Find("a[href=deploy]"));
+    Assert.NotNull(page.Find("a[href='devices/add']"));
 
     Api.RespondWith(new InstallerKeyUsageList { Items = [new InstallerKeyUsage(Guid.NewGuid(), device, Now.AddHours(-2), "203.0.113.7")] });
     Button(page, "Usages").Click();

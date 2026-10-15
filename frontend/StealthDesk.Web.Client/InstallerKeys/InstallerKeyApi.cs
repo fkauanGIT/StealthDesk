@@ -92,4 +92,11 @@ public static class InstallerKeyText
     var command = $".\\StealthDesk.Agent.exe run --server {server.GetLeftPart(UriPartial.Authority)} --installer-key {fullKey}";
     return deviceId is { } id && id != Guid.Empty ? $"{command} --device-id {id}" : command;
   }
+
+  /// <summary>The same, for an agent run from the repository; development agents already point at the local server.</summary>
+  public static string SourceCommand(string fullKey, Guid? deviceId)
+  {
+    var command = $"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {fullKey}";
+    return deviceId is { } id && id != Guid.Empty ? $"{command} --device-id {id}" : command;
+  }
 }

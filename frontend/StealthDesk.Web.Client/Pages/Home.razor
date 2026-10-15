@@ -15,6 +15,9 @@
         <input id="device-search" type="search" placeholder="Search by name, user or IP" value="@search"
                @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
     </div>
+    <AuthorizeView Policy="@InstallPolicy">
+        <a class="sd-btn sd-btn--primary" href="devices/add">Add device</a>
+    </AuthorizeView>
 </header>
 
 @if (Store.Error is not null)
@@ -31,7 +34,34 @@
 }
 else if (Store.Devices.Count == 0)
 {
-    <SdEmptyState Title="No devices yet">Run the agent on a machine, then refresh this page to see it here.</SdEmptyState>
+    <section class="sd-card sd-first-steps" aria-labelledby="first-steps">
+        <h2 id="first-steps" class="sd-card-title">Get started</h2>
+        <p class="sd-muted">No devices yet. A few steps and your team is working on its first machine.</p>
+        <ol class="sd-first-steps-list">
+            <li>
+                <strong>Add your first device</strong>
+                <span class="sd-muted">Make an installer key and run the agent on the machine. It shows up here the moment it connects.</span>
+                <AuthorizeView Policy="@InstallPolicy">
+                    <Authorized><a class="sd-btn sd-btn--primary" href="devices/add">Add a device</a></Authorized>
+                    <NotAuthorized><span class="sd-muted">Ask someone who can install agents to add one.</span></NotAuthorized>
+                </AuthorizeView>
+            </li>
+            <AuthorizeView Policy="@InvitePolicy">
+                <li>
+                    <strong>Bring in your team</strong>
+                    <span class="sd-muted">Invite the people who'll look after these devices.</span>
+                    <a class="sd-btn sd-btn--secondary" href="invites">Invite people</a>
+                </li>
+            </AuthorizeView>
+            <AuthorizeView Policy="@PermissionsPolicy">
+                <li>
+                    <strong>Decide who can do what</strong>
+                    <span class="sd-muted">Give each person the access their work needs, and no more.</span>
+                    <a class="sd-btn sd-btn--secondary" href="permissions">Review permissions</a>
+                </li>
+            </AuthorizeView>
+        </ol>
+    </section>
 }
 else
 {
@@ -112,6 +142,10 @@ else
 }
 
 @code {
+    private static readonly string InstallPolicy = PermissionPolicies.For(PermissionNames.AgentInstall);
+    private static readonly string InvitePolicy = PermissionPolicies.For(PermissionNames.TenantUsersWrite);
+    private static readonly string PermissionsPolicy = PermissionPolicies.For(PermissionNames.TenantPermissionsRead);
+
     private static readonly IReadOnlyList<(StatusFilter, string)> Filters =
         [(StatusFilter.All, "All"), (StatusFilter.Online, "Online"), (StatusFilter.Offline, "Offline")];
 
