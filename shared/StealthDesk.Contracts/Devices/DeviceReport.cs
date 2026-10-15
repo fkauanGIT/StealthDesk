@@ -36,4 +36,10 @@ public sealed record DeviceReport
   public string LocalIpV4 { get; init; } = string.Empty;
   public string LocalIpV6 { get; init; } = string.Empty;
   public IReadOnlyList<DiskInfo> Disks { get; init; } = [];
+
+  /// <summary>
+  /// <c>{id}:{secret}</c> of the installer key that lets a new device join, or a reinstalled one bring a new signing
+  /// key. Sent until the server accepts a report; the server never stores it.
+  /// </summary>
+  public string? InstallerKey { get; init; }
 }

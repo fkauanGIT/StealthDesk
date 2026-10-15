@@ -1,0 +1,260 @@
+@page "/installer-keys"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.InstallerKeyRead)]
+@using StealthDesk.Contracts.InstallerKeys
+@using StealthDesk.Web.Client.InstallerKeys
+@inject InstallerKeyApi Api
+@inject SessionGuard Session
+
+<PageTitle>Installer keys · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Installer keys</h1>
+    <div class="sd-push">
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+        <AuthorizeView Policy="@InstallPolicy">
+            <a class="sd-btn sd-btn--primary" href="deploy">Deploy an agent</a>
+        </AuthorizeView>
+    </div>
+</header>
+<SdAlert Tone="Tone.Info">
+    New agents join with a key, and the device belongs to the key's tenant. Revoking a key stops new installs only:
+    devices that already joined keep working. Spent and expired keys leave the list.
+</SdAlert>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (keys is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading keys..." />
+    }
+}
+else if (keys.Count == 0)
+{
+    <SdEmptyState Title="No installer keys">Create one on the Deploy page to install an agent.</SdEmptyState>
+}
+else
+{
+    <div class="sd-table-wrap">
+        <table class="sd-table" style="min-width: 820px">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Created by</th>
+                    <th>Created</th>
+                    <th>Uses</th>
+                    <th>Expires</th>
+                    <th><span class="sd-visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var key in keys)
+                {
+                    <tr @key="key.Id" data-key="@key.Name">
+                        <td>
+                            <span>@(key.Name ?? "Unnamed")</span>
+                            <span class="sd-cell-sub sd-mono">@key.Id</span>
+                        </td>
+                        <td><SdStatus Tone="@(key.Type == InstallerKeyType.Persistent ? Tone.Warning : Tone.Info)" Text="@InstallerKeyText.Type(key.Type)" /></td>
+                        <td>@(key.CreatorName ?? "Unknown")</td>
+                        <td class="sd-muted" style="white-space: nowrap">@Date(key.CreatedAt)</td>
+                        <td data-cell="uses">@(key.AllowedUses is { } allowed ? $"{key.UsageCount} of {allowed}" : key.UsageCount.ToString())</td>
+                        <td class="sd-muted" style="white-space: nowrap">@(key.ExpiresAt is { } expires ? Date(expires) : "Never")</td>
+                        <td class="sd-row-actions">
+                            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => ShowUsagesAsync(key)">Usages</SdButton>
+                            <AuthorizeView Policy="@WritePolicy">
+                                <SdButton Variant="ButtonVariant.Ghost" OnClick="() => StartRename(key)">Rename</SdButton>
+                                <SdButton Variant="ButtonVariant.Ghost" OnClick="() => revoking = key">Revoke</SdButton>
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<SdDialog Open="viewing is not null" Title="@($"Installs with {viewing?.Name ?? "this key"}")" OnClose="() => viewing = null">
+    <ChildContent>
+        @if (usages is null)
+        {
+            <SdLoading Text="Loading installs..." />
+        }
+        else if (usages.Count == 0)
+        {
+            <p class="sd-muted">No agent has been installed with this key yet.</p>
+        }
+        else
+        {
+            <table class="sd-table" data-usages>
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>When</th>
+                        <th>From</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var usage in usages)
+                    {
+                        <tr @key="usage.Id">
+                            <td><a class="sd-mono" href="@($"devices/{usage.DeviceId}")">@usage.DeviceId</a></td>
+                            <td class="sd-muted" style="white-space: nowrap">@Date(usage.UsedAt)</td>
+                            <td class="sd-mono">@(usage.RemoteAddress ?? "Unknown")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </ChildContent>
+    <Footer>
+        <SdButton OnClick="() => viewing = null">Close</SdButton>
+    </Footer>
+</SdDialog>
+
+<SdDialog Open="renaming is not null" Title="Rename key" OnClose="() => renaming = null">
+    <ChildContent>
+        <SdTextField Label="Name" Hint="Leave it empty to remove the name." Autocomplete="off" @bind-Value="newName" Error="@renameError" />
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => renaming = null">Cancel</SdButton>
+        <SdButton Disabled="busy" OnClick="RenameAsync">Rename</SdButton>
+    </Footer>
+</SdDialog>
+
+<SdDialog Open="revoking is not null" Title="Revoke this key?" OnClose="() => revoking = null">
+    <ChildContent>
+        <p class="sd-muted">
+            Agents can no longer join with <strong>@(revoking?.Name ?? "this key")</strong>, and its install history is
+            removed. Devices that already joined keep working.
+        </p>
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => revoking = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="RevokeAsync">Revoke</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.InstallerKeyWrite);
+    private static readonly string InstallPolicy = PermissionPolicies.For(PermissionNames.AgentInstall);
+
+    private IReadOnlyList<InstallerKey>? keys;
+    private InstallerKey? viewing;
+    private IReadOnlyList<InstallerKeyUsage>? usages;
+    private InstallerKey? renaming;
+    private InstallerKey? revoking;
+    private string? newName;
+    private string? error;
+    private string? renameError;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.ListAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        keys = result.Value?.Items;
+        error = result.Error;
+    }
+
+    private async Task ShowUsagesAsync(InstallerKey key)
+    {
+        viewing = key;
+        usages = null;
+        var result = await Api.UsagesAsync(key.Id);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            viewing = null;
+            error = result.Error;
+            return;
+        }
+
+        usages = result.Value?.Items ?? [];
+    }
+
+    private void StartRename(InstallerKey key)
+    {
+        renaming = key;
+        newName = key.Name;
+        renameError = null;
+    }
+
+    private async Task RenameAsync()
+    {
+        if (renaming is not { } key)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.RenameAsync(key.Id, string.IsNullOrWhiteSpace(newName) ? null : newName.Trim());
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            renameError = result.Error;
+            return;
+        }
+
+        renaming = null;
+        await LoadAsync();
+    }
+
+    private async Task RevokeAsync()
+    {
+        if (revoking is not { } key)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteAsync(key.Id);
+        busy = false;
+        revoking = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private static string Date(DateTimeOffset value) => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

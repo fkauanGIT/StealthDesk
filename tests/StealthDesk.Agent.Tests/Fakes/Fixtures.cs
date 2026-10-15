@@ -25,6 +25,7 @@ internal sealed class TempAgentFolder : IDisposable
       .AddInMemoryCollection(new Dictionary<string, string?>
       {
         ["Agent:ServerUrl"] = (defaults?.ServerUrl ?? new Uri("http://server.test")).ToString(),
+        ["Agent:InstallerKey"] = defaults?.InstallerKey,
       })
       .AddJsonFile(Paths.SettingsFile, optional: true)
       .Build();

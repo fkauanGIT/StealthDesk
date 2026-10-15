@@ -5,15 +5,12 @@ namespace StealthDesk.Web.Server.Devices;
 /// <summary>Stores what agents report and tracks which devices are connected.</summary>
 public interface IDeviceRegistry
 {
-  /// <summary>The key a device registered with, or null if the device is unknown.</summary>
-  Task<string?> FindPublicKeyAsync(Guid deviceId, CancellationToken cancellationToken = default);
-
-  /// <summary>Tenant of a known device, or null if the device is unknown.</summary>
-  Task<Guid?> FindTenantAsync(Guid deviceId, CancellationToken cancellationToken = default);
+  /// <summary>A device of any tenant, as stored, or null if the device is unknown.</summary>
+  Task<DeviceRecord?> FindAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
   /// <summary>
-  /// Saves the report and marks the device online. An unknown device is only created when
-  /// <paramref name="allowNew"/> is true; a known device can't be moved to another tenant.
+  /// Saves the report and marks the device online, signing with <paramref name="publicKey"/> from now on. An unknown
+  /// device is only created when <paramref name="allowNew"/> is true; a known device can't be moved to another tenant.
   /// </summary>
   Task<Outcome<DeviceRecord>> SaveReportAsync(
     DeviceReport report,
@@ -32,22 +29,8 @@ public interface IDeviceRegistry
 
 public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> logger) : IDeviceRegistry
 {
-  public Task<string?> FindPublicKeyAsync(Guid deviceId, CancellationToken cancellationToken = default)
-  {
-    return db.Devices
-      .Where(x => x.Id == deviceId)
-      .Select(x => x.PublicKey)
-      .FirstOrDefaultAsync(cancellationToken);
-  }
-
-  public async Task<Guid?> FindTenantAsync(Guid deviceId, CancellationToken cancellationToken = default)
-  {
-    var tenant = await db.Devices
-      .Where(x => x.Id == deviceId)
-      .Select(x => (Guid?)x.TenantId)
-      .FirstOrDefaultAsync(cancellationToken);
-    return tenant;
-  }
+  public Task<DeviceRecord?> FindAsync(Guid deviceId, CancellationToken cancellationToken = default) =>
+    db.Devices.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(x => x.Id == deviceId, cancellationToken);
 
   public async Task<Outcome<DeviceRecord>> SaveReportAsync(
     DeviceReport report,
@@ -76,6 +59,8 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
       return Outcome.Failure<DeviceRecord>("The device belongs to another tenant.");
     }
 
+    // A reinstalled agent brings a new key; the gateway only passes one it accepted.
+    device.PublicKey = publicKey;
     CopyReport(report, device);
     device.ConnectionId = connection.ConnectionId;
     device.IsOnline = true;

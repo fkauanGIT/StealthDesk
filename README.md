@@ -123,7 +123,7 @@ Account rules come from the `Accounts` section of `appsettings.json`:
 
 A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
 tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
-Agents can only join once that first tenant exists.
+Agents join a tenant with one of its installer keys (see [Running the Agent](#running-the-agent)).
 
 Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
 passwords in a row lock the account for five minutes.
@@ -165,18 +165,25 @@ to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
 
 ## Running the Agent
 
-The agent runs on Windows. Agents join a tenant, so on a new server create the first account before starting one:
-open `http://localhost:5099`, choose **Create an account** on the sign-in page and register. You become the server
-administrator and land on the device list.
+The agent runs on Windows. A new device joins a tenant with an installer key, so on a new server create the first
+account before starting one: open `http://localhost:5099`, choose **Create an account** on the sign-in page and
+register. You become the server administrator and land on the device list.
 
-With the server running (see above), open a second terminal and start the agent:
+Open **Deploy**, create a key and copy the command it shows. From a second terminal, run the agent with that key:
 
 ```
-dotnet run --project agent/StealthDesk.Agent -- run
+dotnet run --project agent/StealthDesk.Agent -- run --installer-key <key>
 ```
 
 In a few seconds the machine appears in the list as online, without refreshing the page. Stop the agent with
-`Ctrl+C` and it turns offline; start it again and the same device comes back online.
+`Ctrl+C` and it turns offline; start it again, with or without the key, and the same device comes back online.
+
+The key is only needed until the device joins: from then on the device signs its reports with its own key, and
+revoking the installer key doesn't affect it. Keys are usage-based (a number of installs within 24 hours),
+time-based (until they expire) or persistent (until revoked), and **Installer keys** lists each key's installs.
+Installs are kept for `InstallerKeys:UsageHistoryDays` (90 by default; zero keeps them all). A reinstalled agent
+brings a new signing key: the server accepts it for a known device only with a key whose creator has `agent.install`
+there, and `--device-id <id>` names the device to take back.
 
 Scripts can do the same through the API (in PowerShell):
 
@@ -194,6 +201,7 @@ accepted report. Both are saved and reused on every later run: that is the devic
 | What | Where |
 |---|---|
 | Server address | `Agent:ServerUrl` in [`agent/StealthDesk.Agent/appsettings.json`](./agent/StealthDesk.Agent/appsettings.json), or `--server <url>` |
+| Installer key (never saved by the agent) | `Agent:InstallerKey`, or `--installer-key <key>` (`-k`) |
 | Identity (device id, tenant, private key) | `C:\ProgramData\StealthDesk\Debug\default\agent-settings.json` |
 | Logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\logs\` |
 
@@ -208,6 +216,7 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
 | `/api/v1/devices` | HTTP | Lists the devices of the signed-in user's tenant; 401 when signed out. |
 | `/api/v1/devices/{id}` | HTTP | Returns one of the tenant's devices, or 404 for an unknown device or one of another tenant. |
+| `/api/v1/installer-keys` | HTTP | The tenant's installer keys: list (`GET`), create (`POST`), rename (`PUT /{id}`), revoke (`DELETE /{id}`) and installs (`GET /{id}/usages`). Without `installer-key.manage-all`, only your own. |
 | `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
 | `/api/auth/register` | HTTP | Registers following the account rules above; 404 while registration is closed. |
 | `/api/auth/settings` | HTTP | Whether registration is open, for the sign-up page. |

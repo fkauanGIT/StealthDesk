@@ -104,6 +104,38 @@ public sealed class HeartbeatServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task InstallerKey_GoesWithEveryReport_UntilOneIsAccepted()
+  {
+    var answers = new Queue<GatewayReply<ReportReceipt>>([
+      GatewayReply.Refuse<ReportReceipt>("No tenant available."),
+      GatewayReply.Accept(new ReportReceipt(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)),
+    ]);
+    _channel.Answer = _ => answers.TryDequeue(out var answer) ? answer : GatewayReply.Accept(new ReportReceipt(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
+    using var heartbeat = Create(_folder.OpenStore(new AgentSettings { InstallerKey = "key-id:secret" }));
+
+    for (var i = 0; i < 3; i++)
+    {
+      await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+    }
+
+    Assert.Equal(["key-id:secret", "key-id:secret", null], _channel.Received.Select(x => x.Payload.InstallerKey));
+  }
+
+  [Fact]
+  public async Task InstallerKey_IsNeverWrittenToTheSettingsFile()
+  {
+    var store = _folder.OpenStore(new AgentSettings { InstallerKey = "key-id:secret" });
+    using var heartbeat = Create(store);
+
+    await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+
+    Assert.Equal("key-id:secret", store.Current.InstallerKey);
+    Assert.False(string.IsNullOrEmpty(store.Current.PrivateKey));
+    Assert.DoesNotContain("secret", await File.ReadAllTextAsync(_folder.Paths.SettingsFile, TestContext.Current.CancellationToken));
+    Assert.Null(_folder.OpenStore().Current.InstallerKey);
+  }
+
+  [Fact]
   public async Task WhileDisconnected_NothingIsSent()
   {
     _channel.State = HubConnectionState.Reconnecting;

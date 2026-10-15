@@ -56,25 +56,23 @@ public class ServerStartupTests
   }
 
   [Fact]
-  public void DevelopmentSettings_AllowSelfRegistrationWithAOneMinuteClockTolerance()
+  public void DevelopmentSettings_AllowAOneMinuteClockTolerance()
   {
     using var server = ServerHost.InMemory();
 
     var options = server.Services.GetRequiredService<IOptions<GatewayOptions>>().Value;
 
-    Assert.True(options.AllowSelfRegistration);
     Assert.Equal(TimeSpan.FromMinutes(1), options.ClockTolerance);
   }
 
   [Fact]
-  public void MissingGatewaySection_TurnsBothRulesOff()
+  public void MissingGatewaySection_TurnsTheClockCheckOff()
   {
     var options = new ConfigurationBuilder().Build()
       .GetSection(GatewayOptions.Section)
       .Get<GatewayOptions>() ?? new GatewayOptions();
 
     Assert.Null(options.ClockTolerance);
-    Assert.False(options.AllowSelfRegistration);
   }
 
   [Fact]

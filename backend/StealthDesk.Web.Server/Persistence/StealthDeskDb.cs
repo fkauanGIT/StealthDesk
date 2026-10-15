@@ -21,6 +21,8 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
   public DbSet<TenantInviteRecord> TenantInvites => Set<TenantInviteRecord>();
   public DbSet<PersonalAccessTokenRecord> PersonalAccessTokens => Set<PersonalAccessTokenRecord>();
+  public DbSet<InstallerKeyRecord> InstallerKeys => Set<InstallerKeyRecord>();
+  public DbSet<InstallerKeyUsageRecord> InstallerKeyUsages => Set<InstallerKeyUsageRecord>();
 
   // No tenant filter: server accounts belong to no tenant, and every read names the tenant it wants.
   public DbSet<ServiceAccountRecord> ServiceAccounts => Set<ServiceAccountRecord>();
@@ -139,6 +141,28 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       credential.Property(x => x.HashedSecret).HasMaxLength(ServiceAccountCredentialRecord.HashMax);
       credential.HasOne(x => x.ServiceAccount).WithMany(x => x.Credentials).HasForeignKey(x => x.ServiceAccountId).OnDelete(DeleteBehavior.Cascade);
       credential.HasIndex(x => x.ServiceAccountId);
+    });
+
+    modelBuilder.Entity<InstallerKeyRecord>(key =>
+    {
+      key.ToTable("installer_keys");
+      key.Property(x => x.Name).HasMaxLength(InstallerKeyRecord.NameMax);
+      key.Property(x => x.HashedSecret).HasMaxLength(InstallerKeyRecord.HashMax);
+      key.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+      key.Property(x => x.CreatorKind).HasConversion<string>().HasMaxLength(30);
+      key.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      key.HasIndex(x => x.TenantId);
+      key.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
+    });
+
+    modelBuilder.Entity<InstallerKeyUsageRecord>(usage =>
+    {
+      usage.ToTable("installer_key_usages");
+      usage.Property(x => x.RemoteAddress).HasMaxLength(InstallerKeyUsageRecord.RemoteAddressMax);
+      usage.HasOne(x => x.InstallerKey).WithMany(x => x.Usages).HasForeignKey(x => x.InstallerKeyId).OnDelete(DeleteBehavior.Cascade);
+      usage.HasIndex(x => x.InstallerKeyId);
+      usage.HasIndex(x => x.UsedAt);
+      usage.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });
 
     modelBuilder.Entity<TenantInviteRecord>(invite =>

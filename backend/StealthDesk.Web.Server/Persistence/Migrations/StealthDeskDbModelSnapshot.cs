@@ -303,6 +303,84 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("devices", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AllowedUses")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreatorKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HashedSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("installer_keys", (string)null);
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InstallerKeyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RemoteAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstallerKeyId");
+
+                    b.HasIndex("UsedAt");
+
+                    b.ToTable("installer_key_usages", (string)null);
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.PermissionAssignmentRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -812,6 +890,28 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyUsageRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", "InstallerKey")
+                        .WithMany("Usages")
+                        .HasForeignKey("InstallerKeyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InstallerKey");
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.PersonalAccessTokenRecord", b =>
                 {
                     b.HasOne("StealthDesk.Web.Server.Persistence.UserRecord", "User")
@@ -894,6 +994,11 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", b =>
+                {
+                    b.Navigation("Usages");
                 });
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountRecord", b =>

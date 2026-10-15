@@ -9,28 +9,34 @@ using StealthDesk.Realtime;
 namespace StealthDesk.Server.Tests.Infrastructure;
 
 /// <summary>
-/// A minimal agent for tests: its own key pair and a realtime channel to the test server
-/// (MessagePack over long polling, because the in-memory server can't upgrade to WebSockets).
+/// A minimal agent for tests: its own key pair, an installer key of the server's tenant that goes with its reports
+/// unless a report names its own, and a realtime channel to the test server (MessagePack over long polling, because
+/// the in-memory server can't upgrade to WebSockets).
 /// </summary>
 public sealed class TestAgent : IAsyncDisposable
 {
   private readonly ServiceProvider _services;
 
-  private TestAgent(ServiceProvider services, IRealtimeChannel<IAgentGateway> channel, SigningKeys keys)
+  private TestAgent(ServiceProvider services, IRealtimeChannel<IAgentGateway> channel, SigningKeys keys, string? installerKey)
   {
     _services = services;
     Channel = channel;
     Keys = keys;
+    InstallerKey = installerKey;
   }
 
   public IRealtimeChannel<IAgentGateway> Channel { get; }
   public SigningKeys Keys { get; }
   public MessageSigner Signer { get; } = new(TimeProvider.System);
 
-  public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null)
+  /// <summary>A persistent key of the server's tenant; none for an agent that was given no key.</summary>
+  public string? InstallerKey { get; }
+
+  /// <param name="withInstallerKey">False for an agent that was given no installer key.</param>
+  public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null, bool withInstallerKey = true)
   {
-    // Self-registration needs a tenant to join, as a server has once its first user registered.
-    await TestTenants.EnsureAsync(server);
+    // A key belongs to a tenant, as a server has once its first user registered.
+    var installerKey = withInstallerKey ? await TestInstallerKeys.CreateAsync(server, await TestTenants.EnsureAsync(server)) : null;
 
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
@@ -48,11 +54,15 @@ public sealed class TestAgent : IAsyncDisposable
     }, TestContext.Current.CancellationToken);
 
     Assert.True(opened, "The test agent could not reach the gateway.");
-    return new TestAgent(services, channel, keys ?? new MessageSigner(TimeProvider.System).CreateKeys());
+    return new TestAgent(services, channel, keys ?? new MessageSigner(TimeProvider.System).CreateKeys(), installerKey);
   }
 
   public Task<GatewayReply<ReportReceipt>> ReportAsync(DeviceReport report) =>
-    Channel.Server.SubmitReport(Signer.Sign(report, Keys.PrivateKey));
+    Channel.Server.SubmitReport(Sign(report));
+
+  /// <summary>The report signed with this agent's key, carrying its installer key unless it names one.</summary>
+  public SignedEnvelope<DeviceReport> Sign(DeviceReport report) =>
+    Signer.Sign(report with { InstallerKey = report.InstallerKey ?? InstallerKey }, Keys.PrivateKey);
 
   public Task<GatewayReply<ReportReceipt>> SubmitAsync(SignedEnvelope<DeviceReport> envelope) =>
     Channel.Server.SubmitReport(envelope);

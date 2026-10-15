@@ -8,7 +8,7 @@ using StealthDesk.Branding;
 namespace StealthDesk.Agent;
 
 /// <summary>
-/// <c>stealthdesk-agent run [--instance name] [--server url]</c>. The executable only parses the command line;
+/// <c>stealthdesk-agent run [--instance name] [--server url] [--installer-key id:secret] [--device-id guid]</c>. The executable only parses the command line;
 /// the behavior lives in the libraries so it can be tested without starting a process.
 /// </summary>
 internal static class AgentCommandLine
@@ -32,10 +32,22 @@ internal static class AgentCommandLine
       Description = "Server address, e.g. http://localhost:5099. Overrides the configured one.",
     };
 
+    var installerKey = new Option<string?>("--installer-key", "-k")
+    {
+      Description = "Installer key ({id}:{secret}) that lets this device join the server. Only needed until it joins.",
+    };
+
+    var deviceId = new Option<Guid?>("--device-id")
+    {
+      Description = "Id for a new device. By default the server picks one; a device that already joined keeps its own.",
+    };
+
     var run = new Command("run", $"Connect to the {Brand.Name} server and keep reporting this device.")
     {
       instance,
       server,
+      installerKey,
+      deviceId,
     };
 
     run.SetAction(async (parse, cancellationToken) =>
@@ -47,7 +59,11 @@ internal static class AgentCommandLine
       }
 
       var builder = Host.CreateApplicationBuilder(args);
-      builder.AddStealthDeskAgent(new AgentStartup(parse.GetValue(instance), parse.GetValue(server)));
+      builder.AddStealthDeskAgent(new AgentStartup(
+        parse.GetValue(instance),
+        parse.GetValue(server),
+        InstallerKey: parse.GetValue(installerKey),
+        DeviceId: parse.GetValue(deviceId)));
       builder.Services.AddWindowsInventory();
 
       using var host = builder.Build();

@@ -1,0 +1,306 @@
+@page "/deploy"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.AgentInstall)]
+@using StealthDesk.Contracts.InstallerKeys
+@using StealthDesk.Web.Client.InstallerKeys
+@inject InstallerKeyApi Api
+@inject SessionGuard Session
+@inject IJSRuntime Js
+@inject IAuthorizationService Authorization
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+
+<PageTitle>Deploy · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Deploy an agent</h1>
+</header>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (fullKey is null)
+{
+    <SdCard Title="Installer key">
+        <p class="sd-muted">An agent joins with an installer key, and the device belongs to this tenant. Create a key or use one you kept.</p>
+        @if (canCreate)
+        {
+            <SdSegmented TValue="KeySource" Label="Key" Options="Sources" @bind-Value="source" />
+        }
+
+        @if (source == KeySource.New && canCreate)
+        {
+            <form class="sd-deploy-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                <SdSegmented TValue="InstallerKeyType" Label="Type" Options="Types" @bind-Value="type" />
+                <p class="sd-field-hint" data-type-hint>@TypeHint</p>
+                <SdTextField Label="Name (optional)" Placeholder="Where it's used, e.g. Front desk PCs" Autocomplete="off" @bind-Value="name" />
+                @if (type == InstallerKeyType.UsageBased)
+                {
+                    <SdTextField Label="Uses" Type="number" min="1" @bind-Value="uses" />
+                }
+                else if (type == InstallerKeyType.TimeBased)
+                {
+                    <SdTextField Label="Expires" Type="datetime-local" @bind-Value="expires" />
+                }
+                @if (createError is not null)
+                {
+                    <SdAlert>@createError</SdAlert>
+                }
+                <div>
+                    <SdButton Type="submit" Icon="IconName.Key" Disabled="busy">@(busy ? "Creating..." : "Create key")</SdButton>
+                </div>
+            </form>
+        }
+        else
+        {
+            <form class="sd-deploy-form" @onsubmit="UseExisting" @onsubmit:preventDefault>
+                @if (existing is null)
+                {
+                    <SdLoading Text="Loading keys..." />
+                }
+                else if (existing.Count == 0)
+                {
+                    <p class="sd-muted">There are no keys you can use. @(canCreate ? "Create a new one instead." : "Ask someone who manages installer keys for one.")</p>
+                }
+                else
+                {
+                    <SdSelect Label="Key" Options="ExistingOptions" @bind-Value="selected" />
+                    <SdTextField Label="Key or secret" Type="password" Autocomplete="off"
+                                 Hint="The key shown when it was created; it is never shown again." @bind-Value="pasted" Error="@pasteError" />
+                    <div>
+                        <SdButton Type="submit" Icon="IconName.Key">Use this key</SdButton>
+                    </div>
+                }
+            </form>
+        }
+    </SdCard>
+}
+else
+{
+    <SdCard Title="Install the agent">
+        <p class="sd-muted">Run this in PowerShell on the machine, from the agent's folder. The device appears once it reports.</p>
+        @if (keyInUse is { } key)
+        {
+            <SdAlert Tone="Tone.Info">@Limits(key)</SdAlert>
+        }
+        <div class="sd-deploy-form">
+            <SdTextField Label="Device ID (optional)" Placeholder="Leave empty for a new random ID" Autocomplete="off"
+                         Hint="Each install needs its own ID; give one only to reinstall a known device." @bind-Value="deviceId" Error="@DeviceIdError" />
+        </div>
+        <code class="sd-secret" data-command>@Command</code>
+        <div class="sd-actions">
+            <SdButton Icon="IconName.Copy" Disabled="DeviceIdError is not null" OnClick="CopyAsync">@(copied ? "Copied" : "Copy command")</SdButton>
+            <SdButton Variant="ButtonVariant.Secondary" OnClick="StartOver">Use another key</SdButton>
+        </div>
+        @if (justCreated)
+        {
+            <SdAlert Tone="Tone.Warning">
+                Save the key now if you'll install more agents with it later: it is never shown again.
+                <code class="sd-secret" data-key>@fullKey</code>
+            </SdAlert>
+        }
+    </SdCard>
+}
+
+@code {
+    private enum KeySource
+    {
+        New,
+        Existing,
+    }
+
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.InstallerKeyWrite);
+
+    private static readonly IReadOnlyList<(KeySource, string)> Sources = [(KeySource.New, "New key"), (KeySource.Existing, "Existing key")];
+
+    private static readonly IReadOnlyList<(InstallerKeyType, string)> Types =
+        [.. new[] { InstallerKeyType.UsageBased, InstallerKeyType.TimeBased, InstallerKeyType.Persistent }.Select(x => (x, InstallerKeyText.Type(x)))];
+
+    private KeySource source = KeySource.New;
+    private InstallerKeyType type = InstallerKeyType.UsageBased;
+    private string? name;
+    private string? uses = "1";
+    private string? expires;
+    private IReadOnlyList<InstallerKey>? existing;
+    private string? selected;
+    private string? pasted;
+    private string? fullKey;
+    private InstallerKey? keyInUse;
+    private string? deviceId;
+    private bool canCreate;
+    private bool justCreated;
+    private bool copied;
+    private bool busy;
+    private string? error;
+    private string? createError;
+    private string? pasteError;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private string TypeHint => type switch
+    {
+        InstallerKeyType.UsageBased => $"Works for a number of installs, within {InstallerKeyRules.UsageBasedLifetime.TotalHours:0} hours.",
+        InstallerKeyType.TimeBased => "Works for any number of installs until it expires.",
+        _ => "Works until it is revoked. Keep it as safe as a password.",
+    };
+
+    private IReadOnlyList<SelectOption> ExistingOptions =>
+        [.. (existing ?? []).Select(x => new SelectOption(x.Id.ToString(), $"{x.Name ?? "Unnamed"} · {InstallerKeyText.Type(x.Type)}"))];
+
+    private string? DeviceIdError =>
+        string.IsNullOrWhiteSpace(deviceId) || Guid.TryParse(deviceId.Trim(), out var id) && id != Guid.Empty ? null : "Enter a device ID like 3f2504e0-4f89-11d3-9a0c-0305e82c3301, or leave it empty.";
+
+    private string Command => InstallerKeyText.AgentCommand(
+        new Uri(Navigation.BaseUri),
+        fullKey!,
+        Guid.TryParse(deviceId?.Trim(), out var id) ? id : null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        expires = Clock.GetLocalNow().AddDays(1).ToString("yyyy-MM-ddTHH:mm");
+        if (AuthenticationState is not null)
+        {
+            canCreate = (await Authorization.AuthorizeAsync((await AuthenticationState).User, WritePolicy)).Succeeded;
+        }
+
+        source = canCreate ? KeySource.New : KeySource.Existing;
+        await LoadExistingAsync();
+    }
+
+    private async Task LoadExistingAsync()
+    {
+        var result = await Api.ListAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        existing = result.Value?.Items ?? [];
+        selected = existing.FirstOrDefault()?.Id.ToString();
+        if (!result.Succeeded && !canCreate)
+        {
+            error = result.Error;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        createError = null;
+        int? allowedUses = null;
+        DateTimeOffset? expiresAt = null;
+        if (type == InstallerKeyType.UsageBased)
+        {
+            if (!int.TryParse(uses, out var count) || count < 1)
+            {
+                createError = "Enter how many installs the key allows, at least 1.";
+                return;
+            }
+
+            allowedUses = count;
+        }
+        else if (type == InstallerKeyType.TimeBased)
+        {
+            if (!DateTime.TryParse(expires, out var local))
+            {
+                createError = "Choose when the key expires.";
+                return;
+            }
+
+            expiresAt = new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Local));
+        }
+
+        busy = true;
+        var result = await Api.CreateAsync(new CreateInstallerKeyRequest(type, string.IsNullOrWhiteSpace(name) ? null : name.Trim(), allowedUses, expiresAt));
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded || result.Value is not { } created)
+        {
+            createError = result.Error;
+            return;
+        }
+
+        fullKey = created.FullKey;
+        keyInUse = created.Key;
+        justCreated = true;
+        copied = false;
+    }
+
+    private void UseExisting()
+    {
+        pasteError = null;
+        var key = existing?.FirstOrDefault(x => x.Id.ToString() == selected);
+        var value = pasted?.Trim();
+        if (key is null || string.IsNullOrEmpty(value))
+        {
+            pasteError = "Paste the key or its secret.";
+            return;
+        }
+
+        if (value.Contains(':'))
+        {
+            if (!value.StartsWith($"{key.Id}:", StringComparison.OrdinalIgnoreCase))
+            {
+                pasteError = "That key isn't the one selected.";
+                return;
+            }
+        }
+        else
+        {
+            value = $"{key.Id}:{value}";
+        }
+
+        fullKey = value;
+        keyInUse = key;
+        justCreated = false;
+        copied = false;
+        pasted = null;
+    }
+
+    private async Task StartOver()
+    {
+        fullKey = null;
+        keyInUse = null;
+        deviceId = null;
+        justCreated = false;
+        copied = false;
+        await LoadExistingAsync();
+    }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", Command);
+            copied = true;
+        }
+        catch (JSException)
+        {
+            error = "The browser didn't allow copying. Select the command and copy it yourself.";
+        }
+    }
+
+    private string Limits(InstallerKey key) => key.Type switch
+    {
+        InstallerKeyType.UsageBased => $"This key installs {key.AllowedUses} agent{(key.AllowedUses == 1 ? string.Empty : "s")} in all, until {Date(key.ExpiresAt)}.",
+        InstallerKeyType.TimeBased => $"This key works until {Date(key.ExpiresAt)}.",
+        _ => "This key works until it is revoked.",
+    };
+
+    private static string Date(DateTimeOffset? value) => value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "it is revoked";
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

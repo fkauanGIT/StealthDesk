@@ -1,6 +1,7 @@
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
+using StealthDesk.Web.Server.InstallerKeys;
 
 namespace StealthDesk.Web.Server.Gateway;
 
@@ -11,7 +12,7 @@ namespace StealthDesk.Web.Server.Gateway;
 public sealed class ReportProcessor(
   IDeviceRegistry registry,
   IDeviceNotifier notifier,
-  StealthDeskDb db,
+  InstallerKeyService installerKeys,
   IMessageSigner signer,
   IOptionsSnapshot<GatewayOptions> options,
   TimeProvider clock,
@@ -22,48 +23,86 @@ public sealed class ReportProcessor(
     ReportOrigin connection,
     CancellationToken cancellationToken = default)
   {
-    var rules = options.Value;
     var report = envelope.Payload;
-
-    // Trust on first use: a new device introduces its key; a known device must keep using that key.
-    var registeredKey = report.DeviceId == Guid.Empty
+    var known = report.DeviceId == Guid.Empty
       ? null
-      : await registry.FindPublicKeyAsync(report.DeviceId, cancellationToken);
+      : await registry.FindAsync(report.DeviceId, cancellationToken);
 
-    if (registeredKey is null && !rules.AllowSelfRegistration)
+    // A known device signing with the key it registered is trusted as it is; any installer key it sends is ignored.
+    if (known is not null && signer.HasValidSignature(envelope, known.PublicKey))
     {
-      return Refuse(report, "Unknown device.");
+      if (!IsRecent(envelope))
+      {
+        return Refuse(report, "Timestamp expired.");
+      }
+
+      var tenant = report.TenantId == Guid.Empty ? known.TenantId : report.TenantId;
+      return await SaveAsync(report with { TenantId = tenant }, connection, known.PublicKey, allowNew: false, cancellationToken);
     }
 
-    var trustedKey = registeredKey ?? envelope.SignerKey;
-    if (!MessageSigner.IsWellFormedPublicKey(trustedKey))
+    // Anything else takes an installer key: a new device joining, or a reinstalled one bringing a new signing key.
+    if (string.IsNullOrEmpty(report.InstallerKey))
+    {
+      return Refuse(report, known is null ? "Unknown device." : "Signature verification failed.");
+    }
+
+    if (!MessageSigner.IsWellFormedPublicKey(envelope.SignerKey))
     {
       return Refuse(report, "Invalid public key.");
     }
 
-    if (!signer.HasValidSignature(envelope, trustedKey))
+    if (!signer.HasValidSignature(envelope, envelope.SignerKey))
     {
       return Refuse(report, "Signature verification failed.");
     }
 
-    if (rules.ClockTolerance is { } tolerance && !signer.IsRecent(envelope, tolerance))
+    if (!IsRecent(envelope))
     {
       return Refuse(report, "Timestamp expired.");
     }
 
-    var tenant = await ResolveTenantAsync(report, rules, cancellationToken);
-    if (!tenant.Succeeded)
+    var key = await installerKeys.CheckAsync(report.InstallerKey, cancellationToken);
+    if (key is null)
     {
-      return Refuse(report, tenant.Error);
+      return Refuse(report, "Invalid installer key.");
     }
 
-    var saved = await registry.SaveReportAsync(
-      report with { TenantId = tenant.Value },
-      connection,
-      trustedKey,
-      allowNew: rules.AllowSelfRegistration,
-      cancellationToken);
+    if (known is not null)
+    {
+      if (known.TenantId != key.TenantId)
+      {
+        return Refuse(report, "The device belongs to another tenant.");
+      }
 
+      if (!await installerKeys.MayReinstallAsync(key, known, cancellationToken))
+      {
+        return Refuse(report, "The installer key's creator may not install an agent on this device.");
+      }
+    }
+
+    // The device joins the key's tenant, whatever an agent remembered from a server it reported to before.
+    var deviceId = report.DeviceId == Guid.Empty ? Guid.NewGuid() : report.DeviceId;
+    var address = connection.RemoteAddress is { IsIPv4MappedToIPv6: true } mapped ? mapped.MapToIPv4() : connection.RemoteAddress;
+    if (!await installerKeys.RedeemAsync(key.Id, deviceId, address?.ToString(), cancellationToken))
+    {
+      return Refuse(report, "Invalid installer key.");
+    }
+
+    logger.LogInformation("Device {DeviceId} ({MachineName}) used installer key {KeyId}.", deviceId, report.MachineName, key.Id);
+    return await SaveAsync(report with { DeviceId = deviceId, TenantId = key.TenantId }, connection, envelope.SignerKey, allowNew: true, cancellationToken);
+  }
+
+  private bool IsRecent(SignedEnvelope<DeviceReport> envelope) =>
+    options.Value.ClockTolerance is not { } tolerance || signer.IsRecent(envelope, tolerance);
+
+  private async Task<GatewayReply<ReportReceipt>> SaveAsync(
+    DeviceReport report,
+    ReportOrigin connection,
+    string publicKey,
+    bool allowNew,
+    CancellationToken cancellationToken)
+  {
+    var saved = await registry.SaveReportAsync(report, connection, publicKey, allowNew, cancellationToken);
     if (!saved.Succeeded)
     {
       return Refuse(report, saved.Error);
@@ -72,48 +111,6 @@ public sealed class ReportProcessor(
     var device = saved.Value!;
     await notifier.DeviceChangedAsync(device);
     return GatewayReply.Accept(new ReportReceipt(device.Id, device.TenantId, clock.GetUtcNow()));
-  }
-
-  // The report's tenant wins; otherwise a known device keeps its own; otherwise self-registration
-  // uses the only tenant there is (with several tenants there's no safe way to guess).
-  private async Task<Outcome<Guid>> ResolveTenantAsync(DeviceReport report, GatewayOptions rules, CancellationToken cancellationToken)
-  {
-    var tenantId = report.TenantId;
-
-    // A server that lost its data (a reset or restored database) no longer has the tenant the agent saved.
-    // A device it doesn't know either joins again like a new one.
-    if (tenantId != Guid.Empty
-      && rules.AllowSelfRegistration
-      && !await db.Tenants.AnyAsync(x => x.Id == tenantId, cancellationToken)
-      && (report.DeviceId == Guid.Empty || await registry.FindTenantAsync(report.DeviceId, cancellationToken) is null))
-    {
-      tenantId = Guid.Empty;
-    }
-
-    if (tenantId == Guid.Empty && report.DeviceId != Guid.Empty)
-    {
-      tenantId = await registry.FindTenantAsync(report.DeviceId, cancellationToken) ?? Guid.Empty;
-    }
-
-    if (tenantId == Guid.Empty && rules.AllowSelfRegistration)
-    {
-      var tenants = await db.Tenants.Select(x => x.Id).Take(2).ToListAsync(cancellationToken);
-      if (tenants.Count != 1)
-      {
-        return Outcome.Failure<Guid>(tenants.Count == 0
-          ? "No tenant available."
-          : "Self-registration needs a single-tenant server.");
-      }
-
-      tenantId = tenants[0];
-    }
-
-    if (tenantId == Guid.Empty || !await db.Tenants.AnyAsync(x => x.Id == tenantId, cancellationToken))
-    {
-      return Outcome.Failure<Guid>("Invalid tenant.");
-    }
-
-    return tenantId;
   }
 
   private GatewayReply<ReportReceipt> Refuse(DeviceReport report, string reason)
