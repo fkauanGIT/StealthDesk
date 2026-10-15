@@ -23,7 +23,11 @@ public abstract class AccountTestContext : BunitContext
     Services.AddSingleton<IPasskeyBridge>(Passkeys);
     Services.AddSingleton<IThemeBridge>(Theme);
     Services.AddSingleton<ThemeState>();
+    Services.AddSingleton<StealthDesk.Web.Client.ServerAdministration.IServerAlerts>(Alerts);
   }
+
+  /// <summary>The server's alert as the layout reads it; none unless a test sets one.</summary>
+  private protected FakeAlerts Alerts { get; } = new();
 
   /// <summary>Passkeys as the browser offers them; unsupported unless a test says otherwise.</summary>
   private protected FakePasskeys Passkeys { get; } = new();

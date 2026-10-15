@@ -1,0 +1,250 @@
+@page "/server/tenants"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.ServerTenantsRead)]
+@using StealthDesk.Contracts.Tenants
+@using StealthDesk.Web.Client.ServerAdministration
+@inject ServerAdministrationApi Api
+@inject SessionGuard Session
+
+<PageTitle>Tenants · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Tenants</h1>
+    <div class="sd-push">
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+    </div>
+</header>
+<p class="sd-muted sd-page-lead">The organizations on this server. Each one sees only its own people and devices.</p>
+
+<AuthorizeView Policy="@WritePolicy">
+    <form class="sd-token-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <SdTextField Label="New tenant" Placeholder="Organization name" Autocomplete="off" @bind-Value="name" Error="@createError" />
+        <SdButton Type="submit" Disabled="busy">@(busy ? "Creating..." : "Create tenant")</SdButton>
+    </form>
+</AuthorizeView>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+@if (tenants is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading tenants..." />
+    }
+}
+else
+{
+    <div class="sd-table-wrap">
+        <table class="sd-table" style="min-width: 640px">
+            <thead>
+                <tr>
+                    <th>Tenant</th>
+                    <th>People</th>
+                    <th>Devices</th>
+                    <th>Created</th>
+                    <th><span class="sd-visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tenant in tenants)
+                {
+                    <tr @key="tenant.Id" data-tenant="@tenant.Name">
+                        <td>
+                            <span>@tenant.Name</span>
+                            @if (tenant.Id == ownTenant)
+                            {
+                                <span class="sd-cell-sub">Yours</span>
+                            }
+                        </td>
+                        <td>@tenant.UserCount</td>
+                        <td>@tenant.DeviceCount</td>
+                        <td class="sd-muted" style="white-space: nowrap">@tenant.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="sd-row-actions">
+                            <AuthorizeView Policy="@WritePolicy">
+                                <SdButton Variant="ButtonVariant.Ghost" OnClick="() => StartRename(tenant)">Rename</SdButton>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="@DeletePolicy">
+                                @if (tenant.Id != ownTenant)
+                                {
+                                    <SdButton Variant="ButtonVariant.Ghost" OnClick="() => StartDelete(tenant)">Delete</SdButton>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<SdDialog Open="renaming is not null" Title="Rename tenant" OnClose="() => renaming = null">
+    <ChildContent>
+        <SdTextField Label="Name" Autocomplete="off" @bind-Value="newName" Error="@renameError" />
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => renaming = null">Cancel</SdButton>
+        <SdButton Disabled="busy" OnClick="RenameAsync">Rename</SdButton>
+    </Footer>
+</SdDialog>
+
+<SdDialog Open="deleting is not null" Title="Delete this tenant?" OnClose="() => deleting = null">
+    <ChildContent>
+        <p class="sd-muted">
+            <strong>@deleting?.Name</strong> is deleted with its @deleting?.UserCount people, @deleting?.DeviceCount devices, keys,
+            settings and history. Its agents stop being accepted. This can't be undone.
+        </p>
+        <SdTextField Label="Type the tenant's name to confirm" Autocomplete="off" @bind-Value="confirmation" />
+    </ChildContent>
+    <Footer>
+        <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+        <SdButton Variant="ButtonVariant.Danger" Disabled="@(busy || confirmation?.Trim() != deleting?.Name)" OnClick="DeleteAsync">Delete tenant</SdButton>
+    </Footer>
+</SdDialog>
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.ServerTenantsWrite);
+    private static readonly string DeletePolicy = PermissionPolicies.For(PermissionNames.ServerTenantsDelete);
+
+    private IReadOnlyList<TenantSummary>? tenants;
+    private TenantSummary? renaming;
+    private TenantSummary? deleting;
+    private Guid? ownTenant;
+    private string? name;
+    private string? newName;
+    private string? confirmation;
+    private string? error;
+    private string? createError;
+    private string? renameError;
+    private bool busy;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        ownTenant = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.TenantsAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        tenants = result.Value?.Items;
+        error = result.Error;
+    }
+
+    private async Task CreateAsync()
+    {
+        createError = null;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            createError = "Enter the organization's name.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.CreateTenantAsync(name.Trim());
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            createError = result.Error;
+            return;
+        }
+
+        name = null;
+        await LoadAsync();
+    }
+
+    private void StartRename(TenantSummary tenant)
+    {
+        renaming = tenant;
+        newName = tenant.Name;
+        renameError = null;
+    }
+
+    private async Task RenameAsync()
+    {
+        if (renaming is not { } tenant)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            renameError = "Enter the organization's name.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.RenameTenantAsync(tenant.Id, newName.Trim());
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            renameError = result.Error;
+            return;
+        }
+
+        renaming = null;
+        await LoadAsync();
+    }
+
+    private void StartDelete(TenantSummary tenant)
+    {
+        deleting = tenant;
+        confirmation = null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } tenant || confirmation?.Trim() != tenant.Name)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.DeleteTenantAsync(tenant.Id);
+        busy = false;
+        deleting = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            error = result.Error;
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

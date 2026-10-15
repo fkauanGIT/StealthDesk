@@ -1,0 +1,168 @@
+@page "/server/settings"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.ServerSettingsWrite)]
+@using StealthDesk.Contracts.ServerSettings
+@using StealthDesk.Web.Client.ServerAdministration
+@inject ServerAdministrationApi Api
+@inject SessionGuard Session
+
+<PageTitle>Server settings · StealthDesk</PageTitle>
+
+<header class="sd-page-header">
+    <h1 class="sd-page-title">Server settings</h1>
+</header>
+<p class="sd-muted sd-page-lead">What applies to everyone on this server, whatever their tenant.</p>
+
+@if (error is not null)
+{
+    <SdAlert>@error</SdAlert>
+}
+
+<SdCard Title="Alert for everyone">
+    <p class="sd-muted">A message at the top of the app for every signed-in user, such as planned maintenance.</p>
+    @if (!loaded)
+    {
+        <SdLoading Text="Loading the alert..." />
+    }
+    else
+    {
+        <form class="sd-deploy-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <SdTextField Label="Message" Autocomplete="off" maxlength="@ServerAlert.MessageMax" @bind-Value="message" />
+            <SdSegmented TValue="AlertSeverity" Label="Severity" Options="Severities" @bind-Value="severity" />
+            <SdCheckbox Label="People can close it" @bind-Checked="dismissible" />
+            <SdCheckbox Label="Closed, it shows again on the next visit" @bind-Checked="comesBack" Disabled="!dismissible" />
+            <SdCheckbox Label="Show the alert" @bind-Checked="enabled" />
+            @if (enabled && !string.IsNullOrWhiteSpace(message))
+            {
+                <div data-alert-preview>
+                    <span class="sd-field-hint">Preview</span>
+                    <SdAlert Tone="@ServerAlertBanner.ToneOf(severity)">@message</SdAlert>
+                </div>
+            }
+            @if (saveError is not null)
+            {
+                <SdAlert>@saveError</SdAlert>
+            }
+            @if (saved)
+            {
+                <SdAlert Tone="Tone.Info">@(enabled ? "The alert is shown to everyone." : "The alert is saved and hidden.")</SdAlert>
+            }
+            <div class="sd-actions">
+                <SdButton Type="submit" Disabled="busy">@(busy ? "Saving..." : "Save alert")</SdButton>
+            </div>
+        </form>
+    }
+</SdCard>
+
+<SdCard Title="Email">
+    <p class="sd-muted">Sends a message to your own address, to check that this server's email settings work.</p>
+    @if (emailResult is not null)
+    {
+        <SdAlert Tone="Tone.Info">@emailResult</SdAlert>
+    }
+    @if (emailError is not null)
+    {
+        <SdAlert>@emailError</SdAlert>
+    }
+    <div class="sd-actions">
+        <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Mail" Disabled="sending" OnClick="SendTestEmailAsync">@(sending ? "Sending..." : "Send test email")</SdButton>
+    </div>
+</SdCard>
+
+@code {
+    private static readonly IReadOnlyList<(AlertSeverity, string)> Severities =
+        [(AlertSeverity.Info, "Info"), (AlertSeverity.Success, "Success"), (AlertSeverity.Warning, "Warning"), (AlertSeverity.Error, "Error")];
+
+    private string? message;
+    private AlertSeverity severity = AlertSeverity.Info;
+    private bool dismissible = true;
+    private bool comesBack;
+    private bool enabled = true;
+    private bool loaded;
+    private bool busy;
+    private bool saved;
+    private bool sending;
+    private string? error;
+    private string? saveError;
+    private string? emailResult;
+    private string? emailError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.AlertAsync();
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        error = result.Error;
+        if (result.Value is { } alert)
+        {
+            message = alert.Message;
+            severity = alert.Severity;
+            dismissible = alert.IsDismissible;
+            comesBack = alert.ComesBack;
+            enabled = alert.IsEnabled;
+        }
+
+        loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        saveError = null;
+        saved = false;
+        if (enabled && string.IsNullOrWhiteSpace(message))
+        {
+            saveError = "Write the message to show, or stop showing the alert.";
+            return;
+        }
+
+        busy = true;
+        var result = await Api.SaveAlertAsync(new ServerAlert(message?.Trim() ?? string.Empty, severity, dismissible, dismissible && comesBack, enabled));
+        busy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            saveError = result.Error;
+            return;
+        }
+
+        saved = true;
+    }
+
+    private async Task SendTestEmailAsync()
+    {
+        emailResult = null;
+        emailError = null;
+        sending = true;
+        var result = await Api.SendTestEmailAsync();
+        sending = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (result.Value is { } sent)
+        {
+            emailResult = $"{sent.Outcome} To: {sent.To}";
+        }
+        else
+        {
+            emailError = result.Error;
+        }
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

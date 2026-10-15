@@ -924,6 +924,31 @@ a.sd-btn:hover {
   color: var(--sd-text);
 }
 
+.sd-log-source {
+  max-width: 320px;
+  margin-bottom: var(--sd-space-5);
+}
+
+.sd-alert--online {
+  background: var(--sd-online-soft);
+  border-color: color-mix(in srgb, var(--sd-online) 40%, transparent);
+  color: var(--sd-online-text);
+}
+
+/* The server's alert, above every page; its close button sits at the end. */
+.sd-server-alert {
+  align-items: center;
+  margin-bottom: var(--sd-space-5);
+}
+
+.sd-server-alert > div {
+  flex: 1;
+}
+
+.sd-server-alert .sd-btn {
+  color: inherit;
+}
+
 /* ---------- Empty state and loading ---------- */
 
 .sd-empty {

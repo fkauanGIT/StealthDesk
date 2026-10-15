@@ -123,9 +123,9 @@ else
     private string? error;
     private Guid? expanded;
 
-    /// <summary>The tenant whose log is shown.</summary>
+    /// <summary>The tenant whose log is shown; none for the server's own entries.</summary>
     [Parameter, EditorRequired]
-    public Guid TenantId { get; set; }
+    public Guid? TenantId { get; set; }
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
@@ -152,7 +152,7 @@ else
         error = null;
         current = null;
         expanded = null;
-        var result = await Api.GetTenantAsync(TenantId, new AuthorizationChangeQuery
+        var query = new AuthorizationChangeQuery
         {
             Action = Blank(action),
             TargetKind = Blank(target),
@@ -163,7 +163,8 @@ else
             To = Day(to)?.AddDays(1),
             Page = pageNumber,
             PageSize = pageSize,
-        });
+        };
+        var result = TenantId is { } tenant ? await Api.GetTenantAsync(tenant, query) : await Api.GetServerAsync(query);
 
         if (result.SessionExpired)
         {

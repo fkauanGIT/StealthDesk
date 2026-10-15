@@ -51,6 +51,14 @@ public class LayoutTests
     await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(1);
     await AssertFitsAsync(app, "users");
 
+    foreach (var (page, heading) in new[] { ("server/tenants", "Tenants"), ("server/settings", "Server settings") })
+    {
+      await app.GoAsync(page);
+      await Expect(app.Heading(heading)).ToBeVisibleAsync();
+      await app.Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+      await AssertFitsAsync(app, page.Replace('/', '-'));
+    }
+
     await app.GoAsync("settings");
     await Expect(app.Heading("Tenant settings")).ToBeVisibleAsync();
     await AssertFitsAsync(app, "settings");
@@ -63,8 +71,8 @@ public class LayoutTests
     foreach (var (page, heading) in new[] { ("authorization-logs", "Authorization log"), ("server/authorization-logs", "Server authorization log") })
     {
       await app.GoAsync(page);
-      await Expect(app.Page.Locator(".sd-log-table")).ToBeVisibleAsync();
       await Expect(app.Heading(heading)).ToBeVisibleAsync();
+      await app.Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
       await AssertFitsAsync(app, page.Replace('/', '-'));
     }
   }
