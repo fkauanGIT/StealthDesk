@@ -630,6 +630,33 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantSettingRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("tenant_settings", (string)null);
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.UserGroupMemberRecord", b =>
                 {
                     b.Property<Guid>("UserGroupId")
@@ -945,6 +972,17 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                 });
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantInviteRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.TenantSettingRecord", b =>
                 {
                     b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
                         .WithMany()

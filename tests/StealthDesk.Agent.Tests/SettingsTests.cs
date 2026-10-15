@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Tests.Fakes;
+using StealthDesk.Contracts.Agents;
 
 namespace StealthDesk.Agent.Tests;
 

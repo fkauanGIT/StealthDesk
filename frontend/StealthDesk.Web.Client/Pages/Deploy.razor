@@ -11,6 +11,7 @@
 @inject NavigationManager Navigation
 @inject TimeProvider Clock
 @inject DeviceStore Devices
+@inject StealthDesk.Web.Client.TenantSettings.TenantSettingApi Settings
 
 <PageTitle>Add a device · StealthDesk</PageTitle>
 
@@ -165,6 +166,7 @@ else
     private InstallerKey? keyInUse;
     private string? deviceId;
     private bool canCreate;
+    private string? instance;
     private DeviceSummary? joined;
     private HashSet<Guid> knownBefore = [];
     private DateTimeOffset watchingSince;
@@ -198,12 +200,13 @@ else
 
     private Guid? RequestedId => Guid.TryParse(deviceId?.Trim(), out var id) && id != Guid.Empty ? id : null;
 
-    private string SourceCommand => InstallerKeyText.SourceCommand(fullKey!, RequestedId);
+    private string SourceCommand => InstallerKeyText.SourceCommand(fullKey!, RequestedId, instance);
 
     private string Command => InstallerKeyText.AgentCommand(
         new Uri(Navigation.BaseUri),
         fullKey!,
-        Guid.TryParse(deviceId?.Trim(), out var id) ? id : null);
+        Guid.TryParse(deviceId?.Trim(), out var id) ? id : null,
+        instance);
 
     protected override async Task OnInitializedAsync()
     {
@@ -215,6 +218,9 @@ else
 
         source = canCreate ? KeySource.New : KeySource.Existing;
         await LoadExistingAsync();
+
+        // The tenant may name an agent instance; without its options the commands simply name none.
+        instance = (await Settings.DeploymentOptionsAsync()).Value?.InstanceName;
     }
 
     private async Task LoadExistingAsync()

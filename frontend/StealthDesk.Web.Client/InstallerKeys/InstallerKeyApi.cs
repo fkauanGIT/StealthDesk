@@ -87,16 +87,21 @@ public static class InstallerKeyText
   };
 
   /// <summary>The command that installs the agent with this key, for the server the page was opened from.</summary>
-  public static string AgentCommand(Uri server, string fullKey, Guid? deviceId)
-  {
-    var command = $".\\StealthDesk.Agent.exe run --server {server.GetLeftPart(UriPartial.Authority)} --installer-key {fullKey}";
-    return deviceId is { } id && id != Guid.Empty ? $"{command} --device-id {id}" : command;
-  }
+  /// <param name="instance">The agent instance the tenant's settings name, if any.</param>
+  public static string AgentCommand(Uri server, string fullKey, Guid? deviceId, string? instance = null) =>
+    WithOptions($".\\StealthDesk.Agent.exe run --server {server.GetLeftPart(UriPartial.Authority)} --installer-key {fullKey}", deviceId, instance);
 
   /// <summary>The same, for an agent run from the repository; development agents already point at the local server.</summary>
-  public static string SourceCommand(string fullKey, Guid? deviceId)
+  public static string SourceCommand(string fullKey, Guid? deviceId, string? instance = null) =>
+    WithOptions($"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {fullKey}", deviceId, instance);
+
+  private static string WithOptions(string command, Guid? deviceId, string? instance)
   {
-    var command = $"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {fullKey}";
-    return deviceId is { } id && id != Guid.Empty ? $"{command} --device-id {id}" : command;
+    if (deviceId is { } id && id != Guid.Empty)
+    {
+      command += $" --device-id {id}";
+    }
+
+    return string.IsNullOrWhiteSpace(instance) ? command : $"{command} --instance {instance}";
   }
 }

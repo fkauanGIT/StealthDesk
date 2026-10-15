@@ -22,4 +22,5 @@ public enum IconName
   Copy,
   Users,
   Group,
+  Settings,
 }
