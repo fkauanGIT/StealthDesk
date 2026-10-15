@@ -1,3 +1,4 @@
+using StealthDesk.Contracts.InstallerKeys;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.ServiceAccounts;
 
@@ -24,6 +25,18 @@ public sealed record ServiceAccountSnapshot(string Name, ServiceAccountKind Kind
 {
   public static ServiceAccountSnapshot Of(ServiceAccountRecord account) =>
     new(account.Name, account.Kind, account.Description, account.IsEnabled, account.AccessMode);
+}
+
+public sealed record InstallerKeySnapshot(
+  string? Name,
+  InstallerKeyType Type,
+  InstallerKeyCreatorKind CreatorKind,
+  Guid CreatorId,
+  int? AllowedUses,
+  DateTimeOffset? ExpiresAt)
+{
+  public static InstallerKeySnapshot Of(InstallerKeyRecord key) =>
+    new(key.Name, key.Type, key.CreatorKind, key.CreatorId, key.AllowedUses, key.ExpiresAt);
 }
 
 public sealed record ServiceAccountCredentialSnapshot(string Name, Guid ServiceAccountId, DateTimeOffset? ExpiresAt)

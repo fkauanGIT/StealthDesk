@@ -10,10 +10,4 @@ public sealed class GatewayOptions
   /// forever, so this is what stops it from being replayed later. <c>null</c> turns the check off.
   /// </summary>
   public TimeSpan? ClockTolerance { get; init; }
-
-  /// <summary>
-  /// Lets an agent the server has never seen register itself with its first report.
-  /// Only works while the server has a single tenant.
-  /// </summary>
-  public bool AllowSelfRegistration { get; init; }
 }

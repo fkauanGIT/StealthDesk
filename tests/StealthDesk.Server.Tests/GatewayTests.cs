@@ -72,7 +72,7 @@ public class GatewayTests
   {
     using var server = await ServerHost.OnPostgresAsync();
     await using var owner = await TestAgent.ConnectAsync(server);
-    await using var impostor = await TestAgent.ConnectAsync(server);
+    await using var impostor = await TestAgent.ConnectAsync(server, withInstallerKey: false);
     var deviceId = Guid.NewGuid();
     await owner.ReportAsync(TestAgent.Report(deviceId));
 
@@ -90,7 +90,7 @@ public class GatewayTests
   {
     using var server = await ServerHost.OnPostgresAsync();
     await using var agent = await TestAgent.ConnectAsync(server);
-    var envelope = agent.Signer.Sign(TestAgent.Report(Guid.NewGuid()), agent.Keys.PrivateKey);
+    var envelope = agent.Sign(TestAgent.Report(Guid.NewGuid()));
 
     var reply = await agent.SubmitAsync(envelope with { Payload = envelope.Payload with { MemoryTotalGb = 1024 } });
 
@@ -107,7 +107,7 @@ public class GatewayTests
 
     // Signed with a clock 5 minutes ahead; Development allows 1 minute.
     var aheadSigner = new StealthDesk.Core.Security.MessageSigner(new ShiftedClock(TimeSpan.FromMinutes(5)));
-    var envelope = aheadSigner.Sign(TestAgent.Report(Guid.NewGuid()), agent.Keys.PrivateKey);
+    var envelope = aheadSigner.Sign(TestAgent.Report(Guid.NewGuid()) with { InstallerKey = agent.InstallerKey }, agent.Keys.PrivateKey);
 
     var reply = await agent.SubmitAsync(envelope);
 
@@ -116,7 +116,7 @@ public class GatewayTests
   }
 
   [Fact]
-  public async Task Report_FromADeviceTheServerForgot_RegistersItAgain()
+  public async Task Report_FromADeviceTheServerForgot_JoinsTheTenantOfItsInstallerKey()
   {
     using var server = await ServerHost.OnPostgresAsync();
     await using var agent = await TestAgent.ConnectAsync(server);
@@ -134,14 +134,15 @@ public class GatewayTests
   }
 
   [Fact]
-  public async Task Report_FromADeviceTheServerForgot_IsRefusedWithoutSelfRegistration()
+  public async Task Report_FromADeviceTheServerForgot_IsRefusedWithoutAnInstallerKey()
   {
-    using var server = (await ServerHost.OnPostgresAsync()).With("Gateway:AllowSelfRegistration", "false");
-    await using var agent = await TestAgent.ConnectAsync(server);
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server, withInstallerKey: false);
 
     var reply = await agent.ReportAsync(TestAgent.Report(Guid.NewGuid()) with { TenantId = Guid.NewGuid() });
 
     Assert.False(reply.Accepted);
+    Assert.Equal("Unknown device.", reply.Error);
     Assert.False(await server.WithDbAsync(db => db.Devices.AnyAsync()));
   }
 

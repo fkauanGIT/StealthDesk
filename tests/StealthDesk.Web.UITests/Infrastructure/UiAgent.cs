@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -5,7 +7,9 @@ using StealthDesk.Contracts;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Core.Security;
+using Npgsql;
 using StealthDesk.Realtime;
+using StealthDesk.Web.Server.Persistence;
 
 namespace StealthDesk.Web.UITests.Infrastructure;
 
@@ -33,8 +37,11 @@ public sealed class UiAgent : IAsyncDisposable
   public string MachineName { get; }
 
   /// <summary>Connects to the server and reports the machine once, as an agent does when it starts.</summary>
-  public static async Task<UiAgent> StartAsync(UiServer server, string machineName)
+  /// <param name="installerKey">The key it joins with; one the test arranges in the database when none is given.</param>
+  public static async Task<UiAgent> StartAsync(UiServer server, string machineName, string? installerKey = null)
   {
+    installerKey ??= await ArrangeInstallerKeyAsync(server);
+
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
       .AddTransient<IHubConnectionBuilder>(_ => new HubConnectionBuilder().AddMessagePackProtocol())
@@ -48,9 +55,10 @@ public sealed class UiAgent : IAsyncDisposable
     }
 
     var agent = new UiAgent(services, channel, machineName);
-    var reply = await channel.Server.SubmitReport(agent._signer.Sign(agent.Report(), agent._keys.PrivateKey));
+    var reply = await channel.Server.SubmitReport(agent._signer.Sign(agent.Report() with { InstallerKey = installerKey }, agent._keys.PrivateKey));
     if (!reply.Accepted)
     {
+      await agent.DisposeAsync();
       throw new InvalidOperationException($"The server refused the test agent's report: {reply.Error}");
     }
 
@@ -62,6 +70,32 @@ public sealed class UiAgent : IAsyncDisposable
   {
     await _channel.DisposeAsync();
     await _services.DisposeAsync();
+  }
+
+  // A persistent key of the server's only tenant, stored as the server stores one, for tests that aren't about keys.
+  private static async Task<string> ArrangeInstallerKeyAsync(UiServer server)
+  {
+    var key = new InstallerKeyRecord { Id = Guid.NewGuid() };
+    var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    var hash = new PasswordHasher<InstallerKeyRecord>().HashPassword(key, secret);
+
+    await using var connection = new NpgsqlConnection(server.Database);
+    await connection.OpenAsync(TestContext.Current.CancellationToken);
+    await using var command = new NpgsqlCommand(
+      """
+      INSERT INTO installer_keys ("Id", "TenantId", "Name", "Type", "CreatorKind", "CreatorId", "HashedSecret", "CreatedAt")
+      SELECT @id, "Id", 'Test key', 'Persistent', 'User', @creator, @hash, now() FROM tenants LIMIT 1
+      """,
+      connection);
+    command.Parameters.AddWithValue("id", key.Id);
+    command.Parameters.AddWithValue("creator", Guid.NewGuid());
+    command.Parameters.AddWithValue("hash", hash);
+    if (await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken) != 1)
+    {
+      throw new InvalidOperationException("There's no tenant for the test agent to join: register a user first.");
+    }
+
+    return $"{key.Id}:{secret}";
   }
 
   private DeviceReport Report() => new()

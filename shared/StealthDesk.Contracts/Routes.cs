@@ -41,6 +41,11 @@ public static class Routes
   public static string ServiceAccountCredential(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}";
   public static string ServiceAccountCredentialPurge(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}/purge";
 
+  /// <summary>A tenant's installer keys (<c>?tenantId=</c>), and the installs made with each.</summary>
+  public const string InstallerKeys = "/api/v1/installer-keys";
+  public static string InstallerKey(Guid id) => $"{InstallerKeys}/{id}";
+  public static string InstallerKeyUsages(Guid id) => $"{InstallerKeys}/{id}/usages";
+
   /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
   public const string UserGroups = "/api/v1/user-groups";
   public static string UserGroup(Guid id) => $"{UserGroups}/{id}";

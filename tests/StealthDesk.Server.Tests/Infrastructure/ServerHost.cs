@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
 
-/// <summary>The real server, hosted in memory, in the Development environment (self-registration on).</summary>
+/// <summary>The real server, hosted in memory, in the Development environment.</summary>
 public sealed class ServerHost : WebApplicationFactory<Program>
 {
   private readonly Dictionary<string, string?> _settings;
@@ -35,7 +35,7 @@ public sealed class ServerHost : WebApplicationFactory<Program>
   public static async Task<ServerHost> OnPostgresAsync() => new(await PostgresDatabases.CreateAsync());
 
   /// <summary>
-  /// Overrides a setting, e.g. <c>With("Gateway:AllowSelfRegistration", "false")</c>. Only before the server starts,
+  /// Overrides a setting, e.g. <c>With("Accounts:EnablePublicRegistration", "true")</c>. Only before the server starts,
   /// which happens on first use.
   /// </summary>
   public ServerHost With(string key, string? value)

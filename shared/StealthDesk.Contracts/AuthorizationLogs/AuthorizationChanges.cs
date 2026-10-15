@@ -3,6 +3,9 @@ namespace StealthDesk.Contracts.AuthorizationLogs;
 /// <summary>What an authorization change log entry records. Stored as readable text, to make raw queries easy.</summary>
 public static class AuthorizationChangeActions
 {
+  public const string InstallerKeyCreated = "installer-key-created";
+  public const string InstallerKeyDeleted = "installer-key-deleted";
+  public const string InstallerKeyRenamed = "installer-key-renamed";
   public const string PermissionAssignmentCreated = "permission-assignment-created";
   public const string PermissionAssignmentDeleted = "permission-assignment-deleted";
   public const string PermissionAssignmentsSeeded = "permission-assignments-seeded";
@@ -36,6 +39,7 @@ public static class AuthorizationChangeActors
 /// <summary>What the change was made to.</summary>
 public static class AuthorizationChangeTargets
 {
+  public const string InstallerKey = "InstallerKey";
   public const string PermissionAssignment = "PermissionAssignment";
   public const string PersonalAccessToken = "PersonalAccessToken";
   public const string ServiceAccount = "ServiceAccount";
