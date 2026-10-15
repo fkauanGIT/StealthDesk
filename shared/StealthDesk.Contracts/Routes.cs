@@ -41,6 +41,14 @@ public static class Routes
   public static string ServiceAccountCredential(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}";
   public static string ServiceAccountCredentialPurge(string accounts, Guid id, Guid credentialId) => $"{accounts}/{id}/credentials/{credentialId}/purge";
 
+  /// <summary>The server's tenants, for its administrators.</summary>
+  public const string Tenants = "/api/v1/tenants";
+  public static string Tenant(Guid id) => $"{Tenants}/{id}";
+
+  /// <summary>The alert every signed-in user sees, and checking that email goes out.</summary>
+  public const string ServerAlert = "/api/v1/server/alert";
+  public const string ServerTestEmail = "/api/v1/server/test-email";
+
   /// <summary>A tenant's settings (<c>?tenantId=</c>), and what install commands use from them.</summary>
   public const string TenantSettings = "/api/v1/tenant-settings";
   public static string TenantSetting(string name) => $"{TenantSettings}/{Uri.EscapeDataString(name)}";
