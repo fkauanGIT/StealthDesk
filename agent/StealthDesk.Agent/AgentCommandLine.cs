@@ -4,6 +4,7 @@ using StealthDesk.Agent.Core;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Windows;
 using StealthDesk.Branding;
+using StealthDesk.Contracts.Agents;
 
 namespace StealthDesk.Agent;
 
