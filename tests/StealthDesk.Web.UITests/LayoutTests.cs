@@ -51,6 +51,15 @@ public class LayoutTests
     await Expect(app.Page.Locator("tbody tr")).ToHaveCountAsync(1);
     await AssertFitsAsync(app, "users");
 
+    await app.GoAsync("settings");
+    await Expect(app.Heading("Tenant settings")).ToBeVisibleAsync();
+    await AssertFitsAsync(app, "settings");
+
+    await app.GoAsync("devices/add");
+    await app.ClickAsync("Create key");
+    await Expect(app.Page.Locator("[data-command]")).ToBeVisibleAsync();
+    await AssertFitsAsync(app, "add-device");
+
     foreach (var (page, heading) in new[] { ("authorization-logs", "Authorization log"), ("server/authorization-logs", "Server authorization log") })
     {
       await app.GoAsync(page);
