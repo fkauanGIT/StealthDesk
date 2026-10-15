@@ -46,6 +46,8 @@ public static class AppSections
     new("Settings", IconName.Settings, [new("Tenant", "settings", For(PermissionNames.TenantSettingsRead))]),
     new("Server", IconName.Shield,
     [
+      new("Tenants", "server/tenants", For(PermissionNames.ServerTenantsRead)),
+      new("Server settings", "server/settings", For(PermissionNames.ServerSettingsWrite)),
       new("Server accounts", "server/service-accounts", For(PermissionNames.ServerServiceAccountsRead)),
       new("Server activity", "server/authorization-logs", For(PermissionNames.ServerAuthorizationLogsRead)),
     ]),

@@ -1,0 +1,98 @@
+@using StealthDesk.Contracts.ServerSettings
+@using StealthDesk.Web.Client.ServerAdministration
+@inject IServerAlerts Alerts
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (alert is { } shown && visible)
+{
+    <div class="sd-server-alert sd-alert sd-alert--@ToneOf(shown.Severity).ToString().ToLowerInvariant()" role="@(shown.Severity is AlertSeverity.Info or AlertSeverity.Success ? "status" : "alert")" data-server-alert>
+        <SdIcon Name="IconName.Alert" />
+        <div>@shown.Message</div>
+        @if (shown.IsDismissible)
+        {
+            <SdButton Variant="ButtonVariant.Ghost" Icon="IconName.Close" AriaLabel="Close the alert" OnClick="CloseAsync" />
+        }
+    </div>
+}
+
+@code {
+    // Which alert this browser closed: the same message and severity stay closed until they change.
+    private const string ClosedKey = "stealthdesk:closed-alert";
+
+    private ServerAlert? alert;
+    private bool visible;
+
+    // Closed during this visit: even one that comes back waits for the next visit.
+    private string? closedThisVisit;
+
+    public static Tone ToneOf(AlertSeverity severity) => severity switch
+    {
+        AlertSeverity.Success => Tone.Online,
+        AlertSeverity.Warning => Tone.Warning,
+        AlertSeverity.Error => Tone.Danger,
+        _ => Tone.Info,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        await LoadAsync();
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    // The layout stays while pages change, so the alert is read again on each move: a new one shows without a reload.
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+    private async Task LoadAsync()
+    {
+        // An alert that can't be read is no reason to stop the page; it simply isn't shown.
+        visible = false;
+        alert = await Alerts.CurrentAsync();
+        if (alert is not { IsEnabled: true } || string.IsNullOrWhiteSpace(alert.Message))
+        {
+            return;
+        }
+
+        visible = !alert.IsDismissible
+            || (closedThisVisit != Fingerprint(alert) && (alert.ComesBack || await ClosedAsync() != Fingerprint(alert)));
+    }
+
+    private async Task CloseAsync()
+    {
+        visible = false;
+        closedThisVisit = alert is null ? null : Fingerprint(alert);
+        if (alert is { ComesBack: false } closed)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("localStorage.setItem", ClosedKey, Fingerprint(closed));
+            }
+            catch (JSException)
+            {
+                // Without storage it simply shows again next time.
+            }
+        }
+    }
+
+    private async Task<string?> ClosedAsync()
+    {
+        try
+        {
+            return await Js.InvokeAsync<string?>("localStorage.getItem", ClosedKey);
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private static string Fingerprint(ServerAlert alert) => $"{alert.Severity}:{alert.Message}";
+}

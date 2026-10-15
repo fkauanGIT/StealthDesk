@@ -488,6 +488,39 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("personal_access_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServerAlertRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ComesBack")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDismissible")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("server_alerts", (string)null);
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.ServiceAccountCredentialRecord", b =>
                 {
                     b.Property<Guid>("Id")

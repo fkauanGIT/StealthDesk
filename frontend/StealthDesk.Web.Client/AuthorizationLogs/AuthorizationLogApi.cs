@@ -14,11 +14,18 @@ public sealed record AuthorizationLogResult(AuthorizationChangePage? Page, strin
 /// <summary>Reads the authorization change log.</summary>
 public sealed class AuthorizationLogApi(HttpClient http)
 {
-  public async Task<AuthorizationLogResult> GetTenantAsync(Guid tenantId, AuthorizationChangeQuery query, CancellationToken cancellationToken = default)
+  public Task<AuthorizationLogResult> GetTenantAsync(Guid tenantId, AuthorizationChangeQuery query, CancellationToken cancellationToken = default) =>
+    GetAsync($"{Routes.AuthorizationLogs}?{QueryString(query)}&tenantId={tenantId}", cancellationToken);
+
+  /// <summary>Changes that belong to no tenant, such as server-wide permissions and server accounts.</summary>
+  public Task<AuthorizationLogResult> GetServerAsync(AuthorizationChangeQuery query, CancellationToken cancellationToken = default) =>
+    GetAsync($"{Routes.ServerAuthorizationLogs}?{QueryString(query)}", cancellationToken);
+
+  private async Task<AuthorizationLogResult> GetAsync(string path, CancellationToken cancellationToken)
   {
     try
     {
-      using var response = await http.GetAsync($"{Routes.AuthorizationLogs}?{QueryString(query)}&tenantId={tenantId}", cancellationToken);
+      using var response = await http.GetAsync(path, cancellationToken);
       return response.StatusCode switch
       {
         HttpStatusCode.OK => new AuthorizationLogResult(await response.Content.ReadFromJsonAsync<AuthorizationChangePage>(cancellationToken), null),

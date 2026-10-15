@@ -24,6 +24,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<InstallerKeyRecord> InstallerKeys => Set<InstallerKeyRecord>();
   public DbSet<InstallerKeyUsageRecord> InstallerKeyUsages => Set<InstallerKeyUsageRecord>();
   public DbSet<TenantSettingRecord> TenantSettings => Set<TenantSettingRecord>();
+  public DbSet<ServerAlertRecord> ServerAlerts => Set<ServerAlertRecord>();
 
   // No tenant filter: server accounts belong to no tenant, and every read names the tenant it wants.
   public DbSet<ServiceAccountRecord> ServiceAccounts => Set<ServiceAccountRecord>();
@@ -142,6 +143,13 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       credential.Property(x => x.HashedSecret).HasMaxLength(ServiceAccountCredentialRecord.HashMax);
       credential.HasOne(x => x.ServiceAccount).WithMany(x => x.Credentials).HasForeignKey(x => x.ServiceAccountId).OnDelete(DeleteBehavior.Cascade);
       credential.HasIndex(x => x.ServiceAccountId);
+    });
+
+    modelBuilder.Entity<ServerAlertRecord>(alert =>
+    {
+      alert.ToTable("server_alerts");
+      alert.Property(x => x.Message).HasMaxLength(ServerAlertRecord.MessageMax);
+      alert.Property(x => x.Severity).HasConversion<string>().HasMaxLength(20);
     });
 
     modelBuilder.Entity<TenantSettingRecord>(setting =>

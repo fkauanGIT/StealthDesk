@@ -228,6 +228,9 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
 | `/api/v1/devices` | HTTP | Lists the devices of the signed-in user's tenant; 401 when signed out. |
 | `/api/v1/devices/{id}` | HTTP | Returns one of the tenant's devices, or 404 for an unknown device or one of another tenant. |
+| `/api/v1/tenants` | HTTP | The server's tenants, for its administrators: list (`GET`), one (`GET /{id}`), create (`POST`), rename (`PUT /{id}`) and delete with everything in them (`DELETE /{id}`, never the caller's own). |
+| `/api/v1/server/alert` | HTTP | The message every signed-in user sees at the top of the app (`GET`), set by the server's administrators (`PUT`). |
+| `/api/v1/server/test-email` | HTTP | Sends a test message to the administrator's own address and says whether it went out. |
 | `/api/v1/tenant-settings` | HTTP | The tenant's settings: list (`GET`), one (`GET /{name}`), change one (`PUT /{name}`) or several (`PUT`), back to the default (`DELETE /{name}`). |
 | `/api/v1/deployment-options` | HTTP | The agent instance install commands name for the tenant, for those who install agents. |
 | `/api/v1/installer-keys` | HTTP | The tenant's installer keys: list (`GET`), create (`POST`), rename (`PUT /{id}`), revoke (`DELETE /{id}`) and installs (`GET /{id}/usages`). Without `installer-key.manage-all`, only your own. |

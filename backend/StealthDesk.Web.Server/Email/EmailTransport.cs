@@ -11,6 +11,30 @@ public interface IEmailTransport
 {
   /// <summary>Never throws: a message that can't be delivered is logged, and the account action goes on.</summary>
   Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default);
+
+  /// <summary>Sends and tells what happened, for whoever needs to know, e.g. a test message.</summary>
+  async Task<EmailDelivery> TrySendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+  {
+    await SendAsync(message, cancellationToken);
+    return EmailDelivery.Sent;
+  }
+}
+
+/// <summary>What became of a message.</summary>
+/// <param name="Error">Why it wasn't delivered, when it wasn't.</param>
+public sealed record EmailDelivery(EmailDeliveryStatus Status, string? Error = null)
+{
+  public static EmailDelivery Sent { get; } = new(EmailDeliveryStatus.Sent);
+}
+
+public enum EmailDeliveryStatus
+{
+  Sent,
+
+  /// <summary>Sending is turned off: the message went to the log instead.</summary>
+  Disabled,
+
+  Failed,
 }
 
 public sealed class EmailTransport(
@@ -18,20 +42,24 @@ public sealed class EmailTransport(
   IHostEnvironment environment,
   ILogger<EmailTransport> logger) : IEmailTransport
 {
-  public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+  // The user can ask for the message again; failing the registration or reset over it helps nobody.
+  public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default) =>
+    TrySendAsync(message, cancellationToken);
+
+  public async Task<EmailDelivery> TrySendAsync(EmailMessage message, CancellationToken cancellationToken = default)
   {
     try
     {
-      await DeliverAsync(message, cancellationToken);
+      return await DeliverAsync(message, cancellationToken);
     }
     catch (Exception ex) when (ex is not OperationCanceledException)
     {
-      // The user can ask for the message again; failing the registration or reset over it helps nobody.
       logger.LogError(ex, "Failed to send \"{Subject}\" to {To}.", message.Subject, message.To);
+      return new EmailDelivery(EmailDeliveryStatus.Failed, ex.Message);
     }
   }
 
-  private async Task DeliverAsync(EmailMessage message, CancellationToken cancellationToken)
+  private async Task<EmailDelivery> DeliverAsync(EmailMessage message, CancellationToken cancellationToken)
   {
     var settings = options.CurrentValue;
 
@@ -49,7 +77,7 @@ public sealed class EmailTransport(
         logger.LogInformation("Email sending is disabled; \"{Subject}\" to {To} was not sent.", message.Subject, message.To);
       }
 
-      return;
+      return new EmailDelivery(EmailDeliveryStatus.Disabled);
     }
 
     if (settings is not { SmtpHost: { Length: > 0 } host, SenderAddress: { Length: > 0 } sender })
@@ -82,5 +110,6 @@ public sealed class EmailTransport(
     await client.SendAsync(mime, cancellationToken);
     await client.DisconnectAsync(quit: true, cancellationToken);
     logger.LogInformation("Sent \"{Subject}\" to {To}.", message.Subject, message.To);
+    return EmailDelivery.Sent;
   }
 }

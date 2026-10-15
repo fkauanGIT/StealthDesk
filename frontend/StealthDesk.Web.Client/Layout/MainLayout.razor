@@ -45,6 +45,11 @@
     </nav>
 
     <main class="sd-content">
+        <AuthorizeView>
+            <Authorized>
+                <ServerAlertBanner />
+            </Authorized>
+        </AuthorizeView>
         @if (current is { Tabs.Count: > 1 } area)
         {
             <nav class="sd-tabs" aria-label="@area.Label">

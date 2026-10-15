@@ -1,11 +1,51 @@
 @page "/server/authorization-logs"
 @attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.ServerAuthorizationLogsRead)]
+@using StealthDesk.Web.Client.ServerAdministration
+@inject ServerAdministrationApi Server
+@inject IAuthorizationService Authorization
 
 <PageTitle>Server authorization log · StealthDesk</PageTitle>
 
 <header class="sd-page-header">
     <h1 class="sd-page-title">Server authorization log</h1>
 </header>
-<p class="sd-muted sd-page-lead">Changes to who can do what, across the tenants this server administers.</p>
+<p class="sd-muted sd-page-lead">Changes to who can do what: the server's own, or any tenant's.</p>
 
-<TenantLog />
+<div class="sd-log-source">
+    <SdSelect Label="Log of" Options="sources" Value="@source" ValueChanged="SourceChanged" />
+</div>
+
+<AuthorizationLogPanel TenantId="@SelectedTenant" />
+
+@code {
+    private const string ServerSource = "server";
+
+    private IReadOnlyList<SelectOption> sources = [new(ServerSource, "The server")];
+    private string? source = ServerSource;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private Guid? SelectedTenant => Guid.TryParse(source, out var id) ? id : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        var options = new List<SelectOption> { new(ServerSource, "The server") };
+
+        // Every tenant for whoever may list them; otherwise only their own.
+        if (user is not null && (await Authorization.AuthorizeAsync(user, PermissionPolicies.For(PermissionNames.ServerTenantsRead))).Succeeded
+            && (await Server.TenantsAsync()).Value is { } tenants)
+        {
+            options.AddRange(tenants.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name)));
+        }
+        else if (Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out var own))
+        {
+            options.Add(new SelectOption(own.ToString(), "Your tenant"));
+        }
+
+        sources = options;
+    }
+
+    private void SourceChanged(string? value) => source = value;
+}
