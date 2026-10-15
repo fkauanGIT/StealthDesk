@@ -13,7 +13,7 @@ public class AuthorizationLogTests
     await using var app = await UiApp.StartAsync();
     await app.RegisterAsync("admin@example.com", Password);
 
-    await app.ClickLinkAsync("Authorization log");
+    await app.OpenAsync("Activity");
     await Expect(app.Heading("Authorization log")).ToBeVisibleAsync();
     var row = app.Page.Locator(".sd-log-table tbody tr").First;
     await Expect(row).ToContainTextAsync("permission-assignments-seeded");
@@ -33,7 +33,7 @@ public class AuthorizationLogTests
     await app.ClickAsync("Apply filters");
     await Expect(app.Page.Locator(".sd-log-table tbody tr")).ToHaveCountAsync(1);
 
-    await app.ClickLinkAsync("Server log");
+    await app.OpenAsync("Server", "Server activity");
     await Expect(app.Heading("Server authorization log")).ToBeVisibleAsync();
   }
 
@@ -47,8 +47,8 @@ public class AuthorizationLogTests
     // Email sending is off in these tests, so the second account can sign in right away.
     await app.RegisterAsync("owner@example.com", Password);
 
-    await Expect(app.Page.GetByRole(AriaRole.Link, new() { Name = "Server log" })).ToHaveCountAsync(0);
-    await app.ClickLinkAsync("Authorization log");
+    await Expect(app.Area("Server")).ToHaveCountAsync(0);
+    await app.OpenAsync("Activity");
     await Expect(app.Page.Locator(".sd-log-table tbody tr")).ToHaveCountAsync(1);
 
     await app.GoAsync("server/authorization-logs");

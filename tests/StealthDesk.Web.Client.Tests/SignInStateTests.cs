@@ -151,6 +151,37 @@ public class SignInStateTests : AccountTestContext
   }
 
   [Fact]
+  public void Layout_GroupsPagesIntoAreas_AndShowsTheAreasPagesAsTabs()
+  {
+    Api.RespondWith(Ana with
+    {
+      Permissions =
+      [
+        Contracts.Permissions.PermissionNames.TenantUsersRead,
+        Contracts.Permissions.PermissionNames.TenantUserGroupsRead,
+        Contracts.Permissions.PermissionNames.InstallerKeyRead,
+      ],
+    });
+    Navigation.NavigateTo("user-groups/7");
+
+    var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
+
+    layout.WaitForAssertion(() => Assert.Equal(["Devices", "People & access", "Integrations"], layout.FindAll(".sd-nav-link").Select(x => x.TextContent.Trim())));
+    Assert.Equal("People & access", layout.Find(".sd-nav-link.active").TextContent.Trim());
+    Assert.Equal("users", layout.FindAll(".sd-nav-link")[1].GetAttribute("href"));
+    Assert.Equal(["People", "Groups"], layout.FindAll(".sd-tab").Select(x => x.TextContent.Trim()));
+    Assert.Equal("Groups", layout.Find(".sd-tab.active").TextContent.Trim());
+
+    // An area with a single page the user may open shows no tabs.
+    Navigation.NavigateTo("installer-keys");
+    layout.WaitForAssertion(() => Assert.Equal("Integrations", layout.Find(".sd-nav-link.active").TextContent.Trim()));
+    Assert.Empty(layout.FindAll(".sd-tabs"));
+
+    Navigation.NavigateTo("devices/42");
+    layout.WaitForAssertion(() => Assert.Equal("Devices", layout.Find(".sd-nav-link.active").TextContent.Trim()));
+  }
+
+  [Fact]
   public async Task Permissions_BecomePoliciesTheUserMeets()
   {
     Api.RespondWith(Ana with { Permissions = [Contracts.Permissions.PermissionNames.ServerAuthorizationLogsRead] });
@@ -183,6 +214,20 @@ public class SignInStateTests : AccountTestContext
     var layout = Render<CascadingAuthenticationState>(x => x.AddChildContent<MainLayout>());
 
     layout.WaitForAssertion(() => Assert.Equal("account/password-change-required", Location));
+  }
+
+  [Fact]
+  public void OnThePasswordChangePage_ItIsNotOpenedAgain()
+  {
+    Navigation.NavigateTo("account/password-change-required");
+    var moves = 0;
+    Navigation.LocationChanged += (_, _) => moves++;
+    var user = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+      [new System.Security.Claims.Claim(ServerAuthenticationState.MustChangePasswordClaim, "true")], "test"));
+
+    Render<RequirePasswordChange>(x => x.Add(p => p.User, user));
+
+    Assert.Equal(0, moves);
   }
 
   [Fact]

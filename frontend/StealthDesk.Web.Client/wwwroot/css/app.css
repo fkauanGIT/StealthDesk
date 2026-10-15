@@ -134,6 +134,44 @@ a:not([class]):hover {
   font-weight: 600;
 }
 
+/* An area's pages, above the page itself: the menu says where you are, the tabs what you're looking at. */
+.sd-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-1);
+  margin-bottom: var(--sd-space-6);
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.sd-tab {
+  position: relative;
+  padding: var(--sd-space-2) var(--sd-space-3) var(--sd-space-3);
+  color: var(--sd-text-muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sd-tab:hover {
+  color: var(--sd-text);
+  text-decoration: none;
+}
+
+.sd-tab.active {
+  color: var(--sd-text);
+  font-weight: 600;
+}
+
+.sd-tab.active::after {
+  content: "";
+  position: absolute;
+  right: var(--sd-space-3);
+  bottom: -1px;
+  left: var(--sd-space-3);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--sd-accent);
+}
+
 .sd-user {
   margin-top: auto;
   display: flex;

@@ -29,7 +29,7 @@ public class InstallerKeyTests
     Assert.StartsWith($@".\StealthDesk.Agent.exe run --server {app.Server.BaseAddress.GetLeftPart(UriPartial.Authority)}", command);
     await using var agent = await UiAgent.StartAsync(app.Server, "PC-FRONT", key);
 
-    await app.ClickLinkAsync("Installer keys");
+    await app.OpenAsync("Integrations", "Installer keys");
     var row = app.Page.Locator("tr[data-key='Front desk']");
     await Expect(row).ToContainTextAsync("1 of 2");
     await row.GetByRole(AriaRole.Button, new() { Name = "Usages" }).ClickAsync();
@@ -43,7 +43,7 @@ public class InstallerKeyTests
 
     var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => UiAgent.StartAsync(app.Server, "PC-LATE", key));
     Assert.Contains("Invalid installer key.", refused.Message);
-    await app.ClickLinkAsync("Devices");
+    await app.OpenAsync("Devices");
     await Expect(app.Page.Locator("tbody tr").Filter(new() { HasText = "PC-FRONT" }).Locator(".device-status")).ToHaveTextAsync("Online");
     await Expect(app.Page.Locator("tbody tr").Filter(new() { HasText = "PC-LATE" })).ToHaveCountAsync(0);
   }

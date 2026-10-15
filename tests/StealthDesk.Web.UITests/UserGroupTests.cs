@@ -18,7 +18,7 @@ public class UserGroupTests
     });
     Assert.Equal(201, created.Status);
 
-    await app.ClickLinkAsync("User groups");
+    await app.OpenAsync("People & access", "Groups");
     await Expect(app.Page.GetByText("No groups yet")).ToBeVisibleAsync();
     await app.ClickAsync("New group");
     await app.FillAsync("Name", "Support");
@@ -49,7 +49,7 @@ public class UserGroupTests
     await app.Page.Locator(".sd-dialog").GetByRole(AriaRole.Button, new() { Name = "Delete" }).ClickAsync();
     await Expect(app.Page.GetByText("No groups yet")).ToBeVisibleAsync();
 
-    await app.ClickLinkAsync("Authorization log");
+    await app.OpenAsync("Activity");
     foreach (var action in new[] { "user-group-created", "user-group-members-added", "user-group-updated", "user-group-members-removed", "user-group-deleted" })
     {
       await Expect(app.Page.Locator(".sd-log-table tbody tr").Filter(new() { HasText = action })).ToHaveCountAsync(1);

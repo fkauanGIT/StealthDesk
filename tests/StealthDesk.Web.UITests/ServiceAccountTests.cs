@@ -16,7 +16,7 @@ public class ServiceAccountTests
     await using var app = await UiApp.StartAsync();
     await app.RegisterAsync("admin@example.com", Password);
 
-    await app.ClickLinkAsync("Service accounts");
+    await app.OpenAsync("Integrations", "Service accounts");
     await Expect(app.Heading("Service accounts")).ToBeVisibleAsync();
     await app.ClickAsync("New account");
     await app.FillAsync("Name", "GLPI");
@@ -38,7 +38,7 @@ public class ServiceAccountTests
     Assert.Equal(HttpStatusCode.OK, (await script.GetAsync("api/v1/users", Cancel)).StatusCode);
     Assert.Equal(HttpStatusCode.Forbidden, (await script.GetAsync("api/v1/permission-assignments", Cancel)).StatusCode);
 
-    await app.ClickLinkAsync("Service accounts");
+    await app.OpenAsync("Integrations", "Service accounts");
     var account = app.Page.Locator("tr[data-account='GLPI']");
     await Expect(account).ToContainTextAsync("1 active of 1");
     await account.GetByRole(AriaRole.Button, new() { Name = "1 active of 1" }).ClickAsync();

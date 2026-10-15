@@ -7,6 +7,7 @@
 @inject ServerAuthenticationState AuthState
 @inject NavigationManager Navigation
 @inject ThemeState Theme
+@inject IAuthorizationService Authorization
 
 <div class="sd-shell">
     <nav class="sd-sidebar" aria-label="Main">
@@ -15,76 +16,14 @@
             StealthDesk
         </a>
         <div class="sd-nav">
-            <NavLink class="sd-nav-link" href="" Match="NavLinkMatch.All">
-                <SdIcon Name="IconName.Device" />
-                Devices
-            </NavLink>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.AgentInstall))">
-                <NavLink class="sd-nav-link" href="deploy">
-                    <SdIcon Name="IconName.Download" />
-                    Deploy
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.InstallerKeyRead))">
-                <NavLink class="sd-nav-link" href="installer-keys">
-                    <SdIcon Name="IconName.Key" />
-                    Installer keys
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersRead))">
-                <NavLink class="sd-nav-link" href="users">
-                    <SdIcon Name="IconName.Users" />
-                    Users
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUserGroupsRead))">
-                <NavLink class="sd-nav-link" href="user-groups">
-                    <SdIcon Name="IconName.Group" />
-                    User groups
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantPermissionsRead))">
-                <NavLink class="sd-nav-link" href="permissions">
-                    <SdIcon Name="IconName.Key" />
-                    Permissions
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.PersonalAccessTokenSelfRead))">
-                <NavLink class="sd-nav-link" href="personal-access-tokens">
-                    <SdIcon Name="IconName.Lock" />
-                    Access tokens
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServiceAccountRead))">
-                <NavLink class="sd-nav-link" href="service-accounts">
-                    <SdIcon Name="IconName.Key" />
-                    Service accounts
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantUsersWrite))">
-                <NavLink class="sd-nav-link" href="invites">
-                    <SdIcon Name="IconName.Mail" />
-                    Invites
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.TenantAuthorizationLogsRead))">
-                <NavLink class="sd-nav-link" href="authorization-logs">
-                    <SdIcon Name="IconName.History" />
-                    Authorization log
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServerServiceAccountsRead))">
-                <NavLink class="sd-nav-link" href="server/service-accounts" Match="NavLinkMatch.All">
-                    <SdIcon Name="IconName.Shield" />
-                    Server accounts
-                </NavLink>
-            </AuthorizeView>
-            <AuthorizeView Policy="@(PermissionPolicies.For(PermissionNames.ServerAuthorizationLogsRead))">
-                <NavLink class="sd-nav-link" href="server/authorization-logs">
-                    <SdIcon Name="IconName.Shield" />
-                    Server log
-                </NavLink>
-            </AuthorizeView>
+            @foreach (var section in sections)
+            {
+                <a class="sd-nav-link @(section == current ? "active" : null)" href="@section.Tabs[0].Href"
+                   aria-current="@(section == current ? "page" : null)">
+                    <SdIcon Name="section.Icon" />
+                    @section.Label
+                </a>
+            }
         </div>
 
         <AuthorizeView>
@@ -106,6 +45,15 @@
     </nav>
 
     <main class="sd-content">
+        @if (current is { Tabs.Count: > 1 } area)
+        {
+            <nav class="sd-tabs" aria-label="@area.Label">
+                @foreach (var tab in area.Tabs)
+                {
+                    <a class="sd-tab @(tab == currentTab ? "active" : null)" href="@tab.Href" aria-current="@(tab == currentTab ? "page" : null)">@tab.Label</a>
+                }
+            </nav>
+        }
         @Body
     </main>
 </div>
@@ -114,17 +62,78 @@
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
 
+    // The areas and tabs this user may open; an area with none of its pages allowed isn't shown.
+    private IReadOnlyList<AppSection> sections = [];
+    private AppSection? current;
+    private SectionTab? currentTab;
+
     protected override async Task OnInitializedAsync()
     {
         Store.SessionExpired += OnSessionExpired;
+        Navigation.LocationChanged += OnLocationChanged;
+        AuthState.AuthenticationStateChanged += OnAuthenticationStateChanged;
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        await ShowSectionsAsync(user);
         if (Enum.TryParse<ThemeMode>(user?.FindFirst(ServerAuthenticationState.ThemeClaim)?.Value, out var theme))
         {
             await Theme.UseAccountThemeAsync(theme);
         }
     }
 
-    public void Dispose() => Store.SessionExpired -= OnSessionExpired;
+    public void Dispose()
+    {
+        Store.SessionExpired -= OnSessionExpired;
+        Navigation.LocationChanged -= OnLocationChanged;
+        AuthState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+
+    private async Task ShowSectionsAsync(System.Security.Claims.ClaimsPrincipal? user)
+    {
+        var visible = new List<AppSection>();
+        foreach (var section in AppSections.All)
+        {
+            var tabs = new List<SectionTab>();
+            foreach (var tab in section.Tabs)
+            {
+                if (tab.Policy is null || (user is not null && (await Authorization.AuthorizeAsync(user, tab.Policy)).Succeeded))
+                {
+                    tabs.Add(tab);
+                }
+            }
+
+            if (tabs.Count > 0)
+            {
+                visible.Add(section with { Tabs = tabs });
+            }
+        }
+
+        sections = visible;
+        Locate();
+    }
+
+    private void Locate()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        current = AppSections.For(path, sections);
+        currentTab = current?.TabFor(path);
+    }
+
+    // Only a new area or tab changes the menu; any other move leaves the layout as it is.
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        var (area, tab) = (current, currentTab);
+        Locate();
+        if (area != current || tab != currentTab)
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> state) => InvokeAsync(async () =>
+    {
+        await ShowSectionsAsync((await state).User);
+        StateHasChanged();
+    });
 
     private void OnSessionExpired() => InvokeAsync(async () =>
     {
