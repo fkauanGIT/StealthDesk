@@ -15,6 +15,8 @@ public class DeviceDetailsTests : BunitContext
     Services.AddSingleton(_api.CreateClient());
     Services.AddSingleton<DeviceStore>();
     Services.AddSingleton<ILiveUpdates>(new FakeLiveUpdates());
+    Services.AddSingleton<StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi>();
+    AddAuthorization();
   }
 
   private DeviceStore Store => Services.GetRequiredService<DeviceStore>();

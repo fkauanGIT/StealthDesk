@@ -59,6 +59,11 @@ public class LayoutTests
       await AssertFitsAsync(app, page.Replace('/', '-'));
     }
 
+    await app.GoAsync("device-groups");
+    await Expect(app.Heading("Device groups")).ToBeVisibleAsync();
+    await app.Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    await AssertFitsAsync(app, "device-groups");
+
     await app.GoAsync("settings");
     await Expect(app.Heading("Tenant settings")).ToBeVisibleAsync();
     await AssertFitsAsync(app, "settings");

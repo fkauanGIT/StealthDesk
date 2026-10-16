@@ -28,7 +28,11 @@ public static class AppSections
 {
   public static IReadOnlyList<AppSection> All { get; } =
   [
-    new("Devices", IconName.Device, [new("Devices", string.Empty, null)], AlsoCovers: ["devices"]),
+    new("Devices", IconName.Device,
+    [
+      new("Devices", string.Empty, null),
+      new("Groups", "device-groups", For(PermissionNames.TenantDeviceGroupsRead)),
+    ], AlsoCovers: ["devices"]),
     new("People & access", IconName.Users,
     [
       new("People", "users", For(PermissionNames.TenantUsersRead)),

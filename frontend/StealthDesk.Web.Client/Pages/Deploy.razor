@@ -12,6 +12,7 @@
 @inject TimeProvider Clock
 @inject DeviceStore Devices
 @inject StealthDesk.Web.Client.TenantSettings.TenantSettingApi Settings
+@inject StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi DeviceGroups
 
 <PageTitle>Add a device · StealthDesk</PageTitle>
 
@@ -49,6 +50,10 @@
                 <SdSegmented TValue="InstallerKeyType" Label="Type" Options="Types" @bind-Value="type" />
                 <p class="sd-field-hint" data-type-hint>@TypeHint</p>
                 <SdTextField Label="Name (optional)" Placeholder="Where it's used, e.g. Front desk PCs" Autocomplete="off" @bind-Value="name" />
+                @if (groupOptions.Count > 1)
+                {
+                    <SdSelect Label="Device group (optional)" Options="groupOptions" @bind-Value="groupChoice" />
+                }
                 @if (type == InstallerKeyType.UsageBased)
                 {
                     <SdTextField Label="Uses" Type="number" min="1" @bind-Value="uses" />
@@ -167,6 +172,8 @@ else
     private string? deviceId;
     private bool canCreate;
     private string? instance;
+    private IReadOnlyList<SelectOption> groupOptions = [];
+    private string? groupChoice = string.Empty;
     private DeviceSummary? joined;
     private HashSet<Guid> knownBefore = [];
     private DateTimeOffset watchingSince;
@@ -221,6 +228,16 @@ else
 
         // The tenant may name an agent instance; without its options the commands simply name none.
         instance = (await Settings.DeploymentOptionsAsync()).Value?.InstanceName;
+
+        // New devices can join a group, for whoever may read the groups; the server checks they may fill it.
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (canCreate && user is not null
+            && (await Authorization.AuthorizeAsync(user, PermissionPolicies.For(PermissionNames.TenantDeviceGroupsRead))).Succeeded
+            && Guid.TryParse(user.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out var tenant)
+            && (await DeviceGroups.ListAsync(tenant)).Value is { } groups)
+        {
+            groupOptions = [new(string.Empty, "No group"), .. groups.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
+        }
     }
 
     private async Task LoadExistingAsync()
@@ -266,7 +283,12 @@ else
         }
 
         busy = true;
-        var result = await Api.CreateAsync(new CreateInstallerKeyRequest(type, string.IsNullOrWhiteSpace(name) ? null : name.Trim(), allowedUses, expiresAt));
+        var result = await Api.CreateAsync(new CreateInstallerKeyRequest(
+            type,
+            string.IsNullOrWhiteSpace(name) ? null : name.Trim(),
+            allowedUses,
+            expiresAt,
+            Guid.TryParse(groupChoice, out var group) ? group : null));
         busy = false;
         if (Expired(result.SessionExpired))
         {
@@ -348,7 +370,7 @@ else
         InstallerKeyType.UsageBased => $"This key installs {key.AllowedUses} agent{(key.AllowedUses == 1 ? string.Empty : "s")} in all, until {Date(key.ExpiresAt)}.",
         InstallerKeyType.TimeBased => $"This key works until {Date(key.ExpiresAt)}.",
         _ => "This key works until it is revoked.",
-    };
+    } + (key.DeviceGroupName is { } group ? $" New devices join the group {group}." : string.Empty);
 
     private static string Date(DateTimeOffset? value) => value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "it is revoked";
 

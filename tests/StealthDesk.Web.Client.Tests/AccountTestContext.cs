@@ -24,6 +24,7 @@ public abstract class AccountTestContext : BunitContext
     Services.AddSingleton<IThemeBridge>(Theme);
     Services.AddSingleton<ThemeState>();
     Services.AddSingleton<StealthDesk.Web.Client.ServerAdministration.IServerAlerts>(Alerts);
+    Services.AddSingleton<StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi>();
   }
 
   /// <summary>The server's alert as the layout reads it; none unless a test sets one.</summary>

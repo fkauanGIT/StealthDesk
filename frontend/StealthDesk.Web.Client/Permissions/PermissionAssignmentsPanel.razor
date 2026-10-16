@@ -3,6 +3,7 @@
 @using StealthDesk.Web.Client.UserGroups
 @inject PermissionApi Api
 @inject UserGroupApi Groups
+@inject StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi DeviceGroupList
 @inject HttpClient Http
 @inject SessionGuard Session
 @inject IAuthorizationService Authorization
@@ -143,7 +144,7 @@ else
     </SdCard>
 }
 
-<AssignmentForm Open="formOpen" Editing="editing" Catalog="catalog" Devices="devices" Groups="groups"
+<AssignmentForm Open="formOpen" Editing="editing" Catalog="catalog" Devices="devices" Groups="groups" DeviceGroups="deviceGroups"
                 CanDeny="canDeny" CanManageServer="canManageServer" OnClose="() => formOpen = false" OnSubmit="SaveAsync" />
 
 <SdDialog Open="confirmingDelete" Title="Delete these permissions?" OnClose="() => confirmingDelete = false">
@@ -166,6 +167,7 @@ else
     private IReadOnlyList<PermissionPresetEntry>? presets;
     private IReadOnlyList<SelectOption> devices = [];
     private IReadOnlyList<SelectOption> groups = [];
+    private IReadOnlyList<SelectOption> deviceGroups = [];
     private PermissionAssignment? editing;
     private EffectivePermission? checkResult;
     private string? checkPermission;
@@ -201,6 +203,7 @@ else
         new(PermissionScopeKind.Server.ToString(), "The server"),
         .. devices.Select(x => new SelectOption($"{PermissionScopeKind.Device}:{x.Value}", $"Device · {x.Text}")),
         .. groups.Select(x => new SelectOption($"{PermissionScopeKind.UserGroup}:{x.Value}", $"User group · {x.Text}")),
+        .. deviceGroups.Select(x => new SelectOption($"{PermissionScopeKind.DeviceGroup}:{x.Value}", $"Device group · {x.Text}")),
     ];
 
     protected override async Task OnInitializedAsync()
@@ -248,6 +251,13 @@ else
         if ((await Groups.ListAsync(TenantId)).Value is { } list2)
         {
             groups = [.. list2.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
+        }
+
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (user is not null && await HoldsAsync(user, PermissionNames.TenantDeviceGroupsRead)
+            && (await DeviceGroupList.ListAsync(TenantId)).Value is { } list3)
+        {
+            deviceGroups = [.. list3.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
         }
     }
 
@@ -368,6 +378,7 @@ else
         PermissionScopeKind.Tenant => "This tenant",
         PermissionScopeKind.Device => $"Device · {devices.FirstOrDefault(x => x.Value == id.ToString())?.Text ?? id.ToString()}",
         PermissionScopeKind.UserGroup => $"User group · {groups.FirstOrDefault(x => x.Value == id.ToString())?.Text ?? id.ToString()}",
+        PermissionScopeKind.DeviceGroup => $"Device group · {deviceGroups.FirstOrDefault(x => x.Value == id.ToString())?.Text ?? id.ToString()}",
         _ => scope.ToString(),
     };
 

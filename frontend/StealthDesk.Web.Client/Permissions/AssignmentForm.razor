@@ -13,9 +13,9 @@
             }
             <SdSelect Label="Effect" Options="EffectOptions" Value="@effect.ToString()" ValueChanged="v => effect = Enum.Parse<PermissionEffect>(v!)" />
             <SdSelect Label="Scope" Options="ScopeOptions" Value="@scope.ToString()" ValueChanged="ScopeChanged" />
-            @if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup)
+            @if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup or PermissionScopeKind.DeviceGroup)
             {
-                <SdSelect Label="@(scope == PermissionScopeKind.Device ? "Device" : "User group")" Options="TargetOptions" Value="@scopeId" ValueChanged="v => scopeId = v" />
+                <SdSelect Label="@TargetLabel" Options="TargetOptions" Value="@scopeId" ValueChanged="v => scopeId = v" />
             }
             <SdTextField Label="Notes" @bind-Value="notes" Autocomplete="off" Hint="Optional. Why it's granted." />
             <SdCheckbox Label="Enabled" @bind-Checked="enabled" />
@@ -55,6 +55,9 @@
     public IReadOnlyList<SelectOption> Groups { get; set; } = [];
 
     [Parameter]
+    public IReadOnlyList<SelectOption> DeviceGroups { get; set; } = [];
+
+    [Parameter]
     public bool CanDeny { get; set; }
 
     [Parameter]
@@ -83,17 +86,30 @@
             .Where(x => x != PermissionScopeKind.Server || CanManageServer || scope == PermissionScopeKind.Server)
             .Where(x => x != PermissionScopeKind.Device || Devices.Count > 0)
             .Where(x => x != PermissionScopeKind.UserGroup || Groups.Count > 0)
+            .Where(x => x != PermissionScopeKind.DeviceGroup || DeviceGroups.Count > 0)
             .Select(x => new SelectOption(x.ToString(), x switch
             {
                 PermissionScopeKind.Server => "The server",
                 PermissionScopeKind.Tenant => "This tenant",
                 PermissionScopeKind.Device => "One device",
                 PermissionScopeKind.UserGroup => "One user group",
+                PermissionScopeKind.DeviceGroup => "One device group",
                 _ => x.ToString(),
             }))];
 
-    private IReadOnlyList<SelectOption> TargetOptions =>
-        [new(string.Empty, scope == PermissionScopeKind.Device ? "Choose a device" : "Choose a user group"), .. scope == PermissionScopeKind.Device ? Devices : Groups];
+    private string TargetLabel => scope switch
+    {
+        PermissionScopeKind.Device => "Device",
+        PermissionScopeKind.DeviceGroup => "Device group",
+        _ => "User group",
+    };
+
+    private IReadOnlyList<SelectOption> TargetOptions => scope switch
+    {
+        PermissionScopeKind.Device => [new(string.Empty, "Choose a device"), .. Devices],
+        PermissionScopeKind.DeviceGroup => [new(string.Empty, "Choose a device group"), .. DeviceGroups],
+        _ => [new(string.Empty, "Choose a user group"), .. Groups],
+    };
 
     // Each time it opens, it starts from the assignment being changed, or blank.
     protected override void OnParametersSet()
@@ -138,9 +154,9 @@
         }
 
         Guid? target = Guid.TryParse(scopeId, out var id) ? id : null;
-        if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup && target is null)
+        if (scope is PermissionScopeKind.Device or PermissionScopeKind.UserGroup or PermissionScopeKind.DeviceGroup && target is null)
         {
-            error = scope == PermissionScopeKind.Device ? "Choose a device." : "Choose a user group.";
+            error = $"Choose a {TargetLabel.ToLowerInvariant()}.";
             return;
         }
 

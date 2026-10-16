@@ -114,6 +114,36 @@ public sealed class DeviceStore(HttpClient http)
 
   public DeviceSummary? Get(Guid id) => _devices.GetValueOrDefault(id);
 
+  /// <summary>
+  /// Reads one device again, after a change this page made that no push announces, such as its groups. A device
+  /// already listed is replaced; the list stays as it is otherwise.
+  /// </summary>
+  public async Task<DeviceSummary?> RefreshAsync(Guid id)
+  {
+    try
+    {
+      using var response = await http.GetAsync(Routes.Device(id));
+      if (response.StatusCode == HttpStatusCode.Unauthorized)
+      {
+        ReportSessionExpired();
+        return null;
+      }
+
+      if (!response.IsSuccessStatusCode || await response.Content.ReadFromJsonAsync<DeviceSummary>() is not { } device)
+      {
+        return null;
+      }
+
+      _devices[id] = device;
+      Publish();
+      return device;
+    }
+    catch (Exception ex) when (ex is HttpRequestException or JsonException)
+    {
+      return null;
+    }
+  }
+
   /// <summary>Every device known, listed or opened directly: the ones live updates subscribe to.</summary>
   public IReadOnlyCollection<Guid> KnownIds => _devices.Keys;
 

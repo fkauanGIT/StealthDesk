@@ -26,6 +26,7 @@ builder.Services.AddScoped<AuthorizationLogApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Users.UserApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Invites.InviteApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.UserGroups.UserGroupApi>();
+builder.Services.AddScoped<StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.Permissions.PermissionApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.PersonalAccessTokens.PersonalAccessTokenApi>();
 builder.Services.AddScoped<StealthDesk.Web.Client.ServiceAccounts.ServiceAccountApi>();
