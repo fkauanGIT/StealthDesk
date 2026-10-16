@@ -27,7 +27,7 @@ public interface IPermissionEvaluator
 public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
 {
   public async Task<PermissionDecision> EvaluateAsync(Principal principal, string permission, Resource resource, CancellationToken cancellationToken = default) =>
-    PermissionRules.Evaluate(await RulesAsync(principal, cancellationToken), permission, resource);
+    PermissionRules.Evaluate(await RulesAsync(principal, cancellationToken), permission, await WithGroupsAsync(resource, cancellationToken));
 
   public async Task<IReadOnlyDictionary<string, PermissionDecision>> EvaluateManyAsync(
     Principal principal,
@@ -36,9 +36,22 @@ public sealed class PermissionEvaluator(StealthDeskDb db) : IPermissionEvaluator
     CancellationToken cancellationToken = default)
   {
     var rules = await RulesAsync(principal, cancellationToken);
+    resource = await WithGroupsAsync(resource, cancellationToken);
     return permissions
       .Distinct(StringComparer.Ordinal)
       .ToDictionary(x => x, x => PermissionRules.Evaluate(rules, x, resource), StringComparer.Ordinal);
+  }
+
+  // A device is decided with the groups it is in, read here so no caller can leave them out.
+  private async Task<Resource> WithGroupsAsync(Resource resource, CancellationToken cancellationToken)
+  {
+    if (resource is not { Kind: PermissionScopeKind.Device, Id: { } device, DeviceGroups: null })
+    {
+      return resource;
+    }
+
+    var groups = await db.DeviceGroupMembers.AsNoTracking().Where(x => x.DeviceId == device).Select(x => x.DeviceGroupId).ToListAsync(cancellationToken);
+    return resource with { DeviceGroups = groups };
   }
 
   // A personal access token acts as its owner: inheriting, the owner's rules decide; restricted, the token's own

@@ -91,6 +91,7 @@ public sealed class TenantService(StealthDeskDb db, TimeProvider clock)
       db.Users.RemoveRange(await db.Users.IgnoreQueryFilters().Where(x => x.TenantId == id).ToListAsync(cancellationToken));
       db.Devices.RemoveRange(await db.Devices.IgnoreQueryFilters().Where(x => x.TenantId == id).ToListAsync(cancellationToken));
       db.UserGroups.RemoveRange(await db.UserGroups.IgnoreQueryFilters().Include(x => x.Members).Where(x => x.TenantId == id).ToListAsync(cancellationToken));
+      db.DeviceGroups.RemoveRange(await db.DeviceGroups.IgnoreQueryFilters().Include(x => x.Members).Where(x => x.TenantId == id).ToListAsync(cancellationToken));
       db.TenantInvites.RemoveRange(await db.TenantInvites.IgnoreQueryFilters().Where(x => x.TenantId == id).ToListAsync(cancellationToken));
       db.InstallerKeys.RemoveRange(await db.InstallerKeys.IgnoreQueryFilters().Include(x => x.Usages).Where(x => x.TenantId == id).ToListAsync(cancellationToken));
       db.TenantSettings.RemoveRange(await db.TenantSettings.IgnoreQueryFilters().Where(x => x.TenantId == id).ToListAsync(cancellationToken));

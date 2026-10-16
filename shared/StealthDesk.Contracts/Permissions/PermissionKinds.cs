@@ -17,6 +17,9 @@ public enum PermissionScopeKind
 
   /// <summary>One user group, for managing that group.</summary>
   UserGroup = 4,
+
+  /// <summary>One device group: the group itself, and every device in it.</summary>
+  DeviceGroup = 5,
 }
 
 public enum PermissionEffect

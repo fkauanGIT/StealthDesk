@@ -3,6 +3,8 @@
 @implements IDisposable
 @inject DeviceStore Store
 @inject ILiveUpdates Live
+@inject StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi DeviceGroups
+@inject IAuthorizationService Authorization
 
 <PageTitle>Devices · StealthDesk</PageTitle>
 
@@ -74,7 +76,15 @@ else
         <div class="sd-stat"><span class="sd-stat-label">Offline</span><span class="sd-stat-value" data-stat="offline">@(Store.Devices.Count - online)</span></div>
     </div>
 
-    <SdSegmented TValue="StatusFilter" Label="Show devices" Options="Filters" @bind-Value="filter" />
+    <div class="sd-device-filters">
+        <SdSegmented TValue="StatusFilter" Label="Show devices" Options="Filters" @bind-Value="filter" />
+        @if (groups.Count > 0)
+        {
+            <div class="sd-device-group-filter">
+                <SdSelect Label="Group" Options="GroupOptions" @bind-Value="groupFilter" />
+            </div>
+        }
+    </div>
 
     @if (shown.Count == 0)
     {
@@ -150,6 +160,14 @@ else
         [(StatusFilter.All, "All"), (StatusFilter.Online, "Online"), (StatusFilter.Offline, "Offline")];
 
     private string search = string.Empty;
+    private string? groupFilter = string.Empty;
+    private IReadOnlyList<StealthDesk.Contracts.DeviceGroups.DeviceGroupSummary> groups = [];
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private IReadOnlyList<SelectOption> GroupOptions =>
+        [new(string.Empty, "All groups"), .. groups.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
     private StatusFilter filter = StatusFilter.All;
 
     private enum StatusFilter
@@ -167,6 +185,21 @@ else
         // Listening starts before loading, so no change can fall between the two.
         _ = Live.StartAsync();
         await Store.LoadAsync();
+        await LoadGroupsAsync();
+    }
+
+    // Filtering by group needs the right to read the groups; without it the filter isn't offered.
+    private async Task LoadGroupsAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        if (user is null
+            || !(await Authorization.AuthorizeAsync(user, PermissionPolicies.For(PermissionNames.TenantDeviceGroupsRead))).Succeeded
+            || !Guid.TryParse(user.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out var tenant))
+        {
+            return;
+        }
+
+        groups = (await DeviceGroups.ListAsync(tenant)).Value?.Items ?? [];
     }
 
     public void Dispose()
@@ -183,6 +216,7 @@ else
         var term = search.Trim();
         return devices.Where(x =>
             (filter == StatusFilter.All || x.IsOnline == (filter == StatusFilter.Online))
+            && (!Guid.TryParse(groupFilter, out var group) || x.GroupIds.Contains(group))
             && (term.Length == 0 || Matches(x, term)));
     }
 

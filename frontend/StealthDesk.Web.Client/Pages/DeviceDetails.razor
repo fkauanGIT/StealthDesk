@@ -30,9 +30,49 @@ else
         <div>
             <h1 class="sd-page-title">@device.Name</h1>
             <p class="sd-muted">@Subtitle(device)</p>
+            @if (canReadGroups)
+            {
+                <div class="sd-device-groups">
+                    <span class="sd-device-groups" data-groups>
+                        @foreach (var (id, name) in GroupNames(device))
+                        {
+                            <a class="sd-chip" href="device-groups/@id">@name</a>
+                        }
+                    </span>
+                    @if (device.GroupIds.Count == 0)
+                    {
+                        <span class="sd-muted">In no group</span>
+                    }
+                    @if (canAssignGroups && groupNames.Count > 0)
+                    {
+                        <SdButton Variant="ButtonVariant.Ghost" OnClick="OpenGroups">Change groups</SdButton>
+                    }
+                </div>
+            }
         </div>
         <DeviceStatus IsOnline="device.IsOnline" />
     </header>
+
+    @if (groupsError is not null)
+    {
+        <SdAlert>@groupsError</SdAlert>
+    }
+
+    <SdDialog Open="choosingGroups" Title="Groups" OnClose="() => choosingGroups = false">
+        <ChildContent>
+            <p class="sd-muted">@device.Name gets the access granted on each group it is in.</p>
+            <div class="sd-member-picker">
+                @foreach (var (id, name) in groupNames.OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase).Select(x => (x.Key, x.Value)))
+                {
+                    <SdCheckbox Label="@name" Checked="chosen.Contains(id)" CheckedChanged="on => Choose(id, on)" />
+                }
+            </div>
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => choosingGroups = false">Cancel</SdButton>
+            <SdButton Disabled="savingGroups" OnClick="SaveGroupsAsync">@(savingGroups ? "Saving..." : "Save")</SdButton>
+        </Footer>
+    </SdDialog>
 
     <div class="sd-grid">
         <div class="sd-stat">
@@ -121,6 +161,27 @@ else
 @code {
     private DeviceLookup? lookup;
     private DeviceSummary? device;
+    private IReadOnlyDictionary<Guid, string> groupNames = new Dictionary<Guid, string>();
+    private readonly HashSet<Guid> chosen = [];
+    private bool canReadGroups;
+    private bool canAssignGroups;
+    private bool choosingGroups;
+    private bool savingGroups;
+    private string? groupsError;
+    private Guid tenantId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    [Inject]
+    private StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi DeviceGroups { get; set; } = default!;
+
+    [Inject]
+    private IAuthorizationService Authorization { get; set; } = default!;
+
+    // Names of the groups the device is in; only for whoever may read the groups.
+    private IReadOnlyList<(Guid Id, string Name)> GroupNames(DeviceSummary device) =>
+        [.. device.GroupIds.Where(groupNames.ContainsKey).Select(x => (x, groupNames[x])).OrderBy(x => x.Item2, StringComparer.OrdinalIgnoreCase)];
 
     [Parameter]
     public Guid Id { get; set; }
@@ -136,6 +197,83 @@ else
         lookup = null;
         lookup = await Store.FindAsync(Id);
         device = lookup.Device;
+
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        canReadGroups = device is not null && user is not null
+            && (await Authorization.AuthorizeAsync(user, PermissionPolicies.For(PermissionNames.TenantDeviceGroupsRead))).Succeeded
+            && Guid.TryParse(user.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        if (canReadGroups)
+        {
+            canAssignGroups = (await Authorization.AuthorizeAsync(user!, PermissionPolicies.For(PermissionNames.DeviceGroupAssignDevices))).Succeeded;
+            groupNames = (await DeviceGroups.ListAsync(tenantId)).Value?.Items.ToDictionary(x => x.Id, x => x.Name) ?? new Dictionary<Guid, string>();
+        }
+    }
+
+    private void OpenGroups()
+    {
+        chosen.Clear();
+        chosen.UnionWith(device!.GroupIds);
+        groupsError = null;
+        choosingGroups = true;
+    }
+
+    private void Choose(Guid group, bool on)
+    {
+        if (on)
+        {
+            chosen.Add(group);
+        }
+        else
+        {
+            chosen.Remove(group);
+        }
+    }
+
+    // Each group added or left is a change of that group, checked against what the user may do there. Leaving one
+    // group for another is a move: one change, as when moving from the group's page.
+    private async Task SaveGroupsAsync()
+    {
+        var current = device!.GroupIds.ToHashSet();
+        var joining = chosen.Where(x => !current.Contains(x)).ToList();
+        var leaving = current.Where(x => !chosen.Contains(x)).ToList();
+        savingGroups = true;
+        var errors = new List<string>();
+        if (joining.Count == 1 && leaving.Count == 1)
+        {
+            Collect(await DeviceGroups.AddDevicesAsync(joining[0], tenantId, [device.Id], fromGroupId: leaving[0]), errors);
+        }
+        else
+        {
+            foreach (var group in joining)
+            {
+                Collect(await DeviceGroups.AddDevicesAsync(group, tenantId, [device.Id]), errors);
+            }
+
+            foreach (var group in leaving)
+            {
+                Collect(await DeviceGroups.RemoveDevicesAsync(group, tenantId, [device.Id]), errors);
+            }
+        }
+
+        savingGroups = false;
+        choosingGroups = false;
+        groupsError = errors.Count == 0 ? null : string.Join(" ", errors.Distinct());
+        if (await Store.RefreshAsync(Id) is { } updated)
+        {
+            device = updated;
+        }
+    }
+
+    private void Collect(StealthDesk.Web.Client.UserGroups.GroupResult<bool> result, List<string> errors)
+    {
+        if (result.SessionExpired)
+        {
+            Store.ReportSessionExpired();
+        }
+        else if (result.Error is { } error)
+        {
+            errors.Add(error);
+        }
     }
 
     public void Dispose() => Store.Changed -= OnStoreChanged;

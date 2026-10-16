@@ -20,6 +20,8 @@ public static class PermissionNames
 
   // A tenant and the people in it.
   public const string TenantAuthorizationLogsRead = "tenant.authorization-logs.read";
+  public const string TenantDeviceGroupsRead = "tenant.device-groups.read";
+  public const string TenantDeviceGroupsWrite = "tenant.device-groups.write";
   public const string TenantPermissionsDeny = "tenant.permissions.deny";
   public const string TenantPermissionsRead = "tenant.permissions.read";
   public const string TenantPermissionsWrite = "tenant.permissions.write";
@@ -34,6 +36,7 @@ public static class PermissionNames
   public const string UserGroupAssignUsers = "user-group.assign-users";
 
   // Devices.
+  public const string DeviceGroupAssignDevices = "device-group.assign-devices";
   public const string DeviceRead = "device.read";
 
   // Credentials and agents.

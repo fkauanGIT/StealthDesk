@@ -41,7 +41,7 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
   {
     var device = report.DeviceId == Guid.Empty
       ? null
-      : await db.Devices.FirstOrDefaultAsync(x => x.Id == report.DeviceId, cancellationToken);
+      : await db.Devices.Include(x => x.GroupMemberships).FirstOrDefaultAsync(x => x.Id == report.DeviceId, cancellationToken);
 
     if (device is null)
     {
@@ -73,7 +73,7 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
 
   public async Task<DeviceRecord?> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default)
   {
-    var device = await db.Devices.FirstOrDefaultAsync(
+    var device = await db.Devices.Include(x => x.GroupMemberships).FirstOrDefaultAsync(
       x => x.Id == deviceId && x.ConnectionId == connectionId,
       cancellationToken);
 

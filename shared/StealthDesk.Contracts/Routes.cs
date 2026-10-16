@@ -59,6 +59,11 @@ public static class Routes
   public static string InstallerKey(Guid id) => $"{InstallerKeys}/{id}";
   public static string InstallerKeyUsages(Guid id) => $"{InstallerKeys}/{id}/usages";
 
+  /// <summary>A tenant's device groups (<c>?tenantId=</c>) and their devices.</summary>
+  public const string DeviceGroups = "/api/v1/device-groups";
+  public static string DeviceGroup(Guid id) => $"{DeviceGroups}/{id}";
+  public static string DeviceGroupMembers(Guid id) => $"{DeviceGroups}/{id}/members";
+
   /// <summary>A tenant's user groups (<c>?tenantId=</c>) and their members.</summary>
   public const string UserGroups = "/api/v1/user-groups";
   public static string UserGroup(Guid id) => $"{UserGroups}/{id}";

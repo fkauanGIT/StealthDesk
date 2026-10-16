@@ -3,6 +3,12 @@ namespace StealthDesk.Contracts.AuthorizationLogs;
 /// <summary>What an authorization change log entry records. Stored as readable text, to make raw queries easy.</summary>
 public static class AuthorizationChangeActions
 {
+  public const string DeviceGroupCreated = "device-group-created";
+  public const string DeviceGroupDeleted = "device-group-deleted";
+  public const string DeviceGroupMembersAdded = "device-group-members-added";
+  public const string DeviceGroupMembersMoved = "device-group-members-moved";
+  public const string DeviceGroupMembersRemoved = "device-group-members-removed";
+  public const string DeviceGroupUpdated = "device-group-updated";
   public const string InstallerKeyCreated = "installer-key-created";
   public const string InstallerKeyDeleted = "installer-key-deleted";
   public const string InstallerKeyRenamed = "installer-key-renamed";
@@ -39,6 +45,7 @@ public static class AuthorizationChangeActors
 /// <summary>What the change was made to.</summary>
 public static class AuthorizationChangeTargets
 {
+  public const string DeviceGroup = "DeviceGroup";
   public const string InstallerKey = "InstallerKey";
   public const string PermissionAssignment = "PermissionAssignment";
   public const string PersonalAccessToken = "PersonalAccessToken";

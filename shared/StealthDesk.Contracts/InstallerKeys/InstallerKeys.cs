@@ -31,6 +31,7 @@ public static class InstallerKeyRules
 /// <param name="AllowedUses">For a usage-based key; none otherwise.</param>
 /// <param name="ExpiresAt">None for a persistent key.</param>
 /// <param name="UsageCount">Installs within the usage history kept.</param>
+/// <param name="DeviceGroupId">The group new devices are put in, if any.</param>
 public sealed record InstallerKey(
   Guid Id,
   string? Name,
@@ -41,7 +42,9 @@ public sealed record InstallerKey(
   DateTimeOffset CreatedAt,
   int? AllowedUses,
   DateTimeOffset? ExpiresAt,
-  int UsageCount);
+  int UsageCount,
+  Guid? DeviceGroupId = null,
+  string? DeviceGroupName = null);
 
 public sealed class InstallerKeyList
 {
@@ -58,11 +61,13 @@ public sealed class InstallerKeyUsageList
 
 /// <param name="AllowedUses">Required for a usage-based key, ignored otherwise.</param>
 /// <param name="ExpiresAt">Required for a time-based key, in the future; ignored otherwise.</param>
+/// <param name="DeviceGroupId">A device group new devices are put in; only one its creator may add devices to.</param>
 public sealed record CreateInstallerKeyRequest(
   InstallerKeyType Type,
   string? Name = null,
   int? AllowedUses = null,
-  DateTimeOffset? ExpiresAt = null)
+  DateTimeOffset? ExpiresAt = null,
+  Guid? DeviceGroupId = null)
 {
   public const int NameMax = 200;
 }

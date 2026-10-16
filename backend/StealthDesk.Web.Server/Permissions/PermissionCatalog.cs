@@ -27,6 +27,7 @@ public static class PermissionCatalog
   public static class Categories
   {
     public const string Agents = "Agents";
+    public const string DeviceGroups = "Device Groups";
     public const string Devices = "Devices";
     public const string InstallerKeys = "Installer Keys";
     public const string PersonalAccessTokens = "Personal Access Tokens";
@@ -39,8 +40,10 @@ public static class PermissionCatalog
   private static readonly PermissionScopeKind[] ServerOnly = [PermissionScopeKind.Server];
   private static readonly PermissionScopeKind[] TenantOnly = [PermissionScopeKind.Tenant];
 
-  // A device permission can be granted for one device, the whole tenant, or (for server principals) every tenant.
-  private static readonly PermissionScopeKind[] Devices = [PermissionScopeKind.Device, PermissionScopeKind.Tenant, PermissionScopeKind.Server];
+  // A device permission can be granted for one device, the devices of a group, the whole tenant, or (for server
+  // principals) every tenant.
+  private static readonly PermissionScopeKind[] Devices = [PermissionScopeKind.Device, PermissionScopeKind.DeviceGroup, PermissionScopeKind.Tenant, PermissionScopeKind.Server];
+  private static readonly PermissionScopeKind[] DeviceGroups = [PermissionScopeKind.DeviceGroup, PermissionScopeKind.Tenant];
   private static readonly PermissionScopeKind[] UserGroups = [PermissionScopeKind.UserGroup, PermissionScopeKind.Tenant];
 
   private static readonly FrozenDictionary<string, PermissionInfo> Entries = new PermissionInfo[]
@@ -64,12 +67,16 @@ public static class PermissionCatalog
     new(PermissionNames.TenantUsersDelete, Categories.Tenant, "Delete users", "Remove users from the tenant.", TenantOnly),
     new(PermissionNames.TenantUserGroupsRead, Categories.Tenant, "Read user groups", "View the tenant's user groups.", TenantOnly),
     new(PermissionNames.TenantUserGroupsWrite, Categories.Tenant, "Manage user groups", "Create, rename and delete user groups.", TenantOnly),
+    new(PermissionNames.TenantDeviceGroupsRead, Categories.Tenant, "Read device groups", "View the tenant's device groups and their devices.", TenantOnly),
+    new(PermissionNames.TenantDeviceGroupsWrite, Categories.Tenant, "Manage device groups", "Create, rename and delete device groups.", TenantOnly),
     new(PermissionNames.TenantPermissionsRead, Categories.Tenant, "Read permissions", "View who holds which permission in the tenant.", TenantOnly),
     new(PermissionNames.TenantPermissionsWrite, Categories.Tenant, "Manage permissions", "Grant, change and remove allow permissions in the tenant.", TenantOnly, SelfRemovable: false),
     new(PermissionNames.TenantPermissionsDeny, Categories.Tenant, "Manage deny permissions", "Grant and change deny permissions, which win over any allow.", TenantOnly, SelfRemovable: false),
     new(PermissionNames.TenantAuthorizationLogsRead, Categories.Tenant, "Read authorization logs", "View the tenant's authorization change log.", TenantOnly),
 
     new(PermissionNames.UserGroupAssignUsers, Categories.UserGroups, "Assign users to a group", "Add users to a user group and remove them.", UserGroups),
+
+    new(PermissionNames.DeviceGroupAssignDevices, Categories.DeviceGroups, "Assign devices to a group", "Add devices to a device group, remove them and move them to another group.", DeviceGroups),
 
     new(PermissionNames.DeviceRead, Categories.Devices, "Read devices", "View devices, their details and their live status.", Devices),
 

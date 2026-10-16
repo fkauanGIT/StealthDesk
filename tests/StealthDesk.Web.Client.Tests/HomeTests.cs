@@ -20,6 +20,7 @@ public class HomeTests : BunitContext
     _auth.SetAuthorized("tech@example.com");
     Services.AddSingleton(_api.CreateClient());
     Services.AddSingleton<DeviceStore>();
+    Services.AddSingleton<StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi>();
     Services.AddSingleton<ILiveUpdates>(_live);
   }
 

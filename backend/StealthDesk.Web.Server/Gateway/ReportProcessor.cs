@@ -89,7 +89,9 @@ public sealed class ReportProcessor(
     }
 
     logger.LogInformation("Device {DeviceId} ({MachineName}) used installer key {KeyId}.", deviceId, report.MachineName, key.Id);
-    return await SaveAsync(report with { DeviceId = deviceId, TenantId = key.TenantId }, connection, envelope.SignerKey, allowNew: true, cancellationToken);
+    // A new device goes into the key's group; a reinstalled one keeps the groups it had.
+    var placeIn = known is null ? key.DeviceGroupId : null;
+    return await SaveAsync(report with { DeviceId = deviceId, TenantId = key.TenantId }, connection, envelope.SignerKey, allowNew: true, cancellationToken, placeIn, key.Id);
   }
 
   private bool IsRecent(SignedEnvelope<DeviceReport> envelope) =>
@@ -100,7 +102,9 @@ public sealed class ReportProcessor(
     ReportOrigin connection,
     string publicKey,
     bool allowNew,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken,
+    Guid? placeIn = null,
+    Guid? installerKeyId = null)
   {
     var saved = await registry.SaveReportAsync(report, connection, publicKey, allowNew, cancellationToken);
     if (!saved.Succeeded)
@@ -109,6 +113,11 @@ public sealed class ReportProcessor(
     }
 
     var device = saved.Value!;
+    if (placeIn is { } group)
+    {
+      await installerKeys.PlaceAsync(device, group, installerKeyId, cancellationToken);
+    }
+
     await notifier.DeviceChangedAsync(device);
     return GatewayReply.Accept(new ReportReceipt(device.Id, device.TenantId, clock.GetUtcNow()));
   }

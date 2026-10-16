@@ -1186,6 +1186,43 @@ a.sd-btn:hover {
   font-size: var(--sd-text-md);
 }
 
+/* ---------- Device groups ---------- */
+
+.sd-device-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sd-space-3) var(--sd-space-5);
+}
+
+.sd-device-group-filter {
+  min-width: 200px;
+}
+
+.sd-device-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-2);
+  margin: var(--sd-space-2) 0 0;
+}
+
+.sd-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-control);
+  background: var(--sd-surface);
+  color: var(--sd-text-secondary);
+  font-size: var(--sd-text-sm);
+  text-decoration: none;
+}
+
+.sd-chip:hover {
+  color: var(--sd-text);
+  text-decoration: none;
+}
+
 /* ---------- First steps ---------- */
 
 .sd-first-steps-list {

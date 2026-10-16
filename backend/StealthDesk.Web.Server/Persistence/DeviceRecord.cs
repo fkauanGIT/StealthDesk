@@ -16,6 +16,9 @@ public class DeviceRecord
   public Guid Id { get; set; }
   public Guid TenantId { get; set; }
   public TenantRecord? Tenant { get; set; }
+
+  /// <summary>The groups the device is in.</summary>
+  public List<DeviceGroupMemberRecord> GroupMemberships { get; set; } = [];
   public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
   // Reported by the agent.

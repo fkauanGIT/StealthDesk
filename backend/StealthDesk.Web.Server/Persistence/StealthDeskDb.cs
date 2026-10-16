@@ -19,6 +19,8 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
   public DbSet<PermissionAssignmentRecord> PermissionAssignments => Set<PermissionAssignmentRecord>();
   public DbSet<UserGroupRecord> UserGroups => Set<UserGroupRecord>();
   public DbSet<UserGroupMemberRecord> UserGroupMembers => Set<UserGroupMemberRecord>();
+  public DbSet<DeviceGroupRecord> DeviceGroups => Set<DeviceGroupRecord>();
+  public DbSet<DeviceGroupMemberRecord> DeviceGroupMembers => Set<DeviceGroupMemberRecord>();
   public DbSet<TenantInviteRecord> TenantInvites => Set<TenantInviteRecord>();
   public DbSet<PersonalAccessTokenRecord> PersonalAccessTokens => Set<PersonalAccessTokenRecord>();
   public DbSet<InstallerKeyRecord> InstallerKeys => Set<InstallerKeyRecord>();
@@ -145,6 +147,25 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       credential.HasIndex(x => x.ServiceAccountId);
     });
 
+    modelBuilder.Entity<DeviceGroupRecord>(group =>
+    {
+      group.ToTable("device_groups");
+      group.Property(x => x.Name).HasMaxLength(DeviceGroupRecord.NameMax);
+      group.Property(x => x.Description).HasMaxLength(DeviceGroupRecord.DescriptionMax);
+      group.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      group.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+      group.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
+    });
+
+    modelBuilder.Entity<DeviceGroupMemberRecord>(member =>
+    {
+      member.ToTable("device_group_members");
+      member.HasKey(x => new { x.DeviceGroupId, x.DeviceId });
+      member.HasOne(x => x.DeviceGroup).WithMany(x => x.Members).HasForeignKey(x => x.DeviceGroupId).OnDelete(DeleteBehavior.Cascade);
+      member.HasOne(x => x.Device).WithMany(x => x.GroupMemberships).HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Cascade);
+      member.HasIndex(x => x.DeviceId);
+    });
+
     modelBuilder.Entity<ServerAlertRecord>(alert =>
     {
       alert.ToTable("server_alerts");
@@ -170,6 +191,7 @@ public class StealthDeskDb(DbContextOptions<StealthDeskDb> options, ITenantScope
       key.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
       key.Property(x => x.CreatorKind).HasConversion<string>().HasMaxLength(30);
       key.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+      key.HasOne(x => x.DeviceGroup).WithMany().HasForeignKey(x => x.DeviceGroupId).OnDelete(DeleteBehavior.SetNull);
       key.HasIndex(x => x.TenantId);
       key.HasQueryFilter(x => CurrentTenantId == null || x.TenantId == CurrentTenantId);
     });

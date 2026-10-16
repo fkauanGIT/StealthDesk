@@ -1,0 +1,336 @@
+@page "/device-groups/{Id:guid}"
+@attribute [Authorize(Policy = PermissionPolicies.Prefix + PermissionNames.TenantDeviceGroupsRead)]
+@using StealthDesk.Contracts.DeviceGroups
+@using StealthDesk.Contracts.UserGroups
+@using StealthDesk.Web.Client.DeviceGroups
+@using StealthDesk.Web.Client.UserGroups
+@inject DeviceGroupApi Api
+@inject DeviceStore Devices
+@inject SessionGuard Session
+
+<PageTitle>@(group?.Name ?? "Device group") · StealthDesk</PageTitle>
+
+<a class="sd-back" href="device-groups">
+    <SdIcon Name="IconName.Back" Size="16" />
+    Device groups
+</a>
+
+@if (notFound)
+{
+    <SdEmptyState Title="Group not found">It may have been deleted, or the link is wrong.</SdEmptyState>
+}
+else if (group is null)
+{
+    @if (error is null)
+    {
+        <SdLoading Text="Loading the group..." />
+    }
+    else
+    {
+        <SdAlert>@error</SdAlert>
+    }
+}
+else
+{
+    <header class="sd-page-header">
+        <h1 class="sd-page-title">@group.Name</h1>
+        <div class="sd-push sd-actions">
+            <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Refresh" AriaLabel="Refresh" OnClick="LoadAsync" />
+            <AuthorizeView Policy="@WritePolicy">
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="() => editing = true">Edit</SdButton>
+            </AuthorizeView>
+            <AuthorizeView Policy="@AssignPolicy">
+                <SdButton OnClick="OpenAddAsync">Add devices</SdButton>
+            </AuthorizeView>
+        </div>
+    </header>
+    @if (group.Description is not null)
+    {
+        <p class="sd-muted sd-page-lead" data-description>@group.Description</p>
+    }
+
+    @if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+
+    @if (group.Devices.Count == 0)
+    {
+        <SdEmptyState Title="No devices yet">Devices added here receive the access granted on the group.</SdEmptyState>
+    }
+    else
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table" style="min-width: 560px">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>Last seen</th>
+                        <AuthorizeView Policy="@AssignPolicy">
+                            <th><span class="sd-visually-hidden">Actions</span></th>
+                        </AuthorizeView>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var device in group.Devices)
+                    {
+                        <tr @key="device.Id" data-device="@device.Name">
+                            <td><a href="devices/@device.Id">@device.Name</a></td>
+                            <td><DeviceStatus IsOnline="device.IsOnline" /></td>
+                            <td class="sd-muted" style="white-space: nowrap">@DeviceFormat.LastSeen(device.LastSeen)</td>
+                            <AuthorizeView Policy="@AssignPolicy">
+                                <td class="sd-row-actions">
+                                    <SdButton Variant="ButtonVariant.Ghost" OnClick="() => OpenMoveAsync(device)">Move</SdButton>
+                                    <SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = device">Remove</SdButton>
+                                </td>
+                            </AuthorizeView>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <UserGroupForm Open="editing" Title="Edit group" SubmitText="Save" Initial="new UserGroupRequest(group.Name, group.Description)"
+                   OnClose="() => editing = false" OnSubmit="SaveAsync" />
+
+    <SdDialog Open="removing is not null" Title="Remove this device?" OnClose="() => removing = null">
+        <ChildContent>
+            <p class="sd-muted">@removing?.Name stops receiving the access granted on "@group.Name". The device itself stays.</p>
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => removing = null">Cancel</SdButton>
+            <SdButton Variant="ButtonVariant.Danger" Disabled="busy" OnClick="RemoveAsync">Remove</SdButton>
+        </Footer>
+    </SdDialog>
+
+    <SdDialog Open="moving is not null" Title="@($"Move {moving?.Name}")" OnClose="() => moving = null">
+        <ChildContent>
+            @if (otherGroups is null)
+            {
+                <SdLoading Text="Loading groups..." />
+            }
+            else if (otherGroups.Count == 0)
+            {
+                <p class="sd-muted">There is no other group to move it to. Create one first.</p>
+            }
+            else
+            {
+                <p class="sd-muted">It leaves "@group.Name" and joins the group chosen, in one change.</p>
+                <SdSelect Label="Move to" Options="otherGroups" @bind-Value="moveTo" />
+            }
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => moving = null">Cancel</SdButton>
+            <SdButton Disabled="@(busy || string.IsNullOrEmpty(moveTo))" OnClick="MoveAsync">Move</SdButton>
+        </Footer>
+    </SdDialog>
+
+    <SdDialog Open="adding" Title="Add devices" OnClose="() => adding = false">
+        <ChildContent>
+            @if (candidatesError is not null)
+            {
+                <SdAlert>@candidatesError</SdAlert>
+            }
+            else if (candidates is null)
+            {
+                <SdLoading Text="Loading devices..." />
+            }
+            else if (candidates.Count == 0)
+            {
+                <p class="sd-muted">Every device you can see is already in this group.</p>
+            }
+            else
+            {
+                <div class="sd-member-picker">
+                    @foreach (var device in candidates)
+                    {
+                        <SdCheckbox Label="@device.Name" Checked="picked.Contains(device.Id)" CheckedChanged="on => Pick(device.Id, on)" />
+                    }
+                </div>
+            }
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => adding = false">Cancel</SdButton>
+            <SdButton Disabled="busy || picked.Count == 0" OnClick="AddAsync">@(picked.Count > 1 ? $"Add {picked.Count} devices" : "Add")</SdButton>
+        </Footer>
+    </SdDialog>
+}
+
+@code {
+    private static readonly string WritePolicy = PermissionPolicies.For(PermissionNames.TenantDeviceGroupsWrite);
+    private static readonly string AssignPolicy = PermissionPolicies.For(PermissionNames.DeviceGroupAssignDevices);
+
+    private readonly HashSet<Guid> picked = [];
+    private DeviceGroupDetail? group;
+    private DeviceGroupDevice? removing;
+    private DeviceGroupDevice? moving;
+    private IReadOnlyList<SelectOption>? otherGroups;
+    private string? moveTo;
+    private IReadOnlyList<DeviceSummary>? candidates;
+    private string? candidatesError;
+    private string? error;
+    private bool notFound;
+    private bool editing;
+    private bool adding;
+    private bool busy;
+    private Guid tenantId;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _ = Guid.TryParse(user?.FindFirst(ServerAuthenticationState.TenantIdClaim)?.Value, out tenantId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.GetAsync(Id, tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        notFound = result.NotFound;
+        group = result.Value ?? group;
+        error = result.NotFound ? null : result.Error;
+    }
+
+    private async Task<string?> SaveAsync(UserGroupRequest request)
+    {
+        var result = await Api.UpdateAsync(Id, tenantId, new DeviceGroupRequest(request.Name, request.Description));
+        if (Expired(result.SessionExpired))
+        {
+            return null;
+        }
+
+        if (!result.Succeeded)
+        {
+            return result.Error;
+        }
+
+        group = result.Value;
+        editing = false;
+        // The form calls this as a plain delegate, which doesn't render this page on its own.
+        StateHasChanged();
+        return null;
+    }
+
+    // The devices to choose from are those the user can see.
+    private async Task OpenAddAsync()
+    {
+        adding = true;
+        picked.Clear();
+        candidates = null;
+        candidatesError = null;
+        await Devices.LoadAsync();
+        if (Devices.Error is not null)
+        {
+            candidatesError = Devices.Error;
+            return;
+        }
+
+        var members = group!.Devices.Select(x => x.Id).ToHashSet();
+        candidates = Devices.Devices?.Where(x => !members.Contains(x.Id)).OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList() ?? [];
+    }
+
+    private void Pick(Guid deviceId, bool on)
+    {
+        if (on)
+        {
+            picked.Add(deviceId);
+        }
+        else
+        {
+            picked.Remove(deviceId);
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        busy = true;
+        var result = await Api.AddDevicesAsync(Id, tenantId, [.. picked]);
+        busy = false;
+        adding = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private async Task OpenMoveAsync(DeviceGroupDevice device)
+    {
+        moving = device;
+        moveTo = null;
+        otherGroups = null;
+        var result = await Api.ListAsync(tenantId);
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        otherGroups = [.. (result.Value?.Items ?? []).Where(x => x.Id != Id).Select(x => new SelectOption(x.Id.ToString(), x.Name))];
+        moveTo = otherGroups.FirstOrDefault()?.Value;
+    }
+
+    private async Task MoveAsync()
+    {
+        if (moving is not { } device || !Guid.TryParse(moveTo, out var target))
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.AddDevicesAsync(target, tenantId, [device.Id], fromGroupId: Id);
+        busy = false;
+        moving = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (removing is not { } device)
+        {
+            return;
+        }
+
+        busy = true;
+        var result = await Api.RemoveDevicesAsync(Id, tenantId, [device.Id]);
+        busy = false;
+        removing = null;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        await LoadAsync();
+        error ??= result.Error;
+    }
+
+    private bool Expired(bool sessionExpired)
+    {
+        if (sessionExpired)
+        {
+            Session.Expired();
+        }
+
+        return sessionExpired;
+    }
+}

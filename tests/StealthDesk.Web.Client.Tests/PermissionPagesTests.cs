@@ -119,6 +119,42 @@ public class PermissionPagesTests : AccountTestContext
   }
 
   [Fact]
+  public void ADevicePermission_CanBeGrantedOnADeviceGroup()
+  {
+    var sales = Guid.NewGuid();
+    var catalog = new PermissionCatalogList
+    {
+      Items = [new(PermissionNames.DeviceRead, "Devices", "Read devices", "View devices.", [PermissionScopeKind.Device, PermissionScopeKind.DeviceGroup, PermissionScopeKind.Tenant])],
+    };
+    Api.RespondWith(Me(PermissionNames.TenantPermissionsWrite, PermissionNames.TenantDeviceGroupsRead));
+    Api.RespondWith(catalog);
+    Api.RespondWith(Presets);
+    Api.RespondWith(new List<DeviceSummary>());
+    Api.RespondWith(new UserGroupList());
+    Api.RespondWith(new StealthDesk.Contracts.DeviceGroups.DeviceGroupList { Items = [new(sales, "Sales", null, Created, 3)] });
+    Api.RespondWith(new PermissionAssignmentList());
+    var panel = RenderPanel();
+    panel.WaitForAssertion(() => Assert.Contains("No permissions", panel.Markup));
+
+    Button(panel, "Add permission").Click();
+    Field(panel, "Permission").Change(PermissionNames.DeviceRead);
+    Assert.Contains("One device group", Field(panel, "Scope").TextContent);
+    Field(panel, "Scope").Change(nameof(PermissionScopeKind.DeviceGroup));
+    Assert.Equal(["Choose a device group", "Sales"], Field(panel, "Device group").QuerySelectorAll("option").Select(x => x.TextContent));
+    Button(panel, "Add").Click();
+    panel.WaitForAssertion(() => Assert.Contains("Choose a device group.", panel.Find(".sd-dialog").TextContent));
+    Field(panel, "Device group").Change(sales.ToString());
+    var granted = new PermissionAssignment(Guid.NewGuid(), PermissionPrincipalKind.User, Tech, PermissionNames.DeviceRead, PermissionEffect.Allow, PermissionScopeKind.DeviceGroup, sales, null, true, Created);
+    Api.Respond(HttpStatusCode.Created, granted);
+    Api.RespondWith(new PermissionAssignmentList { Items = [granted] });
+    Button(panel, "Add").Click();
+
+    panel.WaitForAssertion(() => Assert.Contains("Device group · Sales", panel.Find("[data-cell=scope]").TextContent));
+    Assert.Contains($"\"scopeKind\":{(int)PermissionScopeKind.DeviceGroup}", Api.Bodies[7]);
+    Assert.Contains($"\"scopeId\":\"{sales}\"", Api.Bodies[7]);
+  }
+
+  [Fact]
   public void ARefusal_IsExplainedInTheForm()
   {
     RespondToOpening(Me(PermissionNames.TenantPermissionsWrite, PermissionNames.TenantPermissionsDeny));

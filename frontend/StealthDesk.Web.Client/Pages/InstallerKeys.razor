@@ -45,6 +45,7 @@ else
                 <tr>
                     <th>Name</th>
                     <th>Type</th>
+                    <th>Group</th>
                     <th>Created by</th>
                     <th>Created</th>
                     <th>Uses</th>
@@ -61,6 +62,7 @@ else
                             <span class="sd-cell-sub sd-mono">@key.Id</span>
                         </td>
                         <td><SdStatus Tone="@(key.Type == InstallerKeyType.Persistent ? Tone.Warning : Tone.Info)" Text="@InstallerKeyText.Type(key.Type)" /></td>
+                        <td data-cell="group">@(key.DeviceGroupName ?? "None")</td>
                         <td>@(key.CreatorName ?? "Unknown")</td>
                         <td class="sd-muted" style="white-space: nowrap">@Date(key.CreatedAt)</td>
                         <td data-cell="uses">@(key.AllowedUses is { } allowed ? $"{key.UsageCount} of {allowed}" : key.UsageCount.ToString())</td>

@@ -31,7 +31,7 @@ public sealed class InstallerKeyService(
   /// <summary>The keys that still work, with their installs within the history kept.</summary>
   public async Task<IReadOnlyList<InstallerKey>> ListAsync(Principal actor, Guid tenant, CancellationToken cancellationToken)
   {
-    var keys = await Visible(actor, tenant, await ManagesAllAsync(actor, tenant, cancellationToken)).AsNoTracking().ToListAsync(cancellationToken);
+    var keys = await Visible(actor, tenant, await ManagesAllAsync(actor, tenant, cancellationToken)).Include(x => x.DeviceGroup).AsNoTracking().ToListAsync(cancellationToken);
     var counts = await UsageCountsAsync([.. keys.Select(x => x.Id)], cancellationToken);
     var now = clock.GetUtcNow();
     var live = keys.Where(x => !x.IsSpent(counts.GetValueOrDefault(x.Id), now)).ToList();
@@ -55,6 +55,14 @@ public sealed class InstallerKeyService(
       return Results.NotFound();
     }
 
+    // The devices the key brings in join its group: only one its creator may add devices to.
+    if (request.DeviceGroupId is { } group
+      && (!await db.DeviceGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == group && x.TenantId == tenant, cancellationToken)
+        || !(await evaluator.EvaluateAsync(actor, PermissionNames.DeviceGroupAssignDevices, Resource.DeviceGroup(group, tenant), cancellationToken)).Allowed))
+    {
+      return Invalid("Choose a device group of this tenant that you may add devices to.");
+    }
+
     var now = clock.GetUtcNow();
     var key = new InstallerKeyRecord
     {
@@ -65,6 +73,7 @@ public sealed class InstallerKeyService(
       CreatorKind = CreatorKindOf(actor),
       CreatorId = actor.Id,
       CreatedAt = now,
+      DeviceGroupId = request.DeviceGroupId,
     };
 
     switch (request.Type)
@@ -93,6 +102,7 @@ public sealed class InstallerKeyService(
       AuthorizationChangeActions.InstallerKeyCreated, actor, AuthorizationChangeTargets.InstallerKey, key.Id, tenant,
       after: InstallerKeySnapshot.Of(key)));
     await db.SaveChangesAsync(cancellationToken);
+    await db.Entry(key).Reference(x => x.DeviceGroup).LoadAsync(cancellationToken);
 
     var names = await CreatorNamesAsync([key], cancellationToken);
     return Results.Created(
@@ -224,6 +234,25 @@ public sealed class InstallerKeyService(
     }
 
     return true;
+  }
+
+  /// <summary>
+  /// Puts a device that just joined with a key in the key's group, logged as the system's doing; a group deleted in
+  /// the meantime leaves it in none.
+  /// </summary>
+  public async Task PlaceAsync(DeviceRecord device, Guid group, Guid? keyId, CancellationToken cancellationToken)
+  {
+    if (device.GroupMemberships.Any(x => x.DeviceGroupId == group)
+      || !await db.DeviceGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == group && x.TenantId == device.TenantId, cancellationToken))
+    {
+      return;
+    }
+
+    device.GroupMemberships.Add(new DeviceGroupMemberRecord { DeviceGroupId = group, DeviceId = device.Id });
+    db.AuthorizationChanges.Add(changes.Create(
+      AuthorizationChangeActions.DeviceGroupMembersAdded, actor: null, AuthorizationChangeTargets.DeviceGroup, group, device.TenantId,
+      after: new DeviceGroupMembershipChange(1, InstallerKeyId: keyId)));
+    await db.SaveChangesAsync(cancellationToken);
   }
 
   /// <summary>
@@ -372,7 +401,7 @@ public sealed class InstallerKeyService(
   private static IResult Invalid(string reason) => Results.Problem(reason, statusCode: StatusCodes.Status400BadRequest);
 
   private static InstallerKey ToContract(InstallerKeyRecord x, int usageCount, string? creatorName) =>
-    new(x.Id, x.Name, x.Type, x.CreatorKind, x.CreatorId, creatorName, x.CreatedAt, x.AllowedUses, x.ExpiresAt, usageCount);
+    new(x.Id, x.Name, x.Type, x.CreatorKind, x.CreatorId, creatorName, x.CreatedAt, x.AllowedUses, x.ExpiresAt, usageCount, x.DeviceGroupId, x.DeviceGroup?.Name);
 }
 
 /// <summary>One lock per installer key, held while a use is counted and added.</summary>
