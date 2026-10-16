@@ -47,6 +47,10 @@ public sealed class TestDashboard : IAsyncDisposable
 
     var dashboard = new TestDashboard(connection);
     await connection.StartAsync(TestContext.Current.CancellationToken);
+    // StartAsync returns once the handshake is answered, before the server adds the connection to the ones
+    // Clients.All reaches and runs OnConnectedAsync. Calls are only answered after both, so a round trip makes
+    // the connection fully set up before a test sends to it. Unsubscribing from nothing changes nothing.
+    await connection.InvokeAsync(nameof(IDashboardHub.UnsubscribeFromDevices), Array.Empty<Guid>(), TestContext.Current.CancellationToken);
     return dashboard;
   }
 
