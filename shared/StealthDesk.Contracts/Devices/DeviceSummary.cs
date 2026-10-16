@@ -34,4 +34,7 @@ public sealed record DeviceSummary
 
   public bool IsOnline { get; init; }
   public DateTimeOffset LastSeen { get; init; }
+
+  /// <summary>The device groups it is in.</summary>
+  public IReadOnlyList<Guid> GroupIds { get; init; } = [];
 }

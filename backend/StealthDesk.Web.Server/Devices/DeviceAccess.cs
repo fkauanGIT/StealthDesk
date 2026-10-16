@@ -10,32 +10,44 @@ namespace StealthDesk.Web.Server.Devices;
 /// </summary>
 public sealed class DeviceAccessScope
 {
-  public static DeviceAccessScope None { get; } = new(null, false, [], [], [], []);
+  public static DeviceAccessScope None { get; } = new(null, false, [], [], [], [], [], []);
 
   /// <summary>Every device of every tenant.</summary>
-  public static DeviceAccessScope Everything { get; } = new(null, true, [], [], [], []);
+  public static DeviceAccessScope Everything { get; } = new(null, true, [], [], [], [], [], []);
 
   private readonly Guid? _tenantBoundary;
   private readonly bool _everyTenant;
   private readonly Guid[] _tenants;
   private readonly Guid[] _devices;
+  private readonly Guid[] _groups;
   private readonly Guid[] _deniedTenants;
   private readonly Guid[] _deniedDevices;
+  private readonly Guid[] _deniedGroups;
 
-  private DeviceAccessScope(Guid? tenantBoundary, bool everyTenant, Guid[] tenants, Guid[] devices, Guid[] deniedTenants, Guid[] deniedDevices)
+  private DeviceAccessScope(
+    Guid? tenantBoundary,
+    bool everyTenant,
+    Guid[] tenants,
+    Guid[] devices,
+    Guid[] groups,
+    Guid[] deniedTenants,
+    Guid[] deniedDevices,
+    Guid[] deniedGroups)
   {
     _tenantBoundary = tenantBoundary;
     _everyTenant = everyTenant;
     _tenants = tenants;
     _devices = devices;
+    _groups = groups;
     _deniedTenants = deniedTenants;
     _deniedDevices = deniedDevices;
+    _deniedGroups = deniedGroups;
   }
 
   // A restricted token's devices must also be its owner's.
   private DeviceAccessScope? _owner;
 
-  public bool IsEmpty => (!_everyTenant && _tenants.Length == 0 && _devices.Length == 0) || _owner?.IsEmpty == true;
+  public bool IsEmpty => (!_everyTenant && _tenants.Length == 0 && _devices.Length == 0 && _groups.Length == 0) || _owner?.IsEmpty == true;
 
   /// <param name="tenantBoundary">The principal's tenant, which no device outside of is ever read; none for a server-wide principal.</param>
   public static DeviceAccessScope From(PermissionRuleSet set, Guid? tenantBoundary)
@@ -72,8 +84,10 @@ public sealed class DeviceAccessScope
       allows.Any(x => x.ScopeKind == PermissionScopeKind.Server),
       Ids(allows, PermissionScopeKind.Tenant),
       Ids(allows, PermissionScopeKind.Device),
+      Ids(allows, PermissionScopeKind.DeviceGroup),
       Ids(denies, PermissionScopeKind.Tenant),
-      Ids(denies, PermissionScopeKind.Device));
+      Ids(denies, PermissionScopeKind.Device),
+      Ids(denies, PermissionScopeKind.DeviceGroup));
   }
 
   public IQueryable<DeviceRecord> Apply(IQueryable<DeviceRecord> devices)
@@ -87,14 +101,17 @@ public sealed class DeviceAccessScope
     var everyTenant = _everyTenant;
     var tenants = _tenants;
     var allowed = _devices;
+    var groups = _groups;
     var deniedTenants = _deniedTenants;
     var deniedDevices = _deniedDevices;
+    var deniedGroups = _deniedGroups;
 
     var own = devices.Where(x =>
       (tenantBoundary == null || x.TenantId == tenantBoundary)
-      && (everyTenant || tenants.Contains(x.TenantId) || allowed.Contains(x.Id))
+      && (everyTenant || tenants.Contains(x.TenantId) || allowed.Contains(x.Id) || x.GroupMemberships.Any(m => groups.Contains(m.DeviceGroupId)))
       && !deniedTenants.Contains(x.TenantId)
-      && !deniedDevices.Contains(x.Id));
+      && !deniedDevices.Contains(x.Id)
+      && !x.GroupMemberships.Any(m => deniedGroups.Contains(m.DeviceGroupId)));
     return _owner is null ? own : _owner.Apply(own);
   }
 

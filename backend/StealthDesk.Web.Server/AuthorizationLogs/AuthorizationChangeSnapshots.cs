@@ -11,6 +11,11 @@ public sealed record PermissionSeedSummary(int Count, IReadOnlyList<string> Pres
 
 public sealed record UserGroupSnapshot(string Name, string? Description);
 
+public sealed record DeviceGroupSnapshot(string Name, string? Description);
+
+/// <summary>How many devices joined or left a group at once, and the group they moved from, if they moved.</summary>
+public sealed record DeviceGroupMembershipChange(int Count, Guid? FromGroupId = null, Guid? InstallerKeyId = null);
+
 /// <summary>How many members were added or removed at once.</summary>
 public sealed record UserGroupMembershipChange(int Count);
 
@@ -33,10 +38,11 @@ public sealed record InstallerKeySnapshot(
   InstallerKeyCreatorKind CreatorKind,
   Guid CreatorId,
   int? AllowedUses,
-  DateTimeOffset? ExpiresAt)
+  DateTimeOffset? ExpiresAt,
+  Guid? DeviceGroupId)
 {
   public static InstallerKeySnapshot Of(InstallerKeyRecord key) =>
-    new(key.Name, key.Type, key.CreatorKind, key.CreatorId, key.AllowedUses, key.ExpiresAt);
+    new(key.Name, key.Type, key.CreatorKind, key.CreatorId, key.AllowedUses, key.ExpiresAt, key.DeviceGroupId);
 }
 
 public sealed record ServiceAccountCredentialSnapshot(string Name, Guid ServiceAccountId, DateTimeOffset? ExpiresAt)

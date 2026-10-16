@@ -274,11 +274,13 @@ public sealed class PermissionAssignmentManager(StealthDeskDb db, IPermissionEva
         => Resource.Device(device, tenant),
       PermissionScopeKind.UserGroup when scopeId is { } group && await db.UserGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == group && x.TenantId == tenant, cancellationToken)
         => Resource.UserGroup(group, tenant),
+      PermissionScopeKind.DeviceGroup when scopeId is { } deviceGroup && await db.DeviceGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == deviceGroup && x.TenantId == tenant, cancellationToken)
+        => Resource.DeviceGroup(deviceGroup, tenant),
       _ => null,
     };
     if (resource is null)
     {
-      return Results.Problem("Choose a server, tenant, device or user group of this tenant to check.", statusCode: StatusCodes.Status400BadRequest);
+      return Results.Problem("Choose a server, tenant, device, user group or device group of this tenant to check.", statusCode: StatusCodes.Status400BadRequest);
     }
 
     // A server account belongs to no tenant; the check sees it as it signs in.

@@ -16,7 +16,7 @@ public static class DeviceEndpoints
     devices.MapGet(Routes.Devices, async (ClaimsPrincipal user, IDeviceAccess access, StealthDeskDb db, CancellationToken cancellationToken) =>
     {
       var scope = await access.ForAsync(user, cancellationToken);
-      var devices = await scope.Apply(db.Devices.AsNoTracking())
+      var devices = await scope.Apply(db.Devices.AsNoTracking().Include(x => x.GroupMemberships))
         .OrderBy(x => x.Name)
         .ToListAsync(cancellationToken);
 
@@ -30,7 +30,7 @@ public static class DeviceEndpoints
       StealthDeskDb db,
       CancellationToken cancellationToken) =>
     {
-      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      var device = await db.Devices.AsNoTracking().Include(x => x.GroupMemberships).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
       if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceRead))).Succeeded)
       {
         return Results.NotFound();
@@ -69,5 +69,6 @@ public static class DeviceEndpoints
     Disks = device.Disks,
     IsOnline = device.IsOnline,
     LastSeen = device.LastSeen,
+    GroupIds = [.. device.GroupMemberships.Select(x => x.DeviceGroupId).Order()],
   };
 }

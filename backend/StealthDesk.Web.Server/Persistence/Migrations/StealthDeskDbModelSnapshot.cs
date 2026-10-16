@@ -185,6 +185,50 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                     b.ToTable("authorization_changes", (string)null);
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceGroupMemberRecord", b =>
+                {
+                    b.Property<Guid>("DeviceGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DeviceGroupId", "DeviceId");
+
+                    b.HasIndex("DeviceId");
+
+                    b.ToTable("device_group_members", (string)null);
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceGroupRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("device_groups", (string)null);
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -323,6 +367,9 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("DeviceGroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -344,6 +391,8 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeviceGroupId");
 
                     b.HasIndex("TenantId");
 
@@ -905,6 +954,36 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceGroupMemberRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.DeviceGroupRecord", "DeviceGroup")
+                        .WithMany("Members")
+                        .HasForeignKey("DeviceGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StealthDesk.Web.Server.Persistence.DeviceRecord", "Device")
+                        .WithMany("GroupMemberships")
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+
+                    b.Navigation("DeviceGroup");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceGroupRecord", b =>
+                {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceRecord", b =>
                 {
                     b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
@@ -952,11 +1031,18 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", b =>
                 {
+                    b.HasOne("StealthDesk.Web.Server.Persistence.DeviceGroupRecord", "DeviceGroup")
+                        .WithMany()
+                        .HasForeignKey("DeviceGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("StealthDesk.Web.Server.Persistence.TenantRecord", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("DeviceGroup");
 
                     b.Navigation("Tenant");
                 });
@@ -1065,6 +1151,16 @@ namespace StealthDesk.Web.Server.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceGroupRecord", b =>
+                {
+                    b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("StealthDesk.Web.Server.Persistence.DeviceRecord", b =>
+                {
+                    b.Navigation("GroupMemberships");
                 });
 
             modelBuilder.Entity("StealthDesk.Web.Server.Persistence.InstallerKeyRecord", b =>

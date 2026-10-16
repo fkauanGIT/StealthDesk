@@ -40,6 +40,8 @@ public static class GrantScopes
         => "Choose a device of this tenant.",
       PermissionScopeKind.UserGroup when scopeId is not { } group || !await db.UserGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == group && x.TenantId == tenant, cancellationToken)
         => "Choose a user group of this tenant.",
+      PermissionScopeKind.DeviceGroup when scopeId is not { } deviceGroup || !await db.DeviceGroups.IgnoreQueryFilters().AnyAsync(x => x.Id == deviceGroup && x.TenantId == tenant, cancellationToken)
+        => "Choose a device group of this tenant.",
       _ => null,
     };
   }
@@ -68,6 +70,7 @@ public static class GrantScopes
       PermissionScopeKind.Server => Resource.Server,
       PermissionScopeKind.Device => Resource.Device(scopeId!.Value, tenant),
       PermissionScopeKind.UserGroup => Resource.UserGroup(scopeId!.Value, tenant),
+      PermissionScopeKind.DeviceGroup => Resource.DeviceGroup(scopeId!.Value, tenant),
       _ => Resource.Tenant(tenant),
     };
     var owner = new Principal(PermissionPrincipalKind.User, ownerId, tenant);

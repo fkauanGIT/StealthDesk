@@ -45,9 +45,12 @@ public sealed record Principal(PermissionPrincipalKind Kind, Guid Id, Guid? Tena
   };
 }
 
-/// <summary>What is being accessed: the server, a tenant, a device or a user group.</summary>
+/// <summary>What is being accessed: the server, a tenant, a device, a user group or a device group.</summary>
 /// <param name="TenantId">The tenant it is in; none for the server.</param>
-public sealed record Resource(PermissionScopeKind Kind, Guid? Id = null, Guid? TenantId = null)
+/// <param name="DeviceGroups">
+/// For a device, the groups it is in. Left out, the evaluator reads them: a deny on a group must never be missed.
+/// </param>
+public sealed record Resource(PermissionScopeKind Kind, Guid? Id = null, Guid? TenantId = null, IReadOnlyCollection<Guid>? DeviceGroups = null)
 {
   public static Resource Server { get; } = new(PermissionScopeKind.Server);
 
@@ -58,6 +61,8 @@ public sealed record Resource(PermissionScopeKind Kind, Guid? Id = null, Guid? T
   public static Resource Device(DeviceRecord device) => Device(device.Id, device.TenantId);
 
   public static Resource UserGroup(Guid groupId, Guid tenantId) => new(PermissionScopeKind.UserGroup, groupId, tenantId);
+
+  public static Resource DeviceGroup(Guid groupId, Guid tenantId) => new(PermissionScopeKind.DeviceGroup, groupId, tenantId);
 }
 
 /// <summary>The answer, with why: the rule that decided an allow, or the reason for a deny.</summary>

@@ -91,12 +91,18 @@ public static class PermissionRules
       : PermissionDecision.Allow($"Allowed by a {Describe(allow.Source)} assignment at {allow.ScopeKind} scope.");
   }
 
-  /// <summary>Whether the rule's scope covers the resource: the server covers everything, a tenant all it holds.</summary>
+  /// <summary>
+  /// Whether the rule's scope covers the resource: the server covers everything, a tenant all it holds, a device
+  /// group itself and every device in it.
+  /// </summary>
   public static bool Reaches(PermissionRule rule, Resource resource) => rule.ScopeKind switch
   {
     PermissionScopeKind.Server => true,
     PermissionScopeKind.Tenant => resource.TenantId is { } tenantId && rule.ScopeId == tenantId,
     PermissionScopeKind.Device or PermissionScopeKind.UserGroup => rule.ScopeKind == resource.Kind && rule.ScopeId == resource.Id,
+    PermissionScopeKind.DeviceGroup => rule.ScopeId is { } group
+      && ((resource.Kind == PermissionScopeKind.DeviceGroup && resource.Id == group)
+        || (resource.Kind == PermissionScopeKind.Device && resource.DeviceGroups?.Contains(group) == true)),
     _ => false,
   };
 
@@ -111,7 +117,7 @@ public static class PermissionRules
   private static int Breadth(PermissionScopeKind kind) => kind switch
   {
     PermissionScopeKind.Device => 0,
-    PermissionScopeKind.UserGroup => 1,
+    PermissionScopeKind.UserGroup or PermissionScopeKind.DeviceGroup => 1,
     PermissionScopeKind.Tenant => 2,
     PermissionScopeKind.Server => 3,
     _ => 4,

@@ -34,6 +34,10 @@ public class InstallerKeyRecord
   /// <summary>None for a persistent key.</summary>
   public DateTimeOffset? ExpiresAt { get; set; }
 
+  /// <summary>The group a device joining with the key is put in; none to leave it in no group.</summary>
+  public Guid? DeviceGroupId { get; set; }
+  public DeviceGroupRecord? DeviceGroup { get; set; }
+
   public List<InstallerKeyUsageRecord> Usages { get; set; } = [];
 
   /// <summary>Expired, or a usage-based key with no uses left: it never works again.</summary>

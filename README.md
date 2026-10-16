@@ -228,6 +228,7 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
 | `/api/v1/devices` | HTTP | Lists the devices of the signed-in user's tenant; 401 when signed out. |
 | `/api/v1/devices/{id}` | HTTP | Returns one of the tenant's devices, or 404 for an unknown device or one of another tenant. |
+| `/api/v1/device-groups` | HTTP | The tenant's device groups: list, one with its devices, create, change, delete, and add, remove or move devices (`POST`/`DELETE /{id}/members`, `fromGroupId` to move). Device permissions can be granted on a group, reaching every device in it. |
 | `/api/v1/tenants` | HTTP | The server's tenants, for its administrators: list (`GET`), one (`GET /{id}`), create (`POST`), rename (`PUT /{id}`) and delete with everything in them (`DELETE /{id}`, never the caller's own). |
 | `/api/v1/server/alert` | HTTP | The message every signed-in user sees at the top of the app (`GET`), set by the server's administrators (`PUT`). |
 | `/api/v1/server/test-email` | HTTP | Sends a test message to the administrator's own address and says whether it went out. |

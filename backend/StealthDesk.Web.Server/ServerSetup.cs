@@ -6,6 +6,7 @@ using StealthDesk.Web.Server.AuthorizationLogs;
 using StealthDesk.Web.Server.Email;
 using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
+using StealthDesk.Web.Server.DeviceGroups;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
 using StealthDesk.Contracts.Agents;
@@ -83,6 +84,7 @@ public static class ServerSetup
     app.MapUserEndpoints();
     app.MapInviteEndpoints();
     app.MapUserGroupEndpoints();
+    app.MapDeviceGroupEndpoints();
     app.MapPermissionAssignmentEndpoints();
     app.MapPersonalAccessTokenEndpoints();
     app.MapServiceAccountEndpoints();
