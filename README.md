@@ -101,20 +101,11 @@ return `Healthy`.
 
 ### PostgreSQL
 
-The connection is built from these settings, found in
-[`appsettings.Development.json`](./backend/StealthDesk.Web.Server/appsettings.Development.json):
-
-| Key | Default |
-|---|---|
-| `POSTGRES_HOST` | `localhost` |
-| `POSTGRES_PORT` | `5432` |
-| `POSTGRES_DB` | `stealthdesk` |
-| `POSTGRES_USER` | `postgres` |
-| `POSTGRES_PASSWORD` | `password` |
-
-Change them to match your PostgreSQL instance, or override them without editing the file through
-environment variables (e.g. `POSTGRES_PASSWORD`) or command-line arguments (`--POSTGRES_PASSWORD=...`).
-Then start the server. It applies the pending migrations on startup, creating the database if needed:
+The connection is built from the `POSTGRES_*` [settings](#server-settings).
+[`appsettings.Development.json`](./backend/StealthDesk.Web.Server/appsettings.Development.json) points them at
+`localhost:5432`, database `stealthdesk`, user `postgres` and password `password`. Change them to match your
+PostgreSQL instance, or override them without editing the file through environment variables
+(`StealthDesk_POSTGRES_PASSWORD`) or command-line arguments (`--POSTGRES_PASSWORD=...`). Then start the server. It applies the pending migrations on startup, creating the database if needed:
 
 ```
 dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
@@ -122,23 +113,13 @@ dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
 
 ### Accounts
 
-Account rules come from the `Accounts` section of `appsettings.json`:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `EnableBearerLogin` | `false` | Lets scripts sign in for bearer tokens. Browsers always use a cookie. |
-| `BearerTokenLifetime` | `01:00:00` | How long a bearer token lasts. |
-| `RefreshTokenLifetime` | `30.00:00:00` | How long a refresh token lasts. |
-| `RequireUniqueEmail` | `true` | When false, several accounts may share an email. |
-| `EnablePublicRegistration` | `false` | Lets anyone register at any time; each registration gets its own tenant. |
-| `DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
-| `RequireConfirmedEmail` | `false` | Users must confirm their email before signing in. Needs email sending. |
-| `PersistPasskeySignIn` | `false` | A passkey sign-in keeps the session after the browser closes, like "Remember me". |
-| `MicrosoftClientId`, `MicrosoftClientSecret` | empty | Sign in with a Microsoft account. On only when both are set. |
-| `GitHubClientId`, `GitHubClientSecret` | empty | Sign in with GitHub. On only when both are set. |
+Account rules come from the `Accounts` [settings](#server-settings).
 
 A new server has no users and no tenants. The first person to register (`POST /api/auth/register`) gets a new
 tenant and becomes the server administrator; after that, registration is closed unless public registration is on.
+A server set up by automation can instead get its first administrator from the `Bootstrap` settings, with a
+personal access token and a server service account whose keys the automation chooses in advance; they are created
+on the first start only, while the server has no users.
 Agents join a tenant with one of its installer keys (see [Running the Agent](#running-the-agent)).
 
 Passwords need at least 8 characters with an upper-case letter, a lower-case letter and a digit. Five wrong
@@ -166,30 +147,68 @@ Providers can be linked and unlinked in the account settings, as long as the acc
 ### Tenant settings
 
 Each tenant can change a few settings on the **Settings** page (or `/api/v1/tenant-settings`); one it hasn't set
-follows the server's default, from the `TenantDefaults` section:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `AppendInstanceName` | `false` | Install commands name an agent instance (`--instance`), so agents of several servers can share a machine. |
-| `InstanceName` | empty | The instance they name; empty makes one from the server's address (`desk.example.com` becomes `desk-example-com`). |
-
-The server refuses to start with an instance name an agent wouldn't accept.
+follows the server's default, from the `TenantDefaults` [settings](#server-settings).
 
 ### Email
 
 Account emails (confirm the address, reset the password, confirm a new email) go out by SMTP, configured in the
-`Email` section:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `DisableSending` | `false` (`true` in development) | Sends nothing. In development the messages, links included, are written to the server log. |
-| `SmtpHost`, `SmtpPort` | empty, `587` | The SMTP server. Port 465 uses TLS from the start; others use STARTTLS when offered. |
-| `SmtpUserName`, `SmtpPassword` | empty | Credentials, when the server needs them. |
-| `SenderName`, `SenderAddress` | `StealthDesk`, empty | Who the messages come from. |
+`Email` [settings](#server-settings).
 
 The first user's email is confirmed right away, and so is everyone's while sending is disabled. A message that can't
 be delivered is logged and can be asked for again; it never fails the registration or the reset. The server refuses
 to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
+
+### Server settings
+
+Every setting the server reads, by key. A key with a section is written `Section:Key` on the command line
+(`--Accounts:EnablePublicRegistration=true`) and nested in `appsettings.json`. In a container, set it as an
+environment variable with the `StealthDesk_` prefix and `__` between section and key
+(`StealthDesk_Accounts__EnablePublicRegistration=true`), or as a Docker secret: with `EnableDockerSecrets` on, each
+file in `/run/secrets` is a setting, named the same way without the prefix (`Accounts__GitHubClientSecret`). A secret
+wins over a variable, which wins over the files.
+
+The server checks every setting when it starts and stops with a message naming the key of any invalid one. Outside
+the Development environment it also refuses the in-memory database and the development PostgreSQL password.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `UseInMemoryDatabase` | `false` | An in-memory database instead of PostgreSQL, lost when the server stops. Development and tests only. |
+| `InMemoryDatabaseName` | random | Servers in one process with the same name share the in-memory data. |
+| `POSTGRES_HOST` | `localhost` in development | PostgreSQL's address. Required. |
+| `POSTGRES_PORT` | `5432` | |
+| `POSTGRES_DB` | `stealthdesk` | Created if missing; migrations run on every start. |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD` | `postgres`, `password` in development | Required. |
+| `EnableDockerSecrets` | `false` | Also reads settings from files in `DockerSecretsDirectory`, which must exist. |
+| `DockerSecretsDirectory` | `/run/secrets` | Where Docker mounts the secrets. |
+| `Accounts:EnableBearerLogin` | `false` | Lets scripts sign in for bearer tokens. Browsers always use a cookie. |
+| `Accounts:BearerTokenLifetime` | `01:00:00` | How long a bearer token lasts. |
+| `Accounts:RefreshTokenLifetime` | `30.00:00:00` | How long a refresh token lasts. |
+| `Accounts:RequireUniqueEmail` | `true` | When false, several accounts may share an email. |
+| `Accounts:EnablePublicRegistration` | `false` | Lets anyone register at any time; each registration gets its own tenant. |
+| `Accounts:DisableFirstUserSelfRegistration` | `false` | Closes the registration a new server allows for its first user. |
+| `Accounts:RequireConfirmedEmail` | `false` | Users must confirm their email before signing in. Needs email sending. |
+| `Accounts:PersistPasskeySignIn` | `false` | A passkey sign-in keeps the session after the browser closes, like "Remember me". |
+| `Accounts:DefaultTheme` | `Auto` | How the sign-in pages look: `Auto`, `Light` or `Dark`. Each user then picks their own. |
+| `Accounts:MicrosoftClientId`, `Accounts:MicrosoftClientSecret` | empty | Sign in with a Microsoft account. On only when both are set. |
+| `Accounts:GitHubClientId`, `Accounts:GitHubClientSecret` | empty | Sign in with GitHub. On only when both are set. |
+| `Email:DisableSending` | `false` (`true` in development) | Sends nothing. In development the messages, links included, are written to the server log. |
+| `Email:SmtpHost`, `Email:SmtpPort` | empty, `587` | The SMTP server. Port 465 uses TLS from the start; others use STARTTLS when offered. |
+| `Email:SmtpUserName`, `Email:SmtpPassword` | empty | Credentials, when the server needs them. |
+| `Email:SmtpLocalDomain` | empty | The name the server introduces itself with; some relays require a real domain. |
+| `Email:SmtpCheckCertificateRevocation` | `true` | Checks whether the SMTP server's certificate was revoked. |
+| `Email:SenderName`, `Email:SenderAddress` | `StealthDesk`, empty | Who the messages come from. |
+| `TenantDefaults:AppendInstanceName` | `false` | Install commands name an agent instance (`--instance`), so agents of several servers can share a machine. |
+| `TenantDefaults:InstanceName` | empty | The instance they name; empty makes one from the server's address (`desk.example.com` becomes `desk-example-com`). |
+| `Gateway:ClockTolerance` | `00:01:00` | How far an agent's clock may be from the server's before its reports are refused as replays. Empty turns the check off. |
+| `InstallerKeys:UsageHistoryDays` | `90` | How long each key's installs are kept. Zero keeps them all. |
+| `AuthorizationLogs:RetentionDays` | `365` | How long authorization log entries are kept. Zero keeps them all. |
+| `ServiceAccounts:AuthFailureLimit`, `ServiceAccounts:AuthFailureWindowMinutes` | `5`, `5` | Failed service account sign-ins allowed per address and per credential before more are refused for that many minutes. |
+| `ServiceAccounts:CredentialCleanupAfterDays` | `30` | Revoked and expired credentials are deleted this long after they stopped working. Zero keeps them. |
+| `Bootstrap:AdminEmail`, `Bootstrap:AdminPassword` | empty | The first administrator, created on a start while the server has no users, like the first registration. Both or neither. |
+| `Bootstrap:AdminTokenId`, `Bootstrap:AdminTokenSecret` | empty | A personal access token for that administrator, `{id}:{secret}`, acting as them and never expiring. The secret needs 32 characters or more. |
+| `Bootstrap:ServerServiceAccountName`, `Bootstrap:ServerServiceAccountCredentialId`, `Bootstrap:ServerServiceAccountCredentialSecret` | empty | An unrestricted server service account and its key, `{credential id}:{secret}`, created while none has that name. All three or none; the secret needs 32 characters or more. |
+| `Bootstrap:ServerServiceAccountId`, `Bootstrap:ServerServiceAccountDescription` | new id, empty | Its fixed id and description. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Sends logs, traces and metrics to this OpenTelemetry collector. |
 
 ## Running the Agent
 
