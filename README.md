@@ -8,9 +8,8 @@ StealthDesk is a self-hosted remote device management platform built with .NET 1
 A lightweight agent runs on each managed machine and keeps a signed, real-time SignalR connection to
 the server, which tracks every device and, in later versions, lets technicians reach them from the browser.
 
-> **Early development:** until v1.0 there may be breaking changes between versions. Users sign in since v0.3, but
-> every user of a tenant still sees all of its devices until permissions arrive in v0.4, and the server has not
-> been hardened for the internet yet.
+> **Early development:** until v1.0 there may be breaking changes between versions. Permissions decide what each
+> user can see and do since v0.4, but the server has not been hardened for the internet yet.
 
 ## Project Status
 
@@ -46,7 +45,24 @@ from the browser, and each tenant sees only its own devices.
 - The device API and the dashboard hub require sign-in, and devices and users are kept per tenant
 - Account journeys are tested end to end on PostgreSQL, and browser tests with Playwright run in their own workflow
 
-Next up: **v0.4**, permissions and access.
+**v0.4 - Permissions and access** ([#100](https://github.com/fkauanGIT/StealthDesk/issues/100)) is complete:
+permissions decide what each person, script and agent install can do, and tenants run themselves.
+
+- Permissions are allowed or denied to a user, a user group, a personal access token or a service account, at
+  server, tenant, device group or device scope; a deny always wins, and presets such as Tenant Administrator group
+  the usual ones
+- Every API route and dashboard hub method checks its permission, and the device list, each device and live
+  updates agree on what a user may read
+- Every permission change is kept in an authorization log, per tenant and for the server
+- Tenants manage their users, invites, user groups, device groups and settings; server administrators manage
+  tenants and a server-wide alert, and send a test email
+- Personal access tokens and service accounts let scripts use the API with their own, limited permissions
+- Devices join with installer keys (limited uses, time-limited or persistent), optionally into a device group, from
+  an "Add device" page that waits for the device to appear
+- The web app is organized by task (Devices, People & access, Integrations, Activity, Server), with a light theme
+- Every route is tested with and without its permission and from another tenant, on PostgreSQL
+
+Next up: **v0.5**, deployment.
 
 ### Roadmap
 
