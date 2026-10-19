@@ -6,6 +6,7 @@ using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.ServiceAccounts;
 using StealthDesk.Server.Tests.Infrastructure;
+using StealthDesk.Web.Server.Bootstrap;
 using StealthDesk.Web.Server.ServiceAccounts;
 
 namespace StealthDesk.Server.Tests;
@@ -355,7 +356,7 @@ public class ServiceAccountApiTests
   {
     var credentialId = Guid.NewGuid();
     var accountId = Guid.NewGuid();
-    var secret = new string('s', ServiceAccountBootstrapOptions.MinimumSecretLength);
+    var secret = new string('s', BootstrapOptions.MinimumSecretLength);
     using var server = ServerHost.InMemory()
       .With("Bootstrap:ServerServiceAccountName", "Provisioning")
       .With("Bootstrap:ServerServiceAccountId", accountId.ToString())
@@ -390,9 +391,9 @@ public class ServiceAccountApiTests
       .With("Bootstrap:ServerServiceAccountCredentialId", credentialId ? Guid.NewGuid().ToString() : null)
       .With("Bootstrap:ServerServiceAccountCredentialSecret", secret);
 
-    var thrown = Assert.ThrowsAny<Exception>(() => server.CreateClient());
+    var refusal = server.RefusalToStart();
 
-    Assert.IsType<InvalidOperationException>(thrown.GetBaseException());
+    Assert.Contains("Bootstrap:ServerServiceAccount", refusal, StringComparison.Ordinal);
   }
 
   [Fact]

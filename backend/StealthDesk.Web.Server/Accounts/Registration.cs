@@ -36,6 +36,12 @@ public sealed class Registration(
   PermissionSeeder permissions,
   ILogger<Registration> logger) : IRegistration
 {
+  /// <summary>What an account that starts its own tenant holds.</summary>
+  public static IReadOnlyList<string> CreatorPresets { get; } = [.. PermissionPresets.TenantCreator, .. PermissionPresets.Baseline];
+
+  /// <summary>What the server's first user holds, also when it comes from configuration: their tenant and the server.</summary>
+  public static IReadOnlyList<string> FirstUserPresets { get; } = [.. PermissionPresets.FirstUser, .. CreatorPresets];
+
   public async Task<bool> IsOpenAsync(CancellationToken cancellationToken = default)
   {
     var rules = options.CurrentValue;
@@ -99,8 +105,7 @@ public sealed class Registration(
     var serverAdministrator = firstUser && !options.CurrentValue.DisableFirstUserSelfRegistration;
 
     // The account created its tenant, so it administers it; the server's first one administers the server too.
-    var presets = PermissionPresets.TenantCreator.Concat(PermissionPresets.Baseline);
-    await permissions.SeedAsync(user.Id, user.TenantId, serverAdministrator ? PermissionPresets.FirstUser.Concat(presets) : presets, cancellationToken);
+    await permissions.SeedAsync(user.Id, user.TenantId, serverAdministrator ? FirstUserPresets : CreatorPresets, cancellationToken);
 
     // The first user, and anyone on a server that sends no email, could never get the link: confirmed right away.
     var confirmation = await users.GenerateEmailConfirmationTokenAsync(user);
