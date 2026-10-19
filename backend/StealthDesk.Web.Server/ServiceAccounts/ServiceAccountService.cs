@@ -5,6 +5,7 @@ using StealthDesk.Contracts.AuthorizationLogs;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.ServiceAccounts;
 using StealthDesk.Web.Server.AuthorizationLogs;
+using StealthDesk.Web.Server.Bootstrap;
 using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.ServiceAccounts;
@@ -297,34 +298,20 @@ public sealed class ServiceAccountService(
   }
 
   /// <summary>
-  /// Creates the configured server account and its credential, unrestricted, unless one by that name exists.
-  /// Configuration naming only some of what it needs is a mistake worth stopping the server for.
+  /// Creates the configured server account and its credential, unrestricted, unless one by that name exists. The
+  /// settings were checked when the server started: all of them are set, or none.
   /// </summary>
   /// <returns>Whether the account was created now.</returns>
-  public async Task<bool> BootstrapAsync(ServiceAccountBootstrapOptions options, CancellationToken cancellationToken)
+  public async Task<bool> BootstrapAsync(BootstrapOptions options, CancellationToken cancellationToken)
   {
-    var name = options.ServerServiceAccountName?.Trim();
-    var secret = options.ServerServiceAccountCredentialSecret;
-    var set = new[] { !string.IsNullOrEmpty(name), options.ServerServiceAccountCredentialId is not null, !string.IsNullOrEmpty(secret) };
-    if (set.All(x => !x))
+    if (!options.HasServerServiceAccount)
     {
       return false;
     }
 
-    if (set.Any(x => !x))
-    {
-      throw new InvalidOperationException(
-        $"Set {ServiceAccountBootstrapOptions.Section}:{nameof(options.ServerServiceAccountName)}, " +
-        $"{nameof(options.ServerServiceAccountCredentialId)} and {nameof(options.ServerServiceAccountCredentialSecret)} together, or none of them.");
-    }
-
-    if (secret!.Length < ServiceAccountBootstrapOptions.MinimumSecretLength)
-    {
-      throw new InvalidOperationException(
-        $"{ServiceAccountBootstrapOptions.Section}:{nameof(options.ServerServiceAccountCredentialSecret)} must be at least {ServiceAccountBootstrapOptions.MinimumSecretLength} characters.");
-    }
-
-    if (await NameTakenAsync(null, name!, except: null, cancellationToken))
+    var name = options.ServerServiceAccountName!.Trim();
+    var secret = options.ServerServiceAccountCredentialSecret!;
+    if (await NameTakenAsync(null, name, except: null, cancellationToken))
     {
       return false;
     }
@@ -334,7 +321,7 @@ public sealed class ServiceAccountService(
     {
       Id = options.ServerServiceAccountId ?? Guid.NewGuid(),
       Kind = ServiceAccountKind.Server,
-      Name = name!,
+      Name = name,
       Description = Clean(options.ServerServiceAccountDescription),
       AccessMode = ServiceAccountAccessMode.Unrestricted,
       CreatedAt = now,

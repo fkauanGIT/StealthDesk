@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Web.Server.Accounts;
 
@@ -7,7 +8,13 @@ public static class EmailSetup
 {
   public static WebApplicationBuilder AddStealthDeskEmail(this WebApplicationBuilder builder)
   {
-    builder.Services.AddOptions<EmailOptions>().Bind(builder.Configuration.GetSection(EmailOptions.Section));
+    builder.Services.AddOptions<EmailOptions>()
+      .Bind(builder.Configuration.GetSection(EmailOptions.Section))
+      .Validate(x => x.SmtpPort is > 0 and <= 65535, $"{EmailOptions.Section}:{nameof(EmailOptions.SmtpPort)} must be a port number from 1 to 65535.")
+      .Validate(
+        x => string.IsNullOrWhiteSpace(x.SenderAddress) || MailAddress.TryCreate(x.SenderAddress, out _),
+        $"{EmailOptions.Section}:{nameof(EmailOptions.SenderAddress)} isn't an email address.")
+      .ValidateOnStart();
 
     // Fail at startup rather than when the first user can't confirm their account.
     builder.Services.AddOptions<AccountOptions>()

@@ -136,6 +136,32 @@ public sealed class PersonalAccessTokenService(
     return Results.Created(Routes.PersonalAccessToken(token.Id), new CreatedPersonalAccessToken(Summary(token, grants.Count), $"{token.Id}:{secret}"));
   }
 
+  /// <summary>
+  /// The bootstrap administrator's token, with the id and secret from configuration so automation knows it in
+  /// advance: it acts as its owner and doesn't expire. Logged as the server's own change.
+  /// </summary>
+  public async Task BootstrapAsync(UserRecord owner, Guid id, string secret, CancellationToken cancellationToken)
+  {
+    var token = new PersonalAccessTokenRecord
+    {
+      Id = id,
+      UserId = owner.Id,
+      Name = "Bootstrap token",
+      Mode = PersonalAccessTokenMode.InheritOwner,
+      CreatedAt = clock.GetUtcNow(),
+    };
+    token.HashedSecret = hasher.HashPassword(token, secret);
+    db.PersonalAccessTokens.Add(token);
+    db.AuthorizationChanges.Add(changes.Create(
+      AuthorizationChangeActions.PersonalAccessTokenCreated,
+      actor: null,
+      AuthorizationChangeTargets.PersonalAccessToken,
+      token.Id,
+      owner.TenantId,
+      after: new PersonalAccessTokenSnapshot(token.Name, token.Mode, token.ExpiresAt, Grants: 0)));
+    await db.SaveChangesAsync(cancellationToken);
+  }
+
   public async Task<IResult> RenameAsync(Guid ownerId, Guid id, string name, CancellationToken cancellationToken)
   {
     if (NameRefusal(name) is { } invalid)

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Branding;
+using StealthDesk.Contracts.Accounts;
 using StealthDesk.Web.Server.Permissions;
 
 namespace StealthDesk.Web.Server.Accounts;
@@ -25,7 +26,12 @@ public static class AccountSetup
   {
     var section = builder.Configuration.GetSection(AccountOptions.Section);
     var accounts = section.Get<AccountOptions>() ?? new AccountOptions();
-    builder.Services.Configure<AccountOptions>(section);
+    builder.Services.AddOptions<AccountOptions>()
+      .Bind(section)
+      .Validate(x => x.BearerTokenLifetime > TimeSpan.Zero, Key(nameof(AccountOptions.BearerTokenLifetime)) + " must be longer than zero.")
+      .Validate(x => x.RefreshTokenLifetime > TimeSpan.Zero, Key(nameof(AccountOptions.RefreshTokenLifetime)) + " must be longer than zero.")
+      .Validate(x => Enum.IsDefined(x.DefaultTheme), Key(nameof(AccountOptions.DefaultTheme)) + $" must be one of {string.Join(", ", Enum.GetNames<ThemeMode>())}.")
+      .ValidateOnStart();
 
     builder.Services
       .AddIdentityApiEndpoints<UserRecord>(options =>
@@ -157,4 +163,6 @@ public static class AccountSetup
 
     return Task.CompletedTask;
   }
+
+  private static string Key(string name) => $"{AccountOptions.Section}:{name}";
 }

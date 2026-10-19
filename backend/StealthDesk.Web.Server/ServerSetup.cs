@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
 using StealthDesk.Web.Server.AuthorizationLogs;
+using StealthDesk.Web.Server.Bootstrap;
+using StealthDesk.Web.Server.Configuration;
 using StealthDesk.Web.Server.Email;
 using StealthDesk.Observability;
 using StealthDesk.Web.Server.Dashboard;
@@ -25,12 +27,16 @@ public static class ServerSetup
 {
   public static WebApplicationBuilder AddStealthDeskServer(this WebApplicationBuilder builder)
   {
+    builder.AddStealthDeskConfiguration();
     builder.AddObservability(ServiceNames.Server);
     builder.AddStealthDeskDatabase();
     builder.AddStealthDeskAccounts();
     builder.AddStealthDeskEmail();
 
-    builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection(GatewayOptions.Section));
+    builder.Services.AddOptions<GatewayOptions>()
+      .Bind(builder.Configuration.GetSection(GatewayOptions.Section))
+      .Validate(x => x.ClockTolerance is null || x.ClockTolerance > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.ClockTolerance)} must be longer than zero, or empty to turn the check off.")
+      .ValidateOnStart();
     builder.Services.AddSignalR().AddMessagePackProtocol();
 
     builder.Services.AddSingleton(TimeProvider.System);
@@ -42,14 +48,20 @@ public static class ServerSetup
     builder.Services.AddScoped<PersonalAccessTokenService>();
     builder.Services.AddSingleton<IPasswordHasher<ServiceAccountCredentialRecord>, PasswordHasher<ServiceAccountCredentialRecord>>();
     builder.Services.AddScoped<ServiceAccountService>();
-    builder.Services.Configure<ServiceAccountOptions>(builder.Configuration.GetSection(ServiceAccountOptions.Section));
-    builder.Services.Configure<ServiceAccountBootstrapOptions>(builder.Configuration.GetSection(ServiceAccountBootstrapOptions.Section));
+    builder.Services.AddOptions<ServiceAccountOptions>()
+      .Bind(builder.Configuration.GetSection(ServiceAccountOptions.Section))
+      .Validate(x => x.AuthFailureLimit > 0, $"{ServiceAccountOptions.Section}:{nameof(ServiceAccountOptions.AuthFailureLimit)} must be at least 1.")
+      .Validate(x => x.AuthFailureWindowMinutes > 0, $"{ServiceAccountOptions.Section}:{nameof(ServiceAccountOptions.AuthFailureWindowMinutes)} must be at least 1.")
+      .ValidateOnStart();
+    BootstrapOptions.AddTo(builder.Services, builder.Configuration);
+    builder.Services.AddScoped<ServerBootstrap>();
     builder.Services.AddSingleton<ServiceAccountCredentialCleanup>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<ServiceAccountCredentialCleanup>());
     builder.Services.AddSingleton<IPasswordHasher<InstallerKeyRecord>, PasswordHasher<InstallerKeyRecord>>();
     builder.Services.AddSingleton<InstallerKeyLocks>();
     builder.Services.AddScoped<InstallerKeyService>();
-    builder.Services.Configure<InstallerKeyOptions>(builder.Configuration.GetSection(InstallerKeyOptions.Section));
+    // Any number is valid here (zero or less keeps everything), but a value that isn't one still stops the server.
+    builder.Services.AddOptions<InstallerKeyOptions>().Bind(builder.Configuration.GetSection(InstallerKeyOptions.Section)).ValidateOnStart();
     builder.Services.AddSingleton<InstallerKeyUsageCleanup>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<InstallerKeyUsageCleanup>());
     builder.Services.AddScoped<TenantSettingService>();
@@ -61,7 +73,7 @@ public static class ServerSetup
     builder.Services.AddScoped<ReportProcessor>();
     builder.Services.AddSingleton<IDeviceNotifier, DeviceNotifier>();
 
-    builder.Services.Configure<AuthorizationLogOptions>(builder.Configuration.GetSection(AuthorizationLogOptions.Section));
+    builder.Services.AddOptions<AuthorizationLogOptions>().Bind(builder.Configuration.GetSection(AuthorizationLogOptions.Section)).ValidateOnStart();
     builder.Services.AddSingleton<IAuthorizationChangeFactory, AuthorizationChangeFactory>();
     builder.Services.AddSingleton<AuthorizationLogCleanup>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<AuthorizationLogCleanup>());
