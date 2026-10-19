@@ -197,7 +197,8 @@ The agent runs on Windows. A new device joins a tenant with an installer key, so
 account before starting one: open `http://localhost:5099`, choose **Create an account** on the sign-in page and
 register. You become the server administrator and land on the device list.
 
-Open **Deploy**, create a key and copy the command it shows. From a second terminal, run the agent with that key:
+Choose **Add device** on the device list, create a key and copy the command it shows. From a second terminal, run
+the agent with that key:
 
 ```
 dotnet run --project agent/StealthDesk.Agent -- run --installer-key <key>
