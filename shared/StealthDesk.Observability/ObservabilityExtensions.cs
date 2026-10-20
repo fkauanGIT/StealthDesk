@@ -14,8 +14,8 @@ namespace StealthDesk.Observability;
 
 public static class ObservabilityExtensions
 {
-
-  private const string LivenessTag = "liveness";
+  /// <summary>Checks that only tell whether the process responds; every other check also counts for readiness.</summary>
+  public const string LivenessTag = "liveness";
 
   /// <summary>
   /// Health checks plus OpenTelemetry logs, metrics and traces. Telemetry is only exported when
@@ -59,12 +59,17 @@ public static class ObservabilityExtensions
   }
 
   /// <summary>
-  /// <c>/health</c>: every check must pass (ready for traffic). <c>/alive</c>: only liveness checks (process responsive).
+  /// <c>/health/ready</c> and <c>/health</c>: every check must pass (ready for traffic, e.g. the database answers).
+  /// <c>/health/live</c> and <c>/alive</c>: only liveness checks (the process responds), so an orchestrator restarts a
+  /// stuck process but not one waiting for its database.
   /// </summary>
   public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
   {
+    var liveness = new HealthCheckOptions { Predicate = check => check.Tags.Contains(LivenessTag) };
+    endpoints.MapHealthChecks("/health/ready");
+    endpoints.MapHealthChecks("/health/live", liveness);
     endpoints.MapHealthChecks("/health");
-    endpoints.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = check => check.Tags.Contains(LivenessTag) });
+    endpoints.MapHealthChecks("/alive", liveness);
     return endpoints;
   }
 

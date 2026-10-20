@@ -46,6 +46,9 @@ public sealed class ServerHost : WebApplicationFactory<Program>
     return this;
   }
 
+  /// <summary>A setting the server was given, e.g. <c>POSTGRES_DB</c>.</summary>
+  public string? Setting(string key) => _settings.GetValueOrDefault(key);
+
   /// <summary>Runs the server in another environment, e.g. Production. Only before the server starts.</summary>
   public ServerHost InEnvironment(string environment)
   {
