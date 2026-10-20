@@ -3,32 +3,35 @@ using Microsoft.Extensions.Logging;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
 
-/// <summary>Keeps the server's errors, so tests can show a flow logs none.</summary>
+/// <summary>Keeps the server's warnings and errors, so tests can show a flow logs none, or one it must.</summary>
 public sealed class CapturedLogs : ILoggerProvider
 {
-  private readonly ConcurrentQueue<string> _errors = new();
+  private readonly ConcurrentQueue<(LogLevel Level, string Text)> _entries = new();
 
   /// <summary>Every error or critical entry, as "Category: message".</summary>
-  public IReadOnlyList<string> Errors => [.. _errors];
+  public IReadOnlyList<string> Errors => [.. _entries.Where(x => x.Level >= LogLevel.Error).Select(x => x.Text)];
 
-  public ILogger CreateLogger(string categoryName) => new Logger(categoryName, _errors);
+  /// <summary>Every warning, as "Category: message".</summary>
+  public IReadOnlyList<string> Warnings => [.. _entries.Where(x => x.Level == LogLevel.Warning).Select(x => x.Text)];
+
+  public ILogger CreateLogger(string categoryName) => new Logger(categoryName, _entries);
 
   public void Dispose()
   {
   }
 
-  private sealed class Logger(string category, ConcurrentQueue<string> errors) : ILogger
+  private sealed class Logger(string category, ConcurrentQueue<(LogLevel Level, string Text)> entries) : ILogger
   {
     public IDisposable? BeginScope<TState>(TState state)
       where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
       if (IsEnabled(logLevel))
       {
-        errors.Enqueue($"{category}: {formatter(state, exception)}");
+        entries.Enqueue((logLevel, $"{category}: {formatter(state, exception)}"));
       }
     }
   }

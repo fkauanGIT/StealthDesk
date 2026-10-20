@@ -13,6 +13,7 @@ using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
 using StealthDesk.Contracts.Agents;
 using StealthDesk.Web.Server.InstallerKeys;
+using StealthDesk.Web.Server.KeyProtection;
 using StealthDesk.Web.Server.TenantSettings;
 using StealthDesk.Web.Server.Tenants;
 using StealthDesk.Web.Server.Invites;
@@ -32,6 +33,7 @@ public static class ServerSetup
     builder.AddObservability(ServiceNames.Server);
     builder.AddStealthDeskDatabase();
     builder.AddStealthDeskAccounts();
+    builder.AddStealthDeskDataProtection();
     builder.AddStealthDeskEmail();
     builder.AddStealthDeskReverseProxy();
 
