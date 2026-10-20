@@ -38,6 +38,10 @@ public class ServerConfigurationTests
   [InlineData("Bootstrap:AdminEmail", AdminEmail, "Bootstrap:AdminPassword")]
   [InlineData("Bootstrap:AdminTokenSecret", "too-short", "Bootstrap:AdminTokenId")]
   [InlineData("EnableDockerSecrets", "true", "EnableDockerSecrets")]
+  [InlineData("ReverseProxy:TrustedProxies:0", "proxy.local", "ReverseProxy:TrustedProxies holds 'proxy.local'")]
+  [InlineData("ReverseProxy:TrustedNetworks:0", "10.0.0.0/33", "ReverseProxy:TrustedNetworks holds '10.0.0.0/33'")]
+  [InlineData("ReverseProxy:DockerGatewayAddress", "gateway", "ReverseProxy:DockerGatewayAddress is 'gateway'")]
+  [InlineData("ReverseProxy:TrustCloudflare", "maybe", "ReverseProxy:TrustCloudflare")]
   public void AnInvalidSetting_StopsTheServer_NamingItsKey(string key, string value, string named)
   {
     using var server = ServerHost.InMemory().With(key, value);

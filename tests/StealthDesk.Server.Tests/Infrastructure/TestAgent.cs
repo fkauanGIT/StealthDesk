@@ -33,7 +33,8 @@ public sealed class TestAgent : IAsyncDisposable
   public string? InstallerKey { get; }
 
   /// <param name="withInstallerKey">False for an agent that was given no installer key.</param>
-  public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null, bool withInstallerKey = true)
+  /// <param name="through">A proxy the agent reaches the server through; none connects straight to it.</param>
+  public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null, bool withInstallerKey = true, TestProxy? through = null)
   {
     // A key belongs to a tenant, as a server has once its first user registered.
     var installerKey = withInstallerKey ? await TestInstallerKeys.CreateAsync(server, await TestTenants.EnsureAsync(server)) : null;
@@ -49,7 +50,7 @@ public sealed class TestAgent : IAsyncDisposable
 
     var opened = await channel.OpenAsync(endpoint, options =>
     {
-      options.HttpMessageHandlerFactory = _ => server.Server.CreateHandler();
+      options.HttpMessageHandlerFactory = _ => through?.Handler(server) ?? server.Server.CreateHandler();
       options.Transports = HttpTransportType.LongPolling;
     }, TestContext.Current.CancellationToken);
 
