@@ -5,9 +5,7 @@ using StealthDesk.Web.Server.PersonalAccessTokens;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
-using StealthDesk.Branding;
 using StealthDesk.Contracts.Accounts;
 using StealthDesk.Web.Server.Permissions;
 
@@ -20,7 +18,6 @@ public static class AccountSetup
 
   /// <summary>
   /// Users through ASP.NET Core Identity: browsers sign in with a cookie, scripts with bearer tokens when enabled.
-  /// Data protection keys are kept in the database.
   /// </summary>
   public static WebApplicationBuilder AddStealthDeskAccounts(this WebApplicationBuilder builder)
   {
@@ -117,13 +114,6 @@ public static class AccountSetup
     builder.Services.AddScoped<ITenantScope, RequestTenantScope>();
     builder.Services.AddSingleton<RegistrationGate>();
     builder.Services.AddScoped<IRegistration, Registration>();
-
-    // Keys in the database instead of the machine: cookies stay valid after a restart and across servers.
-    builder.Services
-      .AddDataProtection()
-      .SetApplicationName(Brand.Name)
-      .PersistKeysToDbContext<StealthDeskDb>();
-
     return builder;
   }
 
