@@ -483,3 +483,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Docker Compose deployment: filled-in secrets and certificates
+docker-compose/secrets/
+docker-compose/certificates/

@@ -1,0 +1,85 @@
+# StealthDesk with PostgreSQL, configured through environment variables.
+#
+#   1. Copy .env.example to .env and set at least the database password.
+#   2. docker compose up -d
+#   3. Open http://localhost:8080 (or SERVER_PORT) and register the first user.
+#
+# The telemetry dashboard starts only with: docker compose --profile telemetry up -d
+# To keep passwords out of variables, use docker-compose.secrets.yml instead.
+
+name: stealthdesk
+
+services:
+  server:
+    # Pin a version (SERVER_IMAGE_TAG=0.5.0) and update on purpose. Without a published image, it's built here.
+    image: ghcr.io/fkauangit/stealthdesk:${SERVER_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: backend/StealthDesk.Web.Server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - stealthdesk
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      StealthDesk_POSTGRES_HOST: database
+      StealthDesk_POSTGRES_PORT: 5432
+      # The same values the database below is created with.
+      StealthDesk_POSTGRES_USER: ${StealthDesk_POSTGRES_USER:-postgres}
+      StealthDesk_POSTGRES_DB: ${StealthDesk_POSTGRES_DB:-stealthdesk}
+      # A reverse proxy running on the host reaches the server through this gateway.
+      StealthDesk_ReverseProxy__DockerGatewayAddress: ${DOCKER_GATEWAY:-172.30.0.1}
+    volumes:
+      # Put the data protection key certificate here and point KeyProtection__Certificate__Path to /certificates.
+      - ./certificates:/certificates:ro
+
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    networks:
+      - stealthdesk
+    volumes:
+      - database:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${StealthDesk_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${StealthDesk_POSTGRES_PASSWORD:?Set StealthDesk_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${StealthDesk_POSTGRES_DB:-stealthdesk}
+    healthcheck:
+      # Over TCP: while the image creates the database, it listens on its socket only.
+      test: ["CMD-SHELL", "pg_isready --host 127.0.0.1 --dbname \"$$POSTGRES_DB\" --username \"$$POSTGRES_USER\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  telemetry:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.4
+    profiles: [telemetry]
+    restart: unless-stopped
+    ports:
+      - "${TELEMETRY_DASHBOARD_PORT:-18888}:18888"
+    networks:
+      - stealthdesk
+    environment:
+      Dashboard__Frontend__AuthMode: BrowserToken
+      Dashboard__Frontend__BrowserToken: ${TELEMETRY_DASHBOARD_TOKEN:-}
+      # Only the server sends telemetry, from inside this network; the port isn't published.
+      Dashboard__Otlp__AuthMode: Unsecured
+
+volumes:
+  database:
+    name: stealthdesk-database
+
+networks:
+  stealthdesk:
+    name: stealthdesk
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET:-172.30.0.0/16}
+          gateway: ${DOCKER_GATEWAY:-172.30.0.1}
