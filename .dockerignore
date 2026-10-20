@@ -1,0 +1,32 @@
+# Only what the image builds from: the server, its web client and the shared libraries, never build output,
+# secrets or tests. A smaller context also uploads faster and changes less often, so layers are reused.
+
+# Build output and tool state
+**/bin
+**/obj
+**/TestResults
+**/node_modules
+**/.vs
+**/.vscode
+**/.idea
+**/*.user
+
+# Not part of the server
+.git
+.github
+agent
+tests
+plan.md
+**/*.md
+
+# Secrets that might sit in a working copy
+**/.env
+**/*.pfx
+**/*.pem
+**/*.key
+**/appsettings.*.local.json
+**/secrets*.json
+
+# The image files themselves
+**/Dockerfile*
+**/.dockerignore

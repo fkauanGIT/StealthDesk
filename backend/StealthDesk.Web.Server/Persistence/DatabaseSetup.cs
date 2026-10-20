@@ -10,6 +10,7 @@ public static class DatabaseSetup
 {
   public const string UseInMemoryDatabase = "UseInMemoryDatabase";
   public const string InMemoryDatabaseName = "InMemoryDatabaseName";
+  public const string ApplyMigrationsOnStart = "ApplyMigrationsOnStart";
 
   // What appsettings.Development.json uses, so a server outside development can't run with it by mistake.
   private const string DevelopmentPassword = "password";
@@ -17,12 +18,17 @@ public static class DatabaseSetup
   /// <summary>
   /// PostgreSQL built from the <c>POSTGRES_*</c> settings, or an in-memory database when
   /// <c>UseInMemoryDatabase</c> is true (optionally named by <c>InMemoryDatabaseName</c>). Outside development
-  /// the server refuses the in-memory database and the development password.
+  /// the server refuses the in-memory database and the development password. The readiness health check fails
+  /// while the database can't be reached.
   /// </summary>
   public static WebApplicationBuilder AddStealthDeskDatabase(this WebApplicationBuilder builder)
   {
     var configuration = builder.Configuration;
     var development = builder.Environment.IsDevelopment();
+
+    // Read now, so a value that isn't true or false stops the server before anything else.
+    _ = MigratesOnStart(configuration);
+    builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
     if (configuration.GetValue<bool>(UseInMemoryDatabase))
     {
@@ -45,9 +51,10 @@ public static class DatabaseSetup
   }
 
   /// <summary>
-  /// Checks every setting, then brings the schema up to date (migrations on PostgreSQL, a plain create in memory),
-  /// marks every device offline and creates what the <c>Bootstrap</c> settings describe. Without a bootstrap
-  /// administrator, tenants are created by registration, starting with the first user's.
+  /// Checks every setting, then brings the schema up to date (migrations on PostgreSQL unless
+  /// <c>ApplyMigrationsOnStart</c> is off, a plain create in memory), marks every device offline and creates what the
+  /// <c>Bootstrap</c> settings describe. Without a bootstrap administrator, tenants are created by registration,
+  /// starting with the first user's.
   /// </summary>
   public static async Task PrepareDatabaseAsync(this WebApplication app)
   {
@@ -57,9 +64,20 @@ public static class DatabaseSetup
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<StealthDeskDb>();
 
-    if (db.Database.IsRelational())
+    if (db.Database.IsRelational() && MigratesOnStart(app.Configuration))
     {
       await db.Database.MigrateAsync();
+    }
+    else if (db.Database.IsRelational())
+    {
+      // Whoever turned migrations off applies them another way; a server on an older schema would fail at random.
+      var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+      if (pending.Count > 0)
+      {
+        throw new InvalidOperationException(
+          $"{ApplyMigrationsOnStart} is off, but the database lacks {pending.Count} migrations, starting with {pending[0]}. " +
+          $"Apply them (dotnet ef database update, or the script from dotnet ef migrations script --idempotent), or turn it on.");
+      }
     }
     else
     {
@@ -74,6 +92,8 @@ public static class DatabaseSetup
 
     await scope.ServiceProvider.GetRequiredService<ServerBootstrap>().RunAsync(CancellationToken.None);
   }
+
+  private static bool MigratesOnStart(IConfiguration configuration) => configuration.GetValue(ApplyMigrationsOnStart, true);
 
   // Connections don't survive a restart, and a server that stopped abruptly never saw them close.
   // Agents still running reconnect and report themselves online again.

@@ -37,6 +37,17 @@ internal static class PostgresDatabases
     };
   }
 
+  /// <summary>Drops a database, closing the connections open to it, as if the database server went away.</summary>
+  public static async Task DropAsync(string databaseName)
+  {
+    var container = await _container.Value;
+    await using var connection = new NpgsqlConnection(container.GetConnectionString());
+    await connection.OpenAsync();
+    await using var command = connection.CreateCommand();
+    command.CommandText = $"DROP DATABASE \"{databaseName}\" WITH (FORCE)";
+    await command.ExecuteNonQueryAsync();
+  }
+
   private static async Task<PostgreSqlContainer> StartContainerAsync()
   {
     var container = new PostgreSqlBuilder("postgres:17-alpine").Build();

@@ -109,3 +109,59 @@ jobs:
               throw "Test execution failed for $project."
             }
           }
+
+  # The image builds from a clean checkout, becomes healthy once PostgreSQL answers, and doesn't run as root.
+  container-image:
+    name: Container image
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Build the server image
+        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
+
+      - name: Start the server before its database
+        run: |
+          docker network create stealthdesk
+          docker run --detach --name server --network stealthdesk --restart on-failure \
+            --env StealthDesk_POSTGRES_HOST=database \
+            --env StealthDesk_POSTGRES_USER=postgres \
+            --env StealthDesk_POSTGRES_PASSWORD=ci-password \
+            stealthdesk-server:ci
+
+      - name: Not healthy without its database
+        run: |
+          sleep 20
+          status=$(docker inspect --format '{{.State.Health.Status}}' server)
+          echo "Health without a database: $status"
+          test "$status" != "healthy"
+
+      - name: Healthy once PostgreSQL answers
+        run: |
+          docker run --detach --name database --network stealthdesk --env POSTGRES_PASSWORD=ci-password postgres:17-alpine
+          for attempt in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' server)
+            if [ "$status" = "healthy" ]; then
+              echo "Healthy after $attempt checks."
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs server
+          exit 1
+
+      - name: Not running as root
+        run: |
+          user=$(docker exec server id -u)
+          echo "The server runs as user $user."
+          test "$user" != "0"
+
+      - name: Image labels
+        run: |
+          docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }} {{ index .Config.Labels "org.opencontainers.image.source" }}' stealthdesk-server:ci
+          test -n "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.source" }}' stealthdesk-server:ci)"

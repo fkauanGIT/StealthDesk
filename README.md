@@ -227,6 +227,7 @@ the Development environment it also refuses the in-memory database and the devel
 | `POSTGRES_PORT` | `5432` | |
 | `POSTGRES_DB` | `stealthdesk` | Created if missing; migrations run on every start. |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD` | `postgres`, `password` in development | Required. |
+| `ApplyMigrationsOnStart` | `true` | Brings the database schema up to date on every start. Turned off, the server only checks it is up to date and refuses to start otherwise. |
 | `EnableDockerSecrets` | `false` | Also reads settings from files in `DockerSecretsDirectory`, which must exist. |
 | `DockerSecretsDirectory` | `/run/secrets` | Where Docker mounts the secrets. |
 | `Accounts:EnableBearerLogin` | `false` | Lets scripts sign in for bearer tokens. Browsers always use a cookie. |
@@ -266,6 +267,32 @@ the Development environment it also refuses the in-memory database and the devel
 | `KeyProtection:Certificate:Path`, `KeyProtection:Certificate:Base64`, `KeyProtection:Certificate:Password` | empty | The `.pfx` certificate, with an RSA private key, from a file or its base64 contents (which wins), and its password. |
 | `KeyProtection:PreviousCertificates` | empty | Certificates that only read keys encrypted before a rotation. A list, each with `Path` or `Base64` and `Password`: `KeyProtection:PreviousCertificates:0:Path`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Sends logs, traces and metrics to this OpenTelemetry collector. |
+
+## Running in a container
+
+The server and its web client build into one image, from the repository root:
+
+```bash
+docker build -f backend/StealthDesk.Web.Server/Dockerfile -t stealthdesk-server .
+```
+
+It runs on the ASP.NET runtime as the image's unprivileged `app` user, listens on port 8080 and takes every
+[setting](#server-settings) as a `StealthDesk_` variable. With a PostgreSQL container next to it:
+
+```bash
+docker network create stealthdesk
+docker run -d --name stealthdesk-db --network stealthdesk -e POSTGRES_PASSWORD=change-me postgres:17
+docker run -d --name stealthdesk --network stealthdesk -p 8080:8080 \
+  -e StealthDesk_POSTGRES_HOST=stealthdesk-db \
+  -e StealthDesk_POSTGRES_USER=postgres \
+  -e StealthDesk_POSTGRES_PASSWORD=change-me \
+  stealthdesk-server
+```
+
+The container reports itself healthy once `/health/ready` answers, which needs the database. The server applies
+database migrations as it starts; to apply them another way (for instance from a SQL script made with
+`dotnet ef migrations script --idempotent`), turn off `ApplyMigrationsOnStart`. The image speaks plain HTTP: put a
+[reverse proxy](#behind-a-reverse-proxy) in front of it for HTTPS.
 
 ## Running the Agent
 
@@ -345,8 +372,8 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/auth/external/{provider}` | HTTP | Leaves for Microsoft or GitHub to sign in; the provider comes back to `/signin-microsoft` or `/signin-github`, then to `/api/auth/external/callback`. `/pending` and `/register` create the account on a first visit. |
 | `/api/account/logins` | HTTP | The providers linked to the account: list (`GET`), link (`GET /link/{provider}`), unlink (`DELETE /{provider}/{key}`). |
 | `/api/internal/version/server` | HTTP | Returns the server version. |
-| `/health` | HTTP | Readiness check: every registered health check must pass. |
-| `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |
+| `/health/ready` | HTTP | Readiness: every check must pass, including that the database answers. `/health` does the same. |
+| `/health/live` | HTTP | Liveness: only that the process responds, so a server waiting for its database isn't restarted. `/alive` does the same. |
 
 A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 
