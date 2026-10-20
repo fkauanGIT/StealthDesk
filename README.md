@@ -158,6 +158,20 @@ The first user's email is confirmed right away, and so is everyone's while sendi
 be delivered is logged and can be asked for again; it never fails the registration or the reset. The server refuses
 to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
 
+### Behind a reverse proxy
+
+Behind a reverse proxy (Nginx, Caddy, Cloudflare) the server sees the proxy's address and plain HTTP unless it trusts
+the proxy. From a trusted proxy it takes the client's address, scheme and host from `X-Forwarded-For`,
+`X-Forwarded-Proto` and `X-Forwarded-Host` before anything else runs, so cookies are `Secure`, sign-in redirects go
+back to `https://` and logs record the client. A chain of proxies (Cloudflare in front of Nginx) is followed back as
+long as each one is trusted. Only a proxy on the same machine is trusted until the `ReverseProxy`
+[settings](#server-settings) name others.
+
+The proxy must pass WebSocket upgrades (the `Upgrade` and `Connection` headers) to `/hubs/agent` and
+`/hubs/dashboard`. Agents use nothing but `/hubs/agent`, and prove who they are with signed reports and installer
+keys. When the proxy puts its own sign-in in front of the server (Cloudflare Access, for instance), leave that path
+open; browsers need the rest.
+
 ### Server settings
 
 Every setting the server reads, by key. A key with a section is written `Section:Key` on the command line
@@ -208,6 +222,11 @@ the Development environment it also refuses the in-memory database and the devel
 | `Bootstrap:AdminTokenId`, `Bootstrap:AdminTokenSecret` | empty | A personal access token for that administrator, `{id}:{secret}`, acting as them and never expiring. The secret needs 32 characters or more. |
 | `Bootstrap:ServerServiceAccountName`, `Bootstrap:ServerServiceAccountCredentialId`, `Bootstrap:ServerServiceAccountCredentialSecret` | empty | An unrestricted server service account and its key, `{credential id}:{secret}`, created while none has that name. All three or none; the secret needs 32 characters or more. |
 | `Bootstrap:ServerServiceAccountId`, `Bootstrap:ServerServiceAccountDescription` | new id, empty | Its fixed id and description. |
+| `ReverseProxy:TrustedProxies` | empty | Addresses of proxies whose forwarded headers are trusted, e.g. `10.0.0.2`. A list: `--ReverseProxy:TrustedProxies:0=10.0.0.2`, or `StealthDesk_ReverseProxy__TrustedProxies__0`. |
+| `ReverseProxy:TrustedNetworks` | empty | Networks of trusted proxies, e.g. `10.0.0.0/8`. A list, like the one above. |
+| `ReverseProxy:DockerGatewayAddress` | empty | The gateway of the Docker network the server runs in, which a proxy in front of Docker comes through. |
+| `ReverseProxy:TrustCloudflare` | `false` | Trusts Cloudflare's address ranges, downloaded from Cloudflare when the server starts; it doesn't start if they can't be. |
+| `ReverseProxy:TrustAllProxies` | `false` | Trusts forwarded headers from any address. Only for a server nothing but the proxy can reach: otherwise any client can claim any address. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Sends logs, traces and metrics to this OpenTelemetry collector. |
 
 ## Running the Agent
@@ -287,11 +306,11 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 | `/api/auth/passkey` | HTTP | Signs in with a passkey, after `POST /api/auth/passkey/request-options`. Needs no second factor. |
 | `/api/auth/external/{provider}` | HTTP | Leaves for Microsoft or GitHub to sign in; the provider comes back to `/signin-microsoft` or `/signin-github`, then to `/api/auth/external/callback`. `/pending` and `/register` create the account on a first visit. |
 | `/api/account/logins` | HTTP | The providers linked to the account: list (`GET`), link (`GET /link/{provider}`), unlink (`DELETE /{provider}/{key}`). |
-
-A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 | `/api/internal/version/server` | HTTP | Returns the server version. |
 | `/health` | HTTP | Readiness check: every registered health check must pass. |
 | `/alive` | HTTP | Liveness check: only checks tagged `liveness` must pass. |
+
+A user marked to change their password gets `403` from the rest of the API and the hubs until they change it.
 
 ## Running the Tests
 
