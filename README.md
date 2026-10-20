@@ -294,6 +294,45 @@ database migrations as it starts; to apply them another way (for instance from a
 `dotnet ef migrations script --idempotent`), turn off `ApplyMigrationsOnStart`. The image speaks plain HTTP: put a
 [reverse proxy](#behind-a-reverse-proxy) in front of it for HTTPS.
 
+### With Docker Compose
+
+[`docker-compose/`](./docker-compose) runs the server and PostgreSQL together. The server waits for the database to
+be healthy, both restart unless stopped, and the database lives in the `stealthdesk-database` volume. Users,
+devices and the data protection keys are kept there, so removing and recreating the containers loses nothing.
+
+```bash
+cd docker-compose
+cp .env.example .env    # set StealthDesk_POSTGRES_PASSWORD, and any other setting
+docker compose up -d
+```
+
+`.env.example` lists every setting, commented out at its default. The server image is
+`ghcr.io/fkauangit/stealthdesk`, pinned with `SERVER_IMAGE_TAG`; until it can be pulled, Compose builds it from this
+repository. The server listens on `SERVER_PORT` (8080) and trusts forwarded headers from the network's gateway
+(`DOCKER_GATEWAY`, 172.30.0.1), which a reverse proxy on the same host comes through. To encrypt the
+[data protection keys](#encrypting-the-data-protection-keys), put the `.pfx` in `docker-compose/certificates`: the
+server sees that folder, read-only, as `/certificates`.
+
+To keep passwords out of variables, `docker-compose.secrets.yml` reads them from Docker secrets instead: one file per
+setting in `docker-compose/secrets`, named after it (`Bootstrap__AdminPassword` holds `Bootstrap:AdminPassword`).
+The key certificate goes in `KeyProtection__Certificate__Base64` as base64. An empty file leaves its setting off.
+After a [rotation](#encrypting-the-data-protection-keys), add the previous certificate the same way, as two more
+secrets of the server: `KeyProtection__PreviousCertificates__0__Base64` and `KeyProtection__PreviousCertificates__0__Password`.
+
+```bash
+cp -r secrets.example secrets    # write the database password in secrets/POSTGRES_PASSWORD
+chmod 700 secrets                # the files stay readable inside the containers, which run as other users
+docker compose -f docker-compose.secrets.yml up -d
+```
+
+A single line break at the end of a file is dropped, but a Windows one (CRLF) leaves a carriage return in the value:
+save the files with Unix line endings, or write them with `printf '%s' 'the-password' > secrets/POSTGRES_PASSWORD`.
+
+Both files can also start a dashboard for the server's logs, traces and metrics at `TELEMETRY_DASHBOARD_PORT`
+(18888). Set `StealthDesk_OTEL_EXPORTER_OTLP_ENDPOINT=http://telemetry:18889`, then add `--profile telemetry`
+to the `up` command. The dashboard asks for `TELEMETRY_DASHBOARD_TOKEN` (or the `Dashboard__Frontend__BrowserToken`
+secret); left empty, it makes a new one on each start and logs a sign-in link (`docker compose logs telemetry`).
+
 ## Running the Agent
 
 The agent runs on Windows. A new device joins a tenant with an installer key, so on a new server create the first
@@ -422,6 +461,7 @@ tab, and on pull requests that change them.
 | `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
 | `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests`, and the browser tests in `StealthDesk.Web.UITests` |
+| `docker-compose/` | Compose files that run the server with PostgreSQL, from variables or from Docker secrets |
 
 ## Contributing
 
