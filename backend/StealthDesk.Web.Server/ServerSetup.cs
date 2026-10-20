@@ -19,6 +19,7 @@ using StealthDesk.Web.Server.Invites;
 using StealthDesk.Web.Server.UserGroups;
 using StealthDesk.Web.Server.Permissions;
 using StealthDesk.Web.Server.PersonalAccessTokens;
+using StealthDesk.Web.Server.ReverseProxy;
 using StealthDesk.Web.Server.Users;
 
 namespace StealthDesk.Web.Server;
@@ -32,6 +33,7 @@ public static class ServerSetup
     builder.AddStealthDeskDatabase();
     builder.AddStealthDeskAccounts();
     builder.AddStealthDeskEmail();
+    builder.AddStealthDeskReverseProxy();
 
     builder.Services.AddOptions<GatewayOptions>()
       .Bind(builder.Configuration.GetSection(GatewayOptions.Section))
