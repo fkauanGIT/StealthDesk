@@ -50,7 +50,7 @@ public sealed class DataFolderSecurityTests : IDisposable
 
     var rules = new FileInfo(file).GetAccessControl().GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
       .OfType<FileSystemAccessRule>()
-      .Select(x => x.IdentityReference)
+      .Select(x => (System.Security.Principal.SecurityIdentifier)x.IdentityReference)
       .Distinct()
       .Order();
     Assert.Equal(new[] { DataFolderSecurity.Administrators, DataFolderSecurity.LocalSystem }.Order(), rules);
