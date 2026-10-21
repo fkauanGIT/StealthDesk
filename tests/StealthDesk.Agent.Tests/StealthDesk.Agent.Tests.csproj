@@ -12,6 +12,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\agent\StealthDesk.Agent\StealthDesk.Agent.csproj" />
     <ProjectReference Include="..\..\agent\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
     <ProjectReference Include="..\..\agent\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
   </ItemGroup>
