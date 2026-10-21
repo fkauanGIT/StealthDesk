@@ -26,7 +26,7 @@
 
 <ol class="sd-progress" aria-label="Steps">
     <li class="@StepClass(1)" aria-current="@(Step == 1 ? "step" : null)">Choose a key</li>
-    <li class="@StepClass(2)" aria-current="@(Step == 2 ? "step" : null)">Run the agent</li>
+    <li class="@StepClass(2)" aria-current="@(Step == 2 ? "step" : null)">Install the agent</li>
     <li class="@StepClass(3)" aria-current="@(Step == 3 ? "step" : null)">Device joins</li>
 </ol>
 
@@ -97,8 +97,8 @@
 }
 else
 {
-    <SdCard Title="Run the agent">
-        <p class="sd-muted">Run this in PowerShell on the machine, from the installed agent's folder.</p>
+    <SdCard Title="Install the agent">
+        <p class="sd-muted">Run this in PowerShell as an administrator on the machine, from the folder the agent was downloaded to. It installs the agent as a service that starts with Windows.</p>
         @if (keyInUse is { } key)
         {
             <SdAlert Tone="Tone.Info">@Limits(key)</SdAlert>

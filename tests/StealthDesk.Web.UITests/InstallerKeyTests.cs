@@ -26,7 +26,7 @@ public class InstallerKeyTests
     await app.ScreenshotAsync("deploy-command");
 
     var key = command.Split("--installer-key ")[1].Trim();
-    Assert.StartsWith($@".\StealthDesk.Agent.exe run --server {app.Server.BaseAddress.GetLeftPart(UriPartial.Authority)}", command);
+    Assert.StartsWith($@".\StealthDesk.Agent.exe install --server {app.Server.BaseAddress.GetLeftPart(UriPartial.Authority)}", command);
     await using var agent = await UiAgent.StartAsync(app.Server, "PC-FRONT", key);
 
     await app.OpenAsync("Integrations", "Installer keys");
