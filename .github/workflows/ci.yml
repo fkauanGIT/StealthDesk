@@ -189,7 +189,8 @@ jobs:
             docker events --since "$since" --until "$(date +%s)" --filter "container=$(docker compose ps --quiet "$1")" --format '{{.TimeNano}} {{.Action}}'
           }
           since=$(docker inspect --format '{{.Created}}' "$(docker compose ps --quiet database)")
-          healthy=$(events database | awk '/health_status: healthy/ { print $1; exit }')
+          # awk reads every event: stopping early would end docker events with SIGPIPE, failing the pipe.
+          healthy=$(events database | awk '/health_status: healthy/ && !found { print $1; found = 1 }')
           starts=$(events server | awk '$2 == "start" { print $1 }')
           echo "Database healthy at $healthy; server started at: $starts"
           test -n "$healthy"
