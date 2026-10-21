@@ -67,6 +67,19 @@ internal sealed class RealtimeChannel<TServer, TCallbacks>(
     }
   }
 
+  public async Task CloseAsync()
+  {
+    await _openGate.WaitAsync();
+    try
+    {
+      await CloseCurrentConnection();
+    }
+    finally
+    {
+      _openGate.Release();
+    }
+  }
+
   public async ValueTask DisposeAsync()
   {
     await CloseCurrentConnection();

@@ -42,7 +42,7 @@ else if (Store.Devices.Count == 0)
         <ol class="sd-first-steps-list">
             <li>
                 <strong>Add your first device</strong>
-                <span class="sd-muted">Make an installer key and run the agent on the machine. It shows up here the moment it connects.</span>
+                <span class="sd-muted">Make an installer key and install the agent on the machine. It shows up here the moment it connects.</span>
                 <AuthorizeView Policy="@InstallPolicy">
                     <Authorized><a class="sd-btn sd-btn--primary" href="devices/add">Add a device</a></Authorized>
                     <NotAuthorized><span class="sd-muted">Ask someone who can install agents to add one.</span></NotAuthorized>

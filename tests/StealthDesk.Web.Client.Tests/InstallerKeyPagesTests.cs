@@ -63,7 +63,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.Find("form.sd-deploy-form").Submit();
 
     page.WaitForAssertion(() => Assert.Equal(
-      $@".\StealthDesk.Agent.exe run --server http://localhost --installer-key {key.Id}:shown-once",
+      $@".\StealthDesk.Agent.exe install --server http://localhost --installer-key {key.Id}:shown-once",
       page.Find("[data-command]").TextContent));
     Assert.Equal($"POST {Routes.InstallerKeys}", Api.Requests[3]);
     Assert.Contains($"\"type\":{(int)InstallerKeyType.UsageBased}", Api.Bodies[3]);
@@ -99,7 +99,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     Api.RespondWith(new[] { known });
     page.Find("form.sd-deploy-form").Submit();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-waiting]")));
-    Assert.Equal("Run the agent", page.Find(".sd-progress li.current").TextContent.Trim());
+    Assert.Equal("Install the agent", page.Find(".sd-progress li.current").TextContent.Trim());
     Assert.Equal($"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {key.Id}:x", page.Find("[data-source-command]").TextContent);
 
     Api.RespondWith(new[] { known, joined });

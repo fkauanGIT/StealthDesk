@@ -53,6 +53,19 @@ public sealed class GatewayConnectorTests : IDisposable
   }
 
   [Fact]
+  public async Task Stopping_ClosesTheConnection_SoTheServerSeesTheDeviceLeave()
+  {
+    using var connector = Create(_folder.OpenStore());
+    await connector.StartAsync(TestContext.Current.CancellationToken);
+    Assert.True(await Wait.UntilAsync(() => _heartbeat.Sent == 1));
+
+    await connector.StopAsync(TestContext.Current.CancellationToken);
+
+    Assert.Equal(1, _channel.Closes);
+    Assert.False(((Realtime.IRealtimeChannel<Contracts.Realtime.IAgentGateway>)_channel).IsConnected);
+  }
+
+  [Fact]
   public async Task WithoutAServerUrl_DoesNotTryToConnect()
   {
     var store = new SettingsStore(Microsoft.Extensions.Options.Options.Create(new AgentSettings()), _folder.Paths);
@@ -78,6 +91,8 @@ public sealed class GatewayConnectorTests : IDisposable
     private int _sent;
 
     public int Sent => Volatile.Read(ref _sent);
+
+    public Task<string?> FirstAnswer => Task.FromResult<string?>(null);
 
     public Task SendNowAsync(CancellationToken cancellationToken = default)
     {

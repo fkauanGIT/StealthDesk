@@ -53,5 +53,44 @@ public class AgentCommandLineTests
     Assert.DoesNotContain("Unhandled exception", error.ToString() + output, StringComparison.Ordinal);
   }
 
+  [Fact]
+  public void Install_TakesTheServerTheKeyAndAnInstance()
+  {
+    var parse = Parse("install", "--server", "https://desk.example.com", "--installer-key", "id:secret", "--instance", "office");
+
+    Assert.Empty(parse.Errors);
+    Assert.Equal(new Uri("https://desk.example.com"), parse.GetValue<Uri?>("--server"));
+    Assert.Equal("id:secret", parse.GetValue<string?>("--installer-key"));
+    Assert.Equal("office", parse.GetValue<string?>("--instance"));
+  }
+
+  [Theory]
+  [InlineData("--server", "install needs --installer-key")]
+  [InlineData("--installer-key", "install needs --server")]
+  public void Install_NeedsBothTheServerAndTheKey(string given, string error)
+  {
+    var parse = given == "--server"
+      ? Parse("install", "--server", "http://localhost:8080")
+      : Parse("install", "--installer-key", "id:secret");
+
+    Assert.Contains(parse.Errors, x => x.Message.StartsWith(error, StringComparison.Ordinal));
+  }
+
+  [Fact]
+  public void Install_RefusesABadInstanceName()
+  {
+    var parse = Parse("install", "--server", "http://localhost:8080", "--installer-key", "id:secret", "--instance", "not valid!");
+
+    Assert.NotEmpty(parse.Errors);
+  }
+
+  [Fact]
+  public void Uninstall_TakesOnlyTheInstance()
+  {
+    Assert.Empty(Parse("uninstall").Errors);
+    Assert.Empty(Parse("uninstall", "--instance", "office").Errors);
+    Assert.NotEmpty(Parse("uninstall", "--installer-key", "id:secret").Errors);
+  }
+
   private static ParseResult Parse(params string[] args) => AgentCommandLine.Create(args).Parse(args);
 }

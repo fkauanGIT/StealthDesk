@@ -86,10 +86,10 @@ public static class InstallerKeyText
     _ => "Persistent",
   };
 
-  /// <summary>The command that installs the agent with this key, for the server the page was opened from.</summary>
+  /// <summary>The command that installs the agent as a service with this key, for the server the page was opened from.</summary>
   /// <param name="instance">The agent instance the tenant's settings name, if any.</param>
   public static string AgentCommand(Uri server, string fullKey, Guid? deviceId, string? instance = null) =>
-    WithOptions($".\\StealthDesk.Agent.exe run --server {server.GetLeftPart(UriPartial.Authority)} --installer-key {fullKey}", deviceId, instance);
+    WithOptions($".\\StealthDesk.Agent.exe install --server {server.GetLeftPart(UriPartial.Authority)} --installer-key {fullKey}", deviceId, instance);
 
   /// <summary>The same, for an agent run from the repository; development agents already point at the local server.</summary>
   public static string SourceCommand(string fullKey, Guid? deviceId, string? instance = null) =>

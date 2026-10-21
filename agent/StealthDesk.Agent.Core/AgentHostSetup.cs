@@ -37,11 +37,6 @@ public static class AgentHostSetup
     var paths = new AgentPaths(startup.InstanceName, AgentBuild.IsDebug);
 
     var overrides = new Dictionary<string, string?>();
-    if (startup.ServerUrl is not null)
-    {
-      overrides[$"{AgentSettings.Section}:{nameof(AgentSettings.ServerUrl)}"] = startup.ServerUrl.ToString();
-    }
-
     if (!string.IsNullOrWhiteSpace(startup.InstallerKey))
     {
       overrides[$"{AgentSettings.Section}:{nameof(AgentSettings.InstallerKey)}"] = startup.InstallerKey.Trim();
@@ -58,6 +53,15 @@ public static class AgentHostSetup
     if (startup.UseSettingsFile)
     {
       builder.Configuration.AddJsonFile(paths.SettingsFile, optional: true, reloadOnChange: false);
+    }
+
+    // A server given on the command line wins even over the saved one: that's how a device moves to a new address.
+    if (startup.ServerUrl is not null)
+    {
+      builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+      {
+        [$"{AgentSettings.Section}:{nameof(AgentSettings.ServerUrl)}"] = startup.ServerUrl.ToString(),
+      });
     }
 
     var services = builder.Services;
@@ -88,7 +92,8 @@ public static class AgentHostSetup
   private sealed class AgentCallbacks : IAgentCallbacks;
 }
 
-internal static class AgentBuild
+/// <summary>Whether this is a debug build, which keeps its own folders and service so it never touches an installed agent.</summary>
+public static class AgentBuild
 {
 #if DEBUG
   public const bool IsDebug = true;

@@ -28,4 +28,7 @@ public interface IRealtimeChannel<out TServer> : IAsyncDisposable
   /// Once open, a dropped connection is re-established automatically.
   /// </summary>
   Task<bool> OpenAsync(Uri endpoint, Action<HttpConnectionOptions>? configure = null, CancellationToken cancellationToken = default);
+
+  /// <summary>Closes the connection, so the server learns right away that this side is leaving.</summary>
+  Task CloseAsync();
 }
