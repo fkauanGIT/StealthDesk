@@ -31,6 +31,23 @@ internal static class AgentCommandLine
     var server = new Option<Uri?>("--server", "-s")
     {
       Description = "Server address, e.g. http://localhost:5099. Overrides the configured one.",
+      // System.CommandLine has no conversion to Uri of its own.
+      CustomParser = result =>
+      {
+        // Without a value, System.CommandLine reports the missing argument itself.
+        if (result.Tokens is not [{ Value: var text }])
+        {
+          return null;
+        }
+
+        if (Uri.TryCreate(text, UriKind.Absolute, out var address) && (address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps))
+        {
+          return address;
+        }
+
+        result.AddError($"--server must be an absolute http or https address, such as http://localhost:5099, not '{text}'.");
+        return null;
+      },
     };
 
     var installerKey = new Option<string?>("--installer-key", "-k")

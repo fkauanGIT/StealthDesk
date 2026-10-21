@@ -11,6 +11,9 @@
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="StealthDesk.Agent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
     <ProjectReference Include="..\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
   </ItemGroup>
