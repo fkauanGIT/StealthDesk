@@ -379,6 +379,34 @@ accepted report. Both are saved and reused on every later run: that is the devic
 Debug builds use the `Debug` folder so development never touches an installed agent. Use `--instance <name>`
 (`-i`) to run more than one agent on the same machine, each with its own folder instead of `default`.
 
+### As a Windows service
+
+On a managed machine the agent runs as a service: it starts with Windows, before anyone signs in, and Windows
+restarts it 5 seconds after it fails. From the folder the agent was downloaded to, in PowerShell as an administrator
+(the **Add device** page shows this command with a key):
+
+```powershell
+.\StealthDesk.Agent.exe install --server https://desk.example.com --installer-key <key>
+```
+
+Install copies the agent to `C:\Program Files\StealthDesk\default`, joins the server with the key and stops there if
+the server refuses it, then creates the `StealthDesk.Agent` service (LocalSystem, automatic start), lists it in
+Settings > Apps and starts it. The service itself never gets the key: the device joined already. Its settings,
+private key and logs are in `C:\ProgramData\StealthDesk\default`, which only administrators and SYSTEM can open.
+Stopping the service disconnects it, so the device shows offline at once.
+
+```powershell
+.\StealthDesk.Agent.exe uninstall
+```
+
+Uninstall, also run by **Uninstall** in Settings > Apps, removes the service, the installed files, the settings and
+the device's key. `--instance` works with both, giving each instance its own service (`StealthDesk.Agent.<name>`)
+and folders. Debug builds install as `StealthDesk.Agent.Debug` in `Debug` folders, apart from a real installation.
+
+The agent isn't signed yet, so antivirus software that watches for remote access tools may quarantine it when it
+installs as a service; `.github/scripts/agent-service-test.ps1` checks an installation end to end on a machine where it
+can run.
+
 ## Endpoints
 
 | Path | Transport | Purpose |
