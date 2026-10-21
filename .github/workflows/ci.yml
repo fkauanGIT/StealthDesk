@@ -135,24 +135,30 @@ jobs:
           dotnet build agent/StealthDesk.Agent --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The agent didn't build." }
 
-      - name: Start the server
+      # One step: a process a step starts is ended with that step on Windows runners.
+      - name: Install and check the agent service against a running server
         run: |
           $env:ASPNETCORE_ENVIRONMENT = "Development"
-          Start-Process dotnet -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
+          $server = Start-Process dotnet -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
             "run", "--project", "backend/StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
             "--urls", "http://localhost:5099", "--UseInMemoryDatabase", "true"
-          for ($attempt = 1; $attempt -le 60; $attempt++) {
-            try { Invoke-RestMethod http://localhost:5099/health/ready | Out-Null; Write-Host "Ready after $attempt checks."; exit 0 } catch { Start-Sleep -Seconds 2 }
+          try {
+            $ready = $false
+            for ($attempt = 1; $attempt -le 60 -and -not $ready; $attempt++) {
+              try { Invoke-RestMethod http://localhost:5099/health/ready | Out-Null; $ready = $true; Write-Host "Server ready after $attempt checks." } catch { Start-Sleep -Seconds 2 }
+            }
+            if (-not $ready) { throw "The server didn't become ready." }
+
+            ./.github/scripts/agent-service-test.ps1 -Agent agent/StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
           }
-          Get-Content server.log, server-errors.log
-          exit 1
-
-      - name: Install and check the agent service
-        run: ./.github/scripts/agent-service-test.ps1 -Agent agent/StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
-
-      - name: Server log
-        if: failure()
-        run: Get-Content server.log, server-errors.log -ErrorAction SilentlyContinue
+          catch {
+            Write-Host "--- server log"
+            Get-Content server.log, server-errors.log -ErrorAction SilentlyContinue
+            throw
+          }
+          finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
 
   # The image builds from a clean checkout, becomes healthy once PostgreSQL answers, and doesn't run as root.
   container-image:
