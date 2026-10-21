@@ -29,6 +29,44 @@ public class AgentStartupTests
     Assert.Equal(Guid.Empty, settings.DeviceId);
   }
 
+  [Fact]
+  public void TheServerGiven_WinsOverTheSavedOne_ButTheSavedDeviceIdWinsOverTheOneAskedFor()
+  {
+    var instance = $"t{Guid.NewGuid():N}"[..20];
+    var paths = new AgentPaths(instance, AgentBuild.IsDebug);
+    var saved = Guid.NewGuid();
+    Directory.CreateDirectory(paths.InstanceFolder);
+    File.WriteAllText(paths.SettingsFile, $$"""{ "Agent": { "ServerUrl": "http://old.example.com/", "DeviceId": "{{saved}}" } }""");
+    try
+    {
+      var settings = Settings(new AgentStartup(instance, new Uri("http://new.example.com"), DeviceId: Guid.NewGuid()));
+
+      Assert.Equal(new Uri("http://new.example.com"), settings.ServerUrl);
+      Assert.Equal(saved, settings.DeviceId);
+    }
+    finally
+    {
+      Directory.Delete(paths.InstanceFolder, recursive: true);
+    }
+  }
+
+  [Fact]
+  public void WithoutAServerGiven_TheSavedOneIsUsed()
+  {
+    var instance = $"t{Guid.NewGuid():N}"[..20];
+    var paths = new AgentPaths(instance, AgentBuild.IsDebug);
+    Directory.CreateDirectory(paths.InstanceFolder);
+    File.WriteAllText(paths.SettingsFile, """{ "Agent": { "ServerUrl": "http://saved.example.com/" } }""");
+    try
+    {
+      Assert.Equal(new Uri("http://saved.example.com/"), Settings(new AgentStartup(instance)).ServerUrl);
+    }
+    finally
+    {
+      Directory.Delete(paths.InstanceFolder, recursive: true);
+    }
+  }
+
   private static AgentSettings Settings(AgentStartup startup)
   {
     var builder = Host.CreateApplicationBuilder();

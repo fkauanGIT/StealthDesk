@@ -52,6 +52,15 @@ internal sealed class FakeChannel : IRealtimeChannel<IAgentGateway>, IAgentGatew
     return Task.FromResult(Answer(envelope.Payload));
   }
 
+  public int Closes { get; private set; }
+
+  public Task CloseAsync()
+  {
+    Closes++;
+    State = HubConnectionState.Disconnected;
+    return Task.CompletedTask;
+  }
+
   public Task SimulateRestoredAsync() => Restored?.Invoke() ?? Task.CompletedTask;
 
   public Task SimulateLostAsync() => Lost?.Invoke(null) ?? Task.CompletedTask;

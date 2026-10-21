@@ -56,6 +56,14 @@ public sealed class GatewayConnector(
     }
   }
 
+  /// <summary>Stopping the agent closes the connection, so the server shows the device offline at once.</summary>
+  public override async Task StopAsync(CancellationToken cancellationToken)
+  {
+    await base.StopAsync(cancellationToken);
+    await channel.CloseAsync();
+    logger.LogInformation("Disconnected from the server.");
+  }
+
   // An agent keeps one long-lived connection, so it goes straight to WebSockets
   // and skips the transport negotiation round trip.
   private static void UseWebSocketsOnly(Microsoft.AspNetCore.Http.Connections.Client.HttpConnectionOptions options)

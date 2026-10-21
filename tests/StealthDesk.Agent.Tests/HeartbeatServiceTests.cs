@@ -20,6 +20,45 @@ public sealed class HeartbeatServiceTests : IDisposable
   public void Dispose() => _folder.Dispose();
 
   [Fact]
+  public async Task FirstAnswer_IsNull_OnceTheServerAcceptsTheDevice()
+  {
+    using var heartbeat = Create(_folder.OpenStore());
+    Assert.False(heartbeat.FirstAnswer.IsCompleted);
+
+    await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+
+    Assert.True(heartbeat.FirstAnswer.IsCompletedSuccessfully);
+    Assert.Null(await heartbeat.FirstAnswer.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+  }
+
+  [Fact]
+  public async Task FirstAnswer_IsTheReason_WhenTheServerRefusesTheDevice()
+  {
+    _channel.Answer = _ => GatewayReply.Refuse<ReportReceipt>("The installer key is not valid.");
+    using var heartbeat = Create(_folder.OpenStore());
+
+    await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+
+    Assert.Equal("The installer key is not valid.", await heartbeat.FirstAnswer.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+  }
+
+  [Fact]
+  public async Task FirstAnswer_StaysTheFirst_WhateverComesNext()
+  {
+    var answers = new Queue<GatewayReply<ReportReceipt>>([
+      GatewayReply.Refuse<ReportReceipt>("No tenant available."),
+      GatewayReply.Accept(new ReportReceipt(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)),
+    ]);
+    _channel.Answer = _ => answers.Dequeue();
+    using var heartbeat = Create(_folder.OpenStore());
+
+    await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+    await heartbeat.SendNowAsync(TestContext.Current.CancellationToken);
+
+    Assert.Equal("No tenant available.", await heartbeat.FirstAnswer.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+  }
+
+  [Fact]
   public async Task Runs_OnceEveryInterval()
   {
     using var heartbeat = Create(_folder.OpenStore());

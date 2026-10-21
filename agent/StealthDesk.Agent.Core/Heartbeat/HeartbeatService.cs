@@ -18,6 +18,9 @@ public sealed class HeartbeatOptions
 public interface IHeartbeat
 {
   Task SendNowAsync(CancellationToken cancellationToken = default);
+
+  /// <summary>The server's first answer to a report: null once one is accepted, otherwise why it was refused.</summary>
+  Task<string?> FirstAnswer { get; }
 }
 
 /// <summary>
@@ -37,8 +40,12 @@ public sealed class HeartbeatService(
   // Connect, reconnect and the timer can all ask for a report at once; they go out one at a time.
   private readonly SemaphoreSlim _sending = new(1, 1);
 
+  private readonly TaskCompletionSource<string?> _firstAnswer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
   // Once a report is accepted the device is known and signs with its own key: the installer key isn't needed again.
   private bool _accepted;
+
+  public Task<string?> FirstAnswer => _firstAnswer.Task;
 
   public async Task SendNowAsync(CancellationToken cancellationToken = default)
   {
@@ -65,6 +72,7 @@ public sealed class HeartbeatService(
       if (!reply.Accepted || reply.Value is not { } receipt)
       {
         logger.LogWarning("The server refused the heartbeat: {Reason}", reply.Error);
+        _firstAnswer.TrySetResult(reply.Error ?? "The server refused the report.");
         return;
       }
 
@@ -75,6 +83,8 @@ public sealed class HeartbeatService(
         logger.LogInformation("Server registered this device as {DeviceId}; saving it.", receipt.DeviceId);
         await settings.SaveIdentityAsync(receipt.DeviceId, receipt.TenantId, cancellationToken);
       }
+
+      _firstAnswer.TrySetResult(null);
 
       logger.LogDebug("Heartbeat accepted.");
     }
