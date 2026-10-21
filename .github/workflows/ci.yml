@@ -165,3 +165,94 @@ jobs:
         run: |
           docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }} {{ index .Config.Labels "org.opencontainers.image.source" }}' stealthdesk-server:ci
           test -n "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.source" }}' stealthdesk-server:ci)"
+
+      - name: Remove the standalone containers
+        run: |
+          docker rm --force server database
+          docker network rm stealthdesk
+
+      - name: Compose with variables
+        working-directory: docker-compose
+        run: |
+          docker tag stealthdesk-server:ci ghcr.io/fkauangit/stealthdesk:ci
+          cp .env.example .env
+          sed -i 's/^StealthDesk_POSTGRES_PASSWORD=$/StealthDesk_POSTGRES_PASSWORD=ci-password/' .env
+          printf 'SERVER_IMAGE_TAG=ci\nStealthDesk_Bootstrap__AdminEmail=admin@example.com\nStealthDesk_Bootstrap__AdminPassword=Ci-Password-1\n' >> .env
+          docker compose up --detach --wait --wait-timeout 300 --no-build --pull never || { docker compose logs; exit 1; }
+          curl --fail --silent --show-error http://localhost:8080/health/ready
+          echo
+
+      - name: The server started once, after the database was healthy
+        working-directory: docker-compose
+        run: |
+          events() {
+            docker events --since "$since" --until "$(date +%s)" --filter "container=$(docker compose ps --quiet "$1")" --format '{{.TimeNano}} {{.Action}}'
+          }
+          since=$(docker inspect --format '{{.Created}}' "$(docker compose ps --quiet database)")
+          healthy=$(events database | awk '/health_status: healthy/ { print $1; exit }')
+          starts=$(events server | awk '$2 == "start" { print $1 }')
+          echo "Database healthy at $healthy; server started at: $starts"
+          test -n "$healthy"
+          test "$(echo "$starts" | wc -l)" -eq 1
+          test "$starts" -gt "$healthy"
+
+      - name: Recreating the containers keeps users and keys
+        working-directory: docker-compose
+        run: |
+          curl --fail --silent --show-error --cookie-jar cookies.txt --header 'Content-Type: application/json' \
+            --data '{"email":"admin@example.com","password":"Ci-Password-1"}' 'http://localhost:8080/api/auth/login?useCookies=true'
+          docker compose down
+          docker compose up --detach --wait --wait-timeout 300 --no-build --pull never || { docker compose logs; exit 1; }
+          # A cookie from before still signs in: the user and the keys that protect it were kept.
+          curl --fail --silent --show-error --cookie cookies.txt http://localhost:8080/api/auth/me
+          echo
+
+      - name: Forwarded headers count only from the Docker gateway
+        working-directory: docker-compose
+        run: |
+          # Each personal access token created is logged with the address the server saw.
+          create_token() {
+            curl --fail --silent --show-error --output /dev/null --cookie cookies.txt --header 'Content-Type: application/json' \
+              --data "{\"name\":\"$1\",\"mode\":0}" "${@:2}" http://localhost:8080/api/v1/personal-access-tokens
+          }
+          create_token from-the-host
+          create_token through-a-proxy --header 'X-Forwarded-For: 203.0.113.7'
+          # From another container in the network the header is ignored: only the gateway is trusted.
+          cookie=$(awk 'NF >= 7 && ($1 !~ /^#/ || $1 ~ /^#HttpOnly_/) { printf "%s=%s; ", $6, $7 }' cookies.txt)
+          docker run --rm --network stealthdesk curlimages/curl:8.11.1 --fail --silent --show-error --output /dev/null \
+            --header "Cookie: $cookie" --header 'Content-Type: application/json' --header 'X-Forwarded-For: 203.0.113.99' \
+            --data '{"name":"from-the-network","mode":0}' http://server:8080/api/v1/personal-access-tokens
+          tenant=$(curl --fail --silent --show-error --cookie cookies.txt http://localhost:8080/api/auth/me | jq --raw-output .tenantId)
+          log=$(curl --fail --silent --show-error --cookie cookies.txt "http://localhost:8080/api/v1/authorization-logs?tenantId=$tenant")
+          address() {
+            echo "$log" | jq --raw-output --arg name "$1" \
+              '.items[] | select(.action == "personal-access-token-created" and (.afterJson | fromjson | .name) == $name) | .ipAddress'
+          }
+          echo "From the host: $(address from-the-host); through a proxy: $(address through-a-proxy); from the network: $(address from-the-network)"
+          test "$(address from-the-host)" = "172.30.0.1"
+          test "$(address through-a-proxy)" = "203.0.113.7"
+          test -n "$(address from-the-network)"
+          test "$(address from-the-network)" != "203.0.113.99"
+          test "$(address from-the-network)" != "172.30.0.1"
+
+      - name: Remove the variables deployment
+        working-directory: docker-compose
+        run: |
+          docker compose down --volumes
+          rm .env cookies.txt
+
+      - name: Compose with Docker secrets
+        working-directory: docker-compose
+        run: |
+          cp -r secrets.example secrets
+          chmod 700 secrets
+          printf '%s' ci-password > secrets/POSTGRES_PASSWORD
+          export SERVER_IMAGE_TAG=ci
+          docker compose -f docker-compose.secrets.yml up --detach --wait --wait-timeout 300 --no-build --pull never \
+            || { docker compose -f docker-compose.secrets.yml logs; exit 1; }
+          curl --fail --silent --show-error http://localhost:8080/health/ready
+          # The password reached the server as a file, not as a variable.
+          if docker compose -f docker-compose.secrets.yml exec server printenv | grep --ignore-case password; then
+            exit 1
+          fi
+          docker compose -f docker-compose.secrets.yml down --volumes
