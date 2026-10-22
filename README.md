@@ -258,6 +258,7 @@ the Development environment it also refuses the in-memory database and the devel
 | `Bootstrap:AdminTokenId`, `Bootstrap:AdminTokenSecret` | empty | A personal access token for that administrator, `{id}:{secret}`, acting as them and never expiring. The secret needs 32 characters or more. |
 | `Bootstrap:ServerServiceAccountName`, `Bootstrap:ServerServiceAccountCredentialId`, `Bootstrap:ServerServiceAccountCredentialSecret` | empty | An unrestricted server service account and its key, `{credential id}:{secret}`, created while none has that name. All three or none; the secret needs 32 characters or more. |
 | `Bootstrap:ServerServiceAccountId`, `Bootstrap:ServerServiceAccountDescription` | new id, empty | Its fixed id and description. |
+| `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.exe` in it. The container image ships one. |
 | `ReverseProxy:TrustedProxies` | empty | Addresses of proxies whose forwarded headers are trusted, e.g. `10.0.0.2`. A list: `--ReverseProxy:TrustedProxies:0=10.0.0.2`, or `StealthDesk_ReverseProxy__TrustedProxies__0`. |
 | `ReverseProxy:TrustedNetworks` | empty | Networks of trusted proxies, e.g. `10.0.0.0/8`. A list, like the one above. |
 | `ReverseProxy:DockerGatewayAddress` | empty | The gateway of the Docker network the server runs in, which a proxy in front of Docker comes through. |
@@ -382,8 +383,28 @@ Debug builds use the `Debug` folder so development never touches an installed ag
 ### As a Windows service
 
 On a managed machine the agent runs as a service: it starts with Windows, before anyone signs in, and Windows
-restarts it 5 seconds after it fails. From the folder the agent was downloaded to, in PowerShell as an administrator
-(the **Add device** page shows this command with a key):
+restarts it 5 seconds after it fails.
+
+The **Add device** page gives the command that installs it, for PowerShell as an administrator on the machine. It
+downloads the agent from the server (`/downloads/agent/windows`, open to anyone, since the machine has no account),
+runs it only if its SHA-256 is the one the page named, deletes the download either way, and carries the installer key
+but no password. The agent is a single executable with the .NET runtime inside, so the machine needs nothing else.
+Running the command again updates an installed agent in place; it keeps the device's identity, so a key that was used
+up still works.
+
+The hash guards the download, not the server: it comes from the same server as the file, so it catches a file changed
+on its way to the machine, but a server whose own build was replaced names the replacement's hash. Serve the page over
+HTTPS. Telling a genuine build from any other takes code signing, which the agent doesn't have yet.
+
+The container image ships that build. A server run from source hands it out once it is published into its downloads
+folder:
+
+```powershell
+dotnet publish agent/StealthDesk.Agent -p:PublishProfile=Windows -o backend/StealthDesk.Web.Server/downloads/windows
+```
+
+Without it, the page says the server has no build and gives the command for an agent copied to the machine by hand,
+to run from its folder:
 
 ```powershell
 .\StealthDesk.Agent.exe install --server https://desk.example.com --installer-key <key>
@@ -404,8 +425,8 @@ the device's key. `--instance` works with both, giving each instance its own ser
 and folders. Debug builds install as `StealthDesk.Agent.Debug` in `Debug` folders, apart from a real installation.
 
 The agent isn't signed yet, so antivirus software that watches for remote access tools may quarantine it when it
-installs as a service; `.github/scripts/agent-service-test.ps1` checks an installation end to end on a machine where it
-can run.
+installs as a service. `.github/scripts/agent-download-test.ps1` and `agent-service-test.ps1` check an installation end
+to end on a machine where it can run.
 
 ## Endpoints
 
@@ -420,7 +441,8 @@ can run.
 | `/api/v1/server/alert` | HTTP | The message every signed-in user sees at the top of the app (`GET`), set by the server's administrators (`PUT`). |
 | `/api/v1/server/test-email` | HTTP | Sends a test message to the administrator's own address and says whether it went out. |
 | `/api/v1/tenant-settings` | HTTP | The tenant's settings: list (`GET`), one (`GET /{name}`), change one (`PUT /{name}`) or several (`PUT`), back to the default (`DELETE /{name}`). |
-| `/api/v1/deployment-options` | HTTP | The agent instance install commands name for the tenant, for those who install agents. |
+| `/api/v1/deployment-options` | HTTP | What install commands use, for those who install agents: the tenant's agent instance, and the Windows agent the server hands out with its size and SHA-256. |
+| `/downloads/agent/windows` | HTTP | The Windows agent build, for anyone; 404 when the server has none. |
 | `/api/v1/installer-keys` | HTTP | The tenant's installer keys: list (`GET`), create (`POST`), rename (`PUT /{id}`), revoke (`DELETE /{id}`) and installs (`GET /{id}/usages`). Without `installer-key.manage-all`, only your own. |
 | `/api/auth/login` | HTTP | Signs in. `?useCookies=true` sets the browser cookie; without it, returns bearer tokens when `Accounts:EnableBearerLogin` is on. |
 | `/api/auth/register` | HTTP | Registers following the account rules above; 404 while registration is closed. |
