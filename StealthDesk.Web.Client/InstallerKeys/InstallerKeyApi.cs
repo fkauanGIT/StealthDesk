@@ -93,7 +93,7 @@ public static class InstallerKeyText
 
   /// <summary>The same, for an agent run from the repository; development agents already point at the local server.</summary>
   public static string SourceCommand(string fullKey, Guid? deviceId, string? instance = null) =>
-    WithOptions($"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {fullKey}", deviceId, instance);
+    WithOptions($"dotnet run --project StealthDesk.Agent -- run --installer-key {fullKey}", deviceId, instance);
 
   private static string WithOptions(string command, Guid? deviceId, string? instance)
   {

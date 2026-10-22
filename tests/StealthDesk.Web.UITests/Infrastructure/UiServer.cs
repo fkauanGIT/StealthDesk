@@ -71,7 +71,7 @@ public sealed class UiServer : IAsyncDisposable
     var baseAddress = new Uri($"http://localhost:{port}/");
 
     // The built server, without `dotnet run`: evaluating the project again would cost seconds on every test.
-    var output = Path.Combine(UiPaths.Repository, "backend", "StealthDesk.Web.Server", "bin", BuildConfiguration, "net10.0");
+    var output = Path.Combine(UiPaths.Repository, "StealthDesk.Web.Server", "bin", BuildConfiguration, "net10.0");
     var arguments = new List<string>
     {
       Path.Combine(output, "StealthDesk.Web.Server.dll"),

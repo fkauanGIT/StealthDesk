@@ -489,7 +489,7 @@ docker-compose/secrets/
 docker-compose/certificates/
 
 # The agent build a local server hands out, and single-file agents published by hand or by CI
-backend/StealthDesk.Web.Server/downloads/
+StealthDesk.Web.Server/downloads/
 publish/
 # The profile that builds the agent the server hands out: no credentials, unlike most publish profiles
-!agent/StealthDesk.Agent/Properties/PublishProfiles/Windows.pubxml
+!StealthDesk.Agent/Properties/PublishProfiles/Windows.pubxml

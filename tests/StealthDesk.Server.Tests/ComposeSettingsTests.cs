@@ -60,7 +60,7 @@ public partial class ComposeSettingsTests
   public void EachCommentedOutValue_IsTheDefault()
   {
     var defaults = new ConfigurationBuilder()
-      .AddJsonFile(Path.Combine(Repository.Root, "backend", "StealthDesk.Web.Server", "appsettings.json"))
+      .AddJsonFile(Path.Combine(Repository.Root, "StealthDesk.Web.Server", "appsettings.json"))
       .Build();
 
     var wrong = ExampleSettings()

@@ -15,7 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\backend\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
+    <ProjectReference Include="..\..\StealthDesk.Web.Server\StealthDesk.Web.Server.csproj" />
     <ProjectReference Include="..\..\shared\StealthDesk.Branding\StealthDesk.Branding.csproj" />
     <ProjectReference Include="..\..\shared\StealthDesk.Realtime\StealthDesk.Realtime.csproj" />
   </ItemGroup>

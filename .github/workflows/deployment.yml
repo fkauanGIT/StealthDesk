@@ -11,8 +11,9 @@ on:
     branches:
       - main
     paths:
-      - backend/**
-      - frontend/**
+      - StealthDesk.Web.Server/**
+      - StealthDesk.Web.Client/**
+      - StealthDesk.Agent*/**
       - shared/**
       - docker-compose/**
       - .dockerignore
@@ -50,7 +51,7 @@ jobs:
           dotnet-version: 10.x
 
       - name: Build the image
-        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
+        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
 
       - name: Build the UI tests
         run: dotnet build tests/StealthDesk.Web.UITests --configuration Release
@@ -91,7 +92,7 @@ jobs:
           dotnet-version: 10.x
 
       - name: Build the image
-        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
 
       - name: Start the deployment behind the proxy
         working-directory: docker-compose
@@ -164,9 +165,12 @@ jobs:
           if (-not $before) { $before = git rev-parse HEAD^ }
           Write-Host "Upgrading from $before"
           git worktree add ../before $before
-          docker build --file ../before/backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:before ../before
+          # Versions from before the projects moved to the root keep the Dockerfile in backend/.
+          $dockerfile = 'StealthDesk.Web.Server/Dockerfile'
+          if (-not (Test-Path "../before/$dockerfile")) { $dockerfile = 'backend/StealthDesk.Web.Server/Dockerfile' }
+          docker build --file "../before/$dockerfile" --tag ghcr.io/fkauangit/stealthdesk:before ../before
           if ($LASTEXITCODE -ne 0) { throw "The version before didn't build." }
-          docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+          docker build --file StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
           if ($LASTEXITCODE -ne 0) { throw "This version didn't build." }
 
       - name: Start the version before, with encrypted keys

@@ -91,7 +91,7 @@ Stage files by path. Never `git add .` / `git add -A`:
 
 ```powershell
 git status --short
-git add StealthDesk.slnx backend/StealthDesk.Web.Server frontend/StealthDesk.Web.Client tests
+git add StealthDesk.slnx StealthDesk.Web.Server StealthDesk.Web.Client tests
 git commit -m "chore: rename web projects to PascalCase" -m "Refs #12"
 ```
 

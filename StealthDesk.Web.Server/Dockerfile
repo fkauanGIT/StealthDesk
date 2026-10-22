@@ -1,5 +1,5 @@
 # The server and its web client in one image. Build from the repository root:
-#   docker build -f backend/StealthDesk.Web.Server/Dockerfile -t stealthdesk-server .
+#   docker build -f StealthDesk.Web.Server/Dockerfile -t stealthdesk-server .
 
 # Build with the SDK; only the published output reaches the final image.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -7,38 +7,40 @@ WORKDIR /src
 
 # The project files first: the restore layer is reused until a dependency changes, not on every code change.
 COPY .editorconfig Directory.Build.props Directory.Build.targets Directory.Packages.props ./
-COPY backend/StealthDesk.Web.Server/StealthDesk.Web.Server.csproj backend/StealthDesk.Web.Server/
-COPY frontend/StealthDesk.Web.Client/StealthDesk.Web.Client.csproj frontend/StealthDesk.Web.Client/
+COPY StealthDesk.Web.Server/StealthDesk.Web.Server.csproj StealthDesk.Web.Server/
+COPY StealthDesk.Web.Client/StealthDesk.Web.Client.csproj StealthDesk.Web.Client/
 COPY shared/StealthDesk.Branding/StealthDesk.Branding.csproj shared/StealthDesk.Branding/
 COPY shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj shared/StealthDesk.Contracts/
 COPY shared/StealthDesk.Core/StealthDesk.Core.csproj shared/StealthDesk.Core/
 COPY shared/StealthDesk.Observability/StealthDesk.Observability.csproj shared/StealthDesk.Observability/
-RUN dotnet restore backend/StealthDesk.Web.Server/StealthDesk.Web.Server.csproj
+RUN dotnet restore StealthDesk.Web.Server/StealthDesk.Web.Server.csproj
 
-COPY backend/ backend/
-COPY frontend/ frontend/
+COPY StealthDesk.Web.Server/ StealthDesk.Web.Server/
+COPY StealthDesk.Web.Client/ StealthDesk.Web.Client/
 COPY shared/ shared/
-RUN dotnet publish backend/StealthDesk.Web.Server/StealthDesk.Web.Server.csproj \
+RUN dotnet publish StealthDesk.Web.Server/StealthDesk.Web.Server.csproj \
   --configuration Release --no-restore --output /app -p:UseAppHost=false
 
 # The Windows agent the server hands out: one executable carrying its own runtime. Built in parallel with the server.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS agent
 WORKDIR /src
 COPY .editorconfig Directory.Build.props Directory.Build.targets Directory.Packages.props ./
-COPY agent/StealthDesk.Agent/StealthDesk.Agent.csproj agent/StealthDesk.Agent/
-COPY agent/StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj agent/StealthDesk.Agent.Core/
-COPY agent/StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj agent/StealthDesk.Agent.Windows/
+COPY StealthDesk.Agent/StealthDesk.Agent.csproj StealthDesk.Agent/
+COPY StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj StealthDesk.Agent.Core/
+COPY StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj StealthDesk.Agent.Windows/
 COPY shared/StealthDesk.Branding/StealthDesk.Branding.csproj shared/StealthDesk.Branding/
 COPY shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj shared/StealthDesk.Contracts/
 COPY shared/StealthDesk.Core/StealthDesk.Core.csproj shared/StealthDesk.Core/
 COPY shared/StealthDesk.Hosting/StealthDesk.Hosting.csproj shared/StealthDesk.Hosting/
 COPY shared/StealthDesk.Observability/StealthDesk.Observability.csproj shared/StealthDesk.Observability/
 COPY shared/StealthDesk.Realtime/StealthDesk.Realtime.csproj shared/StealthDesk.Realtime/
-RUN dotnet restore agent/StealthDesk.Agent/StealthDesk.Agent.csproj --runtime win-x64
+RUN dotnet restore StealthDesk.Agent/StealthDesk.Agent.csproj --runtime win-x64
 
-COPY agent/ agent/
+COPY StealthDesk.Agent/ StealthDesk.Agent/
+COPY StealthDesk.Agent.Core/ StealthDesk.Agent.Core/
+COPY StealthDesk.Agent.Windows/ StealthDesk.Agent.Windows/
 COPY shared/ shared/
-RUN dotnet publish agent/StealthDesk.Agent/StealthDesk.Agent.csproj -p:PublishProfile=Windows --output /agent
+RUN dotnet publish StealthDesk.Agent/StealthDesk.Agent.csproj -p:PublishProfile=Windows --output /agent
 
 # Run on the ASP.NET runtime alone.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

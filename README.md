@@ -94,7 +94,7 @@ The fastest way to start the server. Data is lost when it stops.
 ```
 git clone https://github.com/fkauanGIT/StealthDesk.git
 cd StealthDesk
-dotnet run --project backend/StealthDesk.Web.Server --launch-profile http -- --UseInMemoryDatabase=true
+dotnet run --project StealthDesk.Web.Server --launch-profile http -- --UseInMemoryDatabase=true
 ```
 
 The server listens on `http://localhost:5099`. Running `curl http://localhost:5099/health` should
@@ -103,13 +103,13 @@ return `Healthy`.
 ### PostgreSQL
 
 The connection is built from the `POSTGRES_*` [settings](#server-settings).
-[`appsettings.Development.json`](./backend/StealthDesk.Web.Server/appsettings.Development.json) points them at
+[`appsettings.Development.json`](./StealthDesk.Web.Server/appsettings.Development.json) points them at
 `localhost:5432`, database `stealthdesk`, user `postgres` and password `password`. Change them to match your
 PostgreSQL instance, or override them without editing the file through environment variables
 (`StealthDesk_POSTGRES_PASSWORD`) or command-line arguments (`--POSTGRES_PASSWORD=...`). Then start the server. It applies the pending migrations on startup, creating the database if needed:
 
 ```
-dotnet run --project backend/StealthDesk.Web.Server --launch-profile http
+dotnet run --project StealthDesk.Web.Server --launch-profile http
 ```
 
 ### Accounts
@@ -138,8 +138,8 @@ Each provider needs an app registered with it, whose callback address points bac
 Keep the secrets out of `appsettings.json`, e.g. with user secrets:
 
 ```powershell
-dotnet user-secrets set "Accounts:GitHubClientId" "<client id>" --project backend/StealthDesk.Web.Server
-dotnet user-secrets set "Accounts:GitHubClientSecret" "<client secret>" --project backend/StealthDesk.Web.Server
+dotnet user-secrets set "Accounts:GitHubClientId" "<client id>" --project StealthDesk.Web.Server
+dotnet user-secrets set "Accounts:GitHubClientSecret" "<client secret>" --project StealthDesk.Web.Server
 ```
 
 A first sign-in with a provider follows the registration rules above, creating an account without a password.
@@ -275,7 +275,7 @@ the Development environment it also refuses the in-memory database and the devel
 The server and its web client build into one image, from the repository root:
 
 ```bash
-docker build -f backend/StealthDesk.Web.Server/Dockerfile -t stealthdesk-server .
+docker build -f StealthDesk.Web.Server/Dockerfile -t stealthdesk-server .
 ```
 
 It runs on the ASP.NET runtime as the image's unprivileged `app` user, listens on port 8080 and takes every
@@ -345,7 +345,7 @@ Choose **Add device** on the device list, create a key and copy the command it s
 the agent with that key:
 
 ```
-dotnet run --project agent/StealthDesk.Agent -- run --installer-key <key>
+dotnet run --project StealthDesk.Agent -- run --installer-key <key>
 ```
 
 In a few seconds the machine appears in the list as online, without refreshing the page. Stop the agent with
@@ -373,7 +373,7 @@ accepted report. Both are saved and reused on every later run: that is the devic
 
 | What | Where |
 |---|---|
-| Server address | `Agent:ServerUrl` in [`agent/StealthDesk.Agent/appsettings.json`](./agent/StealthDesk.Agent/appsettings.json), or `--server <url>` |
+| Server address | `Agent:ServerUrl` in [`StealthDesk.Agent/appsettings.json`](./StealthDesk.Agent/appsettings.json), or `--server <url>` |
 | Installer key (never saved by the agent) | `Agent:InstallerKey`, or `--installer-key <key>` (`-k`) |
 | Identity (device id, tenant, private key) | `C:\ProgramData\StealthDesk\Debug\default\agent-settings.json` |
 | Logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\logs\` |
@@ -401,7 +401,7 @@ The container image ships that build. A server run from source hands it out once
 folder:
 
 ```powershell
-dotnet publish agent/StealthDesk.Agent -p:PublishProfile=Windows -o backend/StealthDesk.Web.Server/downloads/windows
+dotnet publish StealthDesk.Agent -p:PublishProfile=Windows -o StealthDesk.Web.Server/downloads/windows
 ```
 
 Without it, the page says the server has no build and gives the command for an agent copied to the machine by hand,
@@ -507,9 +507,9 @@ tab, and on pull requests that change them.
 
 | Path | Contents |
 |---|---|
-| `frontend/` | `StealthDesk.Web.Client`: Blazor WebAssembly front end. `Ui/` holds the design system components and `wwwroot/css/tokens.css` its colors, type and spacing |
-| `backend/` | `StealthDesk.Web.Server`: ASP.NET Core server with the agent gateway, REST API and EF Core database |
-| `agent/` | `StealthDesk.Agent` (console executable), `StealthDesk.Agent.Core` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows` (device inventory through Windows APIs) |
+| `StealthDesk.Web.Client/` | Blazor WebAssembly front end. `Ui/` holds the design system components and `wwwroot/css/tokens.css` its colors, type and spacing |
+| `StealthDesk.Web.Server/` | ASP.NET Core server with the agent gateway, REST API and EF Core database |
+| `StealthDesk.Agent/` | The agent's console executable, with `StealthDesk.Agent.Core/` (settings, identity, connection, heartbeat) and `StealthDesk.Agent.Windows/` (device inventory through Windows APIs) next to it |
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
 | `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests`, and the browser tests in `StealthDesk.Web.UITests` |
 | `docker-compose/` | Compose files that run the server with PostgreSQL, from variables or from Docker secrets |

@@ -100,7 +100,7 @@ public class InstallerKeyPagesTests : AccountTestContext
     page.Find("form.sd-deploy-form").Submit();
     page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-waiting]")));
     Assert.Equal("Install the agent", page.Find(".sd-progress li.current").TextContent.Trim());
-    Assert.Equal($"dotnet run --project agent/StealthDesk.Agent -- run --installer-key {key.Id}:x", page.Find("[data-source-command]").TextContent);
+    Assert.Equal($"dotnet run --project StealthDesk.Agent -- run --installer-key {key.Id}:x", page.Find("[data-source-command]").TextContent);
 
     Api.RespondWith(new[] { known, joined });
 
