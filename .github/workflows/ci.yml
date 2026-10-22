@@ -134,14 +134,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "The server didn't build." }
           dotnet build agent/StealthDesk.Agent --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The agent didn't build." }
+          # The single file the server hands out, as the container image builds it.
+          dotnet publish agent/StealthDesk.Agent -p:PublishProfile=Windows --output publish/agent
+          if ($LASTEXITCODE -ne 0) { throw "The single-file agent didn't publish." }
 
       # One step: a process a step starts is ended with that step on Windows runners.
-      - name: Install and check the agent service against a running server
+      - name: Install the agent from the web command and as a service, against a running server
         run: |
           $env:ASPNETCORE_ENVIRONMENT = "Development"
           $server = Start-Process dotnet -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
             "run", "--project", "backend/StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
-            "--urls", "http://localhost:5099", "--UseInMemoryDatabase", "true"
+            "--urls", "http://localhost:5099", "--UseInMemoryDatabase", "true", "--AgentDownloads:Folder", "$PWD/publish/downloads"
           try {
             $ready = $false
             for ($attempt = 1; $attempt -le 60 -and -not $ready; $attempt++) {
@@ -149,6 +152,7 @@ jobs:
             }
             if (-not $ready) { throw "The server didn't become ready." }
 
+            ./.github/scripts/agent-download-test.ps1 -Agent publish/agent/StealthDesk.Agent.exe -Downloads publish/downloads -Server http://localhost:5099
             ./.github/scripts/agent-service-test.ps1 -Agent agent/StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
           }
           catch {
