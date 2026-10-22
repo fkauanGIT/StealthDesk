@@ -309,7 +309,7 @@ docker compose up -d
 ```
 
 `.env.example` lists every setting, commented out at its default. The server image is
-`ghcr.io/fkauangit/stealthdesk`, pinned with `SERVER_IMAGE_TAG`; until it can be pulled, Compose builds it from this
+`franciscokauan/stealthdesk`, pinned with `SERVER_IMAGE_TAG`; until it can be pulled, Compose builds it from this
 repository. The server listens on `SERVER_PORT` (8080) and trusts forwarded headers from the network's gateway
 (`DOCKER_GATEWAY`, 172.30.0.1), which a reverse proxy on the same host comes through. To encrypt the
 [data protection keys](#encrypting-the-data-protection-keys), put the `.pfx` in `docker-compose/certificates`: the

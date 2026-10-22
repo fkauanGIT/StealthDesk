@@ -231,7 +231,7 @@ jobs:
       - name: Compose with variables
         working-directory: docker-compose
         run: |
-          docker tag stealthdesk-server:ci ghcr.io/fkauangit/stealthdesk:ci
+          docker tag stealthdesk-server:ci franciscokauan/stealthdesk:ci
           cp .env.example .env
           sed -i 's/^StealthDesk_POSTGRES_PASSWORD=$/StealthDesk_POSTGRES_PASSWORD=ci-password/' .env
           printf 'SERVER_IMAGE_TAG=ci\nStealthDesk_Bootstrap__AdminEmail=admin@example.com\nStealthDesk_Bootstrap__AdminPassword=Ci-Password-1\n' >> .env

@@ -92,7 +92,7 @@ jobs:
           dotnet-version: 10.x
 
       - name: Build the image
-        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag franciscokauan/stealthdesk:ci .
 
       - name: Start the deployment behind the proxy
         working-directory: docker-compose
@@ -168,9 +168,9 @@ jobs:
           # Versions from before the projects moved to the root keep the Dockerfile in backend/.
           $dockerfile = 'StealthDesk.Web.Server/Dockerfile'
           if (-not (Test-Path "../before/$dockerfile")) { $dockerfile = 'backend/StealthDesk.Web.Server/Dockerfile' }
-          docker build --file "../before/$dockerfile" --tag ghcr.io/fkauangit/stealthdesk:before ../before
+          docker build --file "../before/$dockerfile" --tag franciscokauan/stealthdesk:before ../before
           if ($LASTEXITCODE -ne 0) { throw "The version before didn't build." }
-          docker build --file StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+          docker build --file StealthDesk.Web.Server/Dockerfile --tag franciscokauan/stealthdesk:ci .
           if ($LASTEXITCODE -ne 0) { throw "This version didn't build." }
 
       - name: Start the version before, with encrypted keys
@@ -212,7 +212,7 @@ jobs:
           docker compose up --detach --wait --wait-timeout 300 --no-build --pull missing
           if ($LASTEXITCODE -ne 0) { docker compose logs; throw "This version didn't start on the data of the one before." }
           $image = docker inspect --format '{{.Config.Image}}' (docker compose ps --quiet server)
-          if ($image -ne 'ghcr.io/fkauangit/stealthdesk:ci') { throw "The server still runs $image." }
+          if ($image -ne 'franciscokauan/stealthdesk:ci') { throw "The server still runs $image." }
 
       - name: Check everything is still there
         env:
