@@ -1,0 +1,290 @@
+name: Release
+
+# A version tag (v0.5.0) publishes that version: the server image on Docker Hub and the Windows agent on a GitHub
+# release, both from one image that passed the deployment tests first. Run by hand, it publishes a tag again, for
+# when a step failed after the tests. On pull requests that change it or the release notes, it goes as far as the
+# tests and publishes nothing.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The version tag to publish again, such as v0.5.0"
+        required: true
+        type: string
+  pull_request:
+    branches:
+      - main
+    paths:
+      - release-notes/**
+      - .github/workflows/release.yml
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  IMAGE: franciscokauan/stealthdesk
+
+jobs:
+  # The tag, the project's version and the release notes have to agree, and the image is built once, here.
+  prepare:
+    name: Version and image
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      title: ${{ steps.version.outputs.title }}
+      publish: ${{ steps.version.outputs.publish }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Check the version
+        id: version
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $publish = '${{ github.event_name }}' -ne 'pull_request'
+          $tag = if ('${{ inputs.tag }}') { '${{ inputs.tag }}' } elseif ($publish) { '${{ github.ref_name }}' } else { "v$version" }
+          if ($tag -ne "v$version") { throw "The tag $tag doesn't match the version in Directory.Build.props, $version." }
+
+          # The notes start with "# v0.5.0 — Name": the release's title. A pull request may still hold the next
+          # version's placeholder, so there it only warns.
+          $notes = Get-Content release-notes/current.md -Encoding utf8
+          $heading = $notes[0] -replace '^#\s*', ''
+          if ($notes[0] -notmatch "^#\s*$([regex]::Escape($tag))\s+—\s+\S") {
+            $message = "release-notes/current.md must start with '# $tag — <name>', not '$($notes[0])'."
+            if ($publish) { throw $message } else { Write-Host "::warning::$message" }
+          }
+          if (-not ($notes | Select-Object -Skip 1 | Where-Object { $_.Trim() })) { throw "release-notes/current.md says nothing under its heading." }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$(($version -match '-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "title=$heading" >> $env:GITHUB_OUTPUT
+          "publish=$($publish.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          Write-Host "$tag ($heading), publish: $publish"
+
+      - name: Build the image
+        run: |
+          docker build --file StealthDesk.Web.Server/Dockerfile --tag "${env:IMAGE}:candidate" `
+            --build-arg VERSION=${{ steps.version.outputs.version }} --build-arg REVISION=$(git rev-parse HEAD) .
+          if ($LASTEXITCODE -ne 0) { throw "The image didn't build." }
+          docker save "${env:IMAGE}:candidate" | gzip > image.tar.gz
+
+      # The jobs after this one test and publish this very image, not a build of their own.
+      - name: Keep the image for the next jobs
+        uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: image.tar.gz
+          retention-days: 1
+
+  # The deployment as users run it, with this image: compose behind an HTTPS proxy, a new administrator, an agent
+  # online, signing in again. Nothing is published unless it passes.
+  smoke:
+    name: Deployment tests on the image
+    needs: prepare
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Load the image
+        uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - run: gunzip --stdout image.tar.gz | docker load
+
+      - name: Start the deployment behind the proxy
+        working-directory: docker-compose
+        run: |
+          "SERVER_IMAGE_TAG=candidate`nStealthDesk_POSTGRES_PASSWORD=ci-password`n" | Set-Content .env
+          docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml up --detach --wait --wait-timeout 300 --no-build --pull missing
+          if ($LASTEXITCODE -ne 0) { docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml logs; throw "The deployment didn't start." }
+
+      - name: Build the UI tests
+        run: dotnet build tests/StealthDesk.Web.UITests --configuration Release
+
+      - name: Install Chromium
+        run: ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run the deployment tests
+        env:
+          STEALTHDESK_UI_SERVER: https://localhost:8443
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+          if ($LASTEXITCODE -ne 0) { throw "The deployment tests failed on the image: nothing is published." }
+
+      - name: Server and proxy logs
+        if: failure()
+        working-directory: docker-compose
+        run: docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml logs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-smoke
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
+
+  # A draft release with the agent first, then the image, then the release made public: a failure on the way leaves
+  # a draft, never a public release without its image.
+  publish:
+    name: Publish
+    needs: [prepare, smoke]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      TITLE: ${{ needs.prepare.outputs.title }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Load the image
+        uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - run: gunzip --stdout image.tar.gz | docker load
+
+      # The same agent the server in the image hands out, with its hash for anyone downloading it from here.
+      - name: Take the agent out of the image
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $container = docker create "${env:IMAGE}:candidate"
+          docker cp "${container}:/app/downloads/windows/StealthDesk.Agent.exe" dist/StealthDesk.Agent.exe
+          docker rm $container | Out-Null
+          if (-not (Test-Path dist/StealthDesk.Agent.exe)) { throw "The image has no agent." }
+          $hash = (Get-FileHash -Algorithm SHA256 dist/StealthDesk.Agent.exe).Hash
+          "$hash  StealthDesk.Agent.exe" | Set-Content dist/StealthDesk.Agent.exe.sha256 -NoNewline
+          Write-Host "StealthDesk.Agent.exe $hash"
+
+      - name: Create the release as a draft
+        run: |
+          # The notes without their heading, which is the title.
+          Get-Content release-notes/current.md -Encoding utf8 | Select-Object -Skip 1 | Set-Content notes.md -Encoding utf8
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # Published again by hand: the release is already there.
+            gh release upload $env:TAG dist/StealthDesk.Agent.exe dist/StealthDesk.Agent.exe.sha256 --clobber
+          } else {
+            $flags = @('--draft', '--verify-tag', '--title', $env:TITLE, '--notes-file', 'notes.md')
+            if ($env:PRERELEASE -eq 'true') { $flags += '--prerelease' }
+            gh release create $env:TAG @flags dist/StealthDesk.Agent.exe dist/StealthDesk.Agent.exe.sha256
+          }
+          if ($LASTEXITCODE -ne 0) { throw "The release wasn't created." }
+
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: franciscokauan
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 0.5.0, and for a final version 0.5 and latest too; a pre-release (0.5.0-rc.1) moves neither.
+      - name: Push the image
+        run: |
+          $tags = @($env:VERSION)
+          if ($env:PRERELEASE -ne 'true') { $tags += ($env:VERSION -replace '^(\d+\.\d+)\..*$', '$1'), 'latest' }
+          foreach ($tag in $tags) {
+            docker tag "${env:IMAGE}:candidate" "${env:IMAGE}:$tag"
+            docker push "${env:IMAGE}:$tag"
+            if ($LASTEXITCODE -ne 0) { throw "Pushing ${env:IMAGE}:$tag failed." }
+          }
+          "**Image:** $(($tags | ForEach-Object { "``${env:IMAGE}:$_``" }) -join ', ')" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Make the release public
+        run: |
+          $flags = @('--draft=false')
+          if ($env:PRERELEASE -ne 'true') { $flags += '--latest' }
+          gh release edit $env:TAG @flags
+          if ($LASTEXITCODE -ne 0) { throw "The release stayed a draft." }
+          "**Release:** $(gh release view $env:TAG --json url --jq .url)" >> $env:GITHUB_STEP_SUMMARY
+
+  # The notes of a final version move to release-notes/v0.5.0.md and the next version starts from a blank page,
+  # through a pull request like any other change.
+  archive-notes:
+    name: Archive the release notes
+    needs: [prepare, publish]
+    if: needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Open a pull request that archives the notes
+        run: |
+          $branch = "release-notes/$env:TAG"
+          git switch --create $branch
+          git mv release-notes/current.md "release-notes/$env:TAG.md"
+          @(
+            '# vX.Y.Z — Name'
+            ''
+            'What the next release brings, written as each change lands. The heading becomes the release''s title: before'
+            'tagging, give it the version, which has to match the tag and Directory.Build.props.'
+          ) | Set-Content release-notes/current.md -Encoding utf8
+          git add release-notes
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' `
+            commit --message "chore: archive the release notes of $env:TAG"
+          git push origin $branch
+          if ($LASTEXITCODE -ne 0) { throw "The branch wasn't pushed." }
+
+          # Workflows may open pull requests only where the repository allows it; otherwise the branch waits for one.
+          gh pr create --base main --head $branch --title "chore: archive the release notes of $env:TAG" `
+            --body "Moves the notes published with $env:TAG to release-notes/$env:TAG.md and starts release-notes/current.md for the next version."
+          if ($LASTEXITCODE -ne 0) {
+            $compare = "${{ github.server_url }}/${{ github.repository }}/compare/main...$branch"
+            Write-Host "::warning::Open the pull request that archives the notes: $compare"
+            "**Release notes:** open the pull request from [$branch]($compare)." >> $env:GITHUB_STEP_SUMMARY
+          }

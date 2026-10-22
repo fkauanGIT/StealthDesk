@@ -309,8 +309,9 @@ docker compose up -d
 ```
 
 `.env.example` lists every setting, commented out at its default. The server image is
-`franciscokauan/stealthdesk`, pinned with `SERVER_IMAGE_TAG`; until it can be pulled, Compose builds it from this
-repository. The server listens on `SERVER_PORT` (8080) and trusts forwarded headers from the network's gateway
+[`franciscokauan/stealthdesk`](https://hub.docker.com/r/franciscokauan/stealthdesk) on Docker Hub, published with each
+[release](#releases) and pinned with `SERVER_IMAGE_TAG` (`0.5.0`, `0.5` or `latest`); a tag that can't be pulled is
+built from this repository. The server listens on `SERVER_PORT` (8080) and trusts forwarded headers from the network's gateway
 (`DOCKER_GATEWAY`, 172.30.0.1), which a reverse proxy on the same host comes through. To encrypt the
 [data protection keys](#encrypting-the-data-protection-keys), put the `.pfx` in `docker-compose/certificates`: the
 server sees that folder, read-only, as `/certificates`.
@@ -513,6 +514,31 @@ tab, and on pull requests that change them.
 | `shared/` | Used by both sides: `Contracts` (messages and the gateway interface), `Core` (message signing, retry backoff), `Realtime` (typed SignalR channel), `Hosting` (file logging), `Observability` (health checks, OpenTelemetry) and `Branding` |
 | `tests/` | `StealthDesk.Shared.Tests`, `StealthDesk.Server.Tests`, `StealthDesk.Agent.Tests`, `StealthDesk.Web.Client.Tests`, and the browser tests in `StealthDesk.Web.UITests` |
 | `docker-compose/` | Compose files that run the server with PostgreSQL, from variables or from Docker secrets |
+
+## Releases
+
+Each release publishes the server image on Docker Hub, tagged with its version (`0.5.0`), its minor version (`0.5`)
+and `latest`, and a GitHub release with the Windows agent (`StealthDesk.Agent.exe`) and its SHA-256. A pre-release
+such as `0.5.0-rc.1` gets only its own tag, and `latest` stays where it was.
+
+The [Release workflow](./.github/workflows/release.yml) runs on version tags:
+
+1. It checks that the tag matches `<Version>` in `Directory.Build.props` and the heading of
+   [`release-notes/current.md`](./release-notes/current.md), such as `# v0.5.0 — Deployment`, which becomes the
+   release's title.
+2. It builds the image once and runs the deployment tests on it, behind an HTTPS proxy. Nothing is published unless
+   they pass.
+3. It creates the release as a draft with the agent taken out of that image, pushes that same image, then makes the
+   release public.
+4. It opens a pull request that keeps the notes as `release-notes/v0.5.0.md` and starts `current.md` for the next
+   version.
+
+So a release is: write its notes in `release-notes/current.md` as changes land, set the version, merge, then tag
+`main` with an annotated tag and push it (`git tag -a v0.5.0 -m "v0.5.0" && git push origin v0.5.0`). If a step after
+the tests fails, run the workflow again by hand with the tag.
+
+Pushing to Docker Hub takes a repository secret, `DOCKERHUB_TOKEN`: an access token of the `franciscokauan` account
+with read and write access.
 
 ## Contributing
 
