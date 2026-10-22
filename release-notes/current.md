@@ -1,4 +1,4 @@
-# v0.5.0 — Deployment
+# v0.5.0-rc.1 — Deployment preview
 
 Fifth milestone of StealthDesk: it runs on a company server, as a container behind HTTPS, and agents install as a
 Windows service from a command copied from the web.
