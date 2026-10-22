@@ -1,0 +1,233 @@
+name: Deployment
+
+# The server as users run it: the container image, behind an HTTPS reverse proxy, and upgraded from the version
+# before. On pull requests that change what goes into the image or how it's deployed, and on every release tag.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - backend/**
+      - frontend/**
+      - shared/**
+      - docker-compose/**
+      - .dockerignore
+      - Directory.Build.props
+      - Directory.Build.targets
+      - Directory.Packages.props
+      - LICENSE
+      - tests/StealthDesk.Web.UITests/**
+      - .github/deployment/**
+      - .github/workflows/deployment.yml
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  # Every browser test, each against a container of the image on a fresh database, in Production.
+  ui-against-image:
+    name: UI tests against the image
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Build the image
+        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
+
+      - name: Build the UI tests
+        run: dotnet build tests/StealthDesk.Web.UITests --configuration Release
+
+      - name: Install Chromium
+        run: ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run the UI tests against the image
+        env:
+          STEALTHDESK_UI_IMAGE: stealthdesk-server:ci
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw "UI tests against the image failed." }
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-against-image
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
+
+  # The compose deployment behind Caddy with HTTPS: signing up, an agent and signing in again, all through the proxy.
+  behind-a-proxy:
+    name: Behind an HTTPS reverse proxy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Build the image
+        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+
+      - name: Start the deployment behind the proxy
+        working-directory: docker-compose
+        run: |
+          "SERVER_IMAGE_TAG=ci`nStealthDesk_POSTGRES_PASSWORD=ci-password`n" | Set-Content .env
+          docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml up --detach --wait --wait-timeout 300 --no-build --pull missing
+          if ($LASTEXITCODE -ne 0) { docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml logs; throw "The deployment didn't start." }
+
+
+      - name: Build the UI tests
+        run: dotnet build tests/StealthDesk.Web.UITests --configuration Release
+
+      - name: Install Chromium
+        run: ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run the deployment tests through the proxy
+        env:
+          STEALTHDESK_UI_SERVER: https://localhost:8443
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+          if ($LASTEXITCODE -ne 0) { throw "The deployment tests failed through the proxy." }
+
+      - name: The server takes the proxy's HTTPS as its own
+        run: |
+          # The administrator the tests signed up signs in through the proxy. The session cookie is marked secure only
+          # when the server knows the browser used HTTPS: it trusted the proxy's forwarded scheme.
+          $headers = curl --insecure --silent --output /dev/null --dump-header - --header 'Content-Type: application/json' `
+            --data '{"email":"admin@example.com","password":"Deployment-Test-1"}' 'https://localhost:8443/api/auth/login?useCookies=true'
+          $cookie = $headers | Where-Object { $_ -match '^set-cookie:' } | Select-Object -First 1
+          Write-Host $cookie
+          if ($cookie -notmatch '; secure') { throw "The session cookie isn't marked secure: the server didn't take the forwarded HTTPS." }
+      - name: Server and proxy logs
+        if: failure()
+        working-directory: docker-compose
+        run: docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml logs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: behind-a-proxy
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
+
+  # Data made by the version before, with encrypted keys, kept by this one: users, a permission, a device and a
+  # signed-in session.
+  upgrade:
+    name: Upgrade from the version before
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      # A pull request upgrades from what it merges into; anything else from the commit before it. Once releases
+      # publish images (#125), a release upgrades from the image of the release before.
+      - name: Build the version before and this one
+        run: |
+          $before = '${{ github.event.pull_request.base.sha }}'
+          if (-not $before) { $before = git rev-parse HEAD^ }
+          Write-Host "Upgrading from $before"
+          git worktree add ../before $before
+          docker build --file ../before/backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:before ../before
+          if ($LASTEXITCODE -ne 0) { throw "The version before didn't build." }
+          docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag ghcr.io/fkauangit/stealthdesk:ci .
+          if ($LASTEXITCODE -ne 0) { throw "This version didn't build." }
+
+      - name: Start the version before, with encrypted keys
+        working-directory: docker-compose
+        run: |
+          New-Item -ItemType Directory -Force certificates | Out-Null
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=StealthDesk keys' -keyout keys.key -out keys.crt
+          openssl pkcs12 -export -inkey keys.key -in keys.crt -passout pass:ci-keys -out certificates/keys.pfx
+          chmod 644 certificates/keys.pfx
+          @(
+            'SERVER_IMAGE_TAG=before'
+            'StealthDesk_POSTGRES_PASSWORD=ci-password'
+            'StealthDesk_KeyProtection__EncryptKeys=true'
+            'StealthDesk_KeyProtection__Certificate__Path=/certificates/keys.pfx'
+            'StealthDesk_KeyProtection__Certificate__Password=ci-keys'
+          ) | Set-Content .env
+          docker compose up --detach --wait --wait-timeout 300 --no-build --pull missing
+          if ($LASTEXITCODE -ne 0) { docker compose logs; throw "The version before didn't start." }
+
+      - name: Build the UI tests
+        run: dotnet build tests/StealthDesk.Web.UITests --configuration Release
+
+      - name: Install Chromium
+        run: ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Put data in the version before
+        env:
+          STEALTHDESK_UI_SERVER: http://localhost:8080
+          STEALTHDESK_UI_PHASE: before
+          STEALTHDESK_UI_STATE: ${{ runner.temp }}/upgrade.json
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+          if ($LASTEXITCODE -ne 0) { throw "Putting data in the version before failed." }
+
+      - name: Upgrade to this version
+        working-directory: docker-compose
+        run: |
+          (Get-Content .env) -replace '^SERVER_IMAGE_TAG=.*', 'SERVER_IMAGE_TAG=ci' | Set-Content .env
+          docker compose up --detach --wait --wait-timeout 300 --no-build --pull missing
+          if ($LASTEXITCODE -ne 0) { docker compose logs; throw "This version didn't start on the data of the one before." }
+          $image = docker inspect --format '{{.Config.Image}}' (docker compose ps --quiet server)
+          if ($image -ne 'ghcr.io/fkauangit/stealthdesk:ci') { throw "The server still runs $image." }
+
+      - name: Check everything is still there
+        env:
+          STEALTHDESK_UI_SERVER: http://localhost:8080
+          STEALTHDESK_UI_PHASE: after
+          STEALTHDESK_UI_STATE: ${{ runner.temp }}/upgrade.json
+        run: |
+          dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+          if ($LASTEXITCODE -ne 0) { throw "Something didn't survive the upgrade." }
+
+      - name: Server log
+        if: failure()
+        working-directory: docker-compose
+        run: docker compose logs server
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upgrade
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7

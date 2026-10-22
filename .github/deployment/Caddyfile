@@ -1,0 +1,6 @@
+# The reverse proxy of the deployment tests: HTTPS with a certificate Caddy makes for itself, forwarding to the
+# server with the X-Forwarded headers it adds on its own.
+https://localhost {
+  tls internal
+  reverse_proxy server:8080
+}
