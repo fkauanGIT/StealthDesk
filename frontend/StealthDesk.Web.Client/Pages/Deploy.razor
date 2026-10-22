@@ -98,7 +98,18 @@
 else
 {
     <SdCard Title="Install the agent">
-        <p class="sd-muted">Run this in PowerShell as an administrator on the machine, from the folder the agent was downloaded to. It installs the agent as a service that starts with Windows.</p>
+        @if (windowsAgent is not null)
+        {
+            <p class="sd-muted" data-download-instructions>Run this in PowerShell as an administrator on the machine. It downloads the agent from this server, runs it only if it is the expected build, and installs it as a service that starts with Windows. Running it again updates an installed agent.</p>
+        }
+        else
+        {
+            <div data-no-download>
+                <SdAlert Tone="Tone.Warning">
+                    This server has no agent build to hand out. Copy @AgentFileName to the machine, then run this in PowerShell as an administrator from its folder.
+                </SdAlert>
+            </div>
+        }
         @if (keyInUse is { } key)
         {
             <SdAlert Tone="Tone.Info">@Limits(key)</SdAlert>
@@ -172,6 +183,7 @@ else
     private string? deviceId;
     private bool canCreate;
     private string? instance;
+    private StealthDesk.Contracts.Agents.AgentDownload? windowsAgent;
     private IReadOnlyList<SelectOption> groupOptions = [];
     private string? groupChoice = string.Empty;
     private DeviceSummary? joined;
@@ -209,11 +221,12 @@ else
 
     private string SourceCommand => InstallerKeyText.SourceCommand(fullKey!, RequestedId, instance);
 
-    private string Command => InstallerKeyText.AgentCommand(
-        new Uri(Navigation.BaseUri),
-        fullKey!,
-        Guid.TryParse(deviceId?.Trim(), out var id) ? id : null,
-        instance);
+    private const string AgentFileName = "StealthDesk.Agent.exe";
+
+    // With a build to hand out, the command fetches and checks it; without one, it runs an agent copied by hand.
+    private string Command => windowsAgent is not null
+        ? StealthDesk.Contracts.Agents.AgentInstallCommand.Windows(new Uri(Navigation.BaseUri), windowsAgent, fullKey!, RequestedId, instance)
+        : InstallerKeyText.AgentCommand(new Uri(Navigation.BaseUri), fullKey!, RequestedId, instance);
 
     protected override async Task OnInitializedAsync()
     {
@@ -226,8 +239,11 @@ else
         source = canCreate ? KeySource.New : KeySource.Existing;
         await LoadExistingAsync();
 
-        // The tenant may name an agent instance; without its options the commands simply name none.
-        instance = (await Settings.DeploymentOptionsAsync()).Value?.InstanceName;
+        // The tenant may name an agent instance, and the server may hand out the agent; without its options the
+        // commands name no instance and run an agent copied by hand.
+        var options = (await Settings.DeploymentOptionsAsync()).Value;
+        instance = options?.InstanceName;
+        windowsAgent = options?.WindowsAgent;
 
         // New devices can join a group, for whoever may read the groups; the server checks they may fill it.
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;

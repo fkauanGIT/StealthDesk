@@ -32,4 +32,5 @@ public sealed record SetTenantSettingsRequest(IReadOnlyDictionary<string, string
 
 /// <summary>What install commands use for the tenant acted in, every value resolved.</summary>
 /// <param name="InstanceName">The instance commands name; none when they name no instance.</param>
-public sealed record DeploymentOptions(string? InstanceName);
+/// <param name="WindowsAgent">The Windows agent this server hands out; none when it has no build of it.</param>
+public sealed record DeploymentOptions(string? InstanceName, Agents.AgentDownload? WindowsAgent = null);

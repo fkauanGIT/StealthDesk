@@ -111,6 +111,47 @@ public class InstallerKeyPagesTests : AccountTestContext
   }
 
   [Fact]
+  public void Deploy_WithABuildOnTheServer_CopiesTheCommandThatDownloadsAndChecksIt()
+  {
+    var key = Key("Lab");
+    var download = new StealthDesk.Contracts.Agents.AgentDownload(Routes.WindowsAgentDownload, "StealthDesk.Agent.exe", 53_000_000, "C0FFEE");
+    Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
+    Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions("office", download));
+    var page = RenderPage<Pages.Deploy>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
+    Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
+
+    page.Find("form.sd-deploy-form").Submit();
+
+    page.WaitForAssertion(() => Assert.Equal(
+      StealthDesk.Contracts.Agents.AgentInstallCommand.Windows(new Uri("http://localhost/"), download, $"{key.Id}:x", instance: "office"),
+      page.Find("[data-command]").TextContent));
+    Assert.NotNull(page.Find("[data-download-instructions]"));
+    Assert.Empty(page.FindAll("[data-no-download]"));
+  }
+
+  [Fact]
+  public void Deploy_WithoutABuildOnTheServer_SaysSo_AndRunsAnAgentCopiedByHand()
+  {
+    var key = Key("Lab");
+    Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
+    Api.RespondWith(new InstallerKeyList());
+    Api.RespondWith(new DeploymentOptions(null));
+    var page = RenderPage<Pages.Deploy>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
+    Api.Respond(HttpStatusCode.Created, new CreatedInstallerKey(key, $"{key.Id}:x"));
+    Api.RespondWith(Array.Empty<DeviceSummary>());
+
+    page.Find("form.sd-deploy-form").Submit();
+
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-no-download]")));
+    Assert.StartsWith(@".\StealthDesk.Agent.exe install --server http://localhost", page.Find("[data-command]").TextContent);
+    Assert.Empty(page.FindAll("[data-download-instructions]"));
+  }
+
+  [Fact]
   public void Deploy_NamesTheInstanceTheTenantAsksFor_InBothCommands()
   {
     var key = Key("Lab");

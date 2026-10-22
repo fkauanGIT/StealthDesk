@@ -119,12 +119,12 @@ internal static class AgentCommandLine
       var installer = Installer(parse.GetValue(instance), parse.InvocationConfiguration.Output);
       if (installer.Tool.RunsFromInstallFolder(AppContext.BaseDirectory))
       {
-        return installer.Tool.ContinueFromACopy(AppContext.BaseDirectory, args);
+        return installer.Tool.ContinueFromACopy(Executable, args);
       }
 
       // The instance as given: the default one has no name of its own to pass on.
       var startup = new AgentStartup(parse.GetValue(instance), parse.GetValue(server), InstallerKey: parse.GetValue(installerKey), DeviceId: parse.GetValue(deviceId));
-      return await installer.Tool.InstallAsync(token => JoinAsync(args, startup, token), cancellationToken);
+      return await installer.Tool.InstallAsync(Executable, token => JoinAsync(args, startup, token), cancellationToken);
     });
 
     var uninstall = new Command("uninstall", $"Remove this agent's Windows service, its files and the device's identity. Needs an administrator.")
@@ -143,7 +143,7 @@ internal static class AgentCommandLine
       var installer = Installer(parse.GetValue(instance), parse.InvocationConfiguration.Output);
       if (installer.Tool.RunsFromInstallFolder(AppContext.BaseDirectory))
       {
-        return installer.Tool.ContinueFromACopy(AppContext.BaseDirectory, args);
+        return installer.Tool.ContinueFromACopy(Executable, args);
       }
 
       return await installer.Tool.UninstallAsync(AppContext.BaseDirectory);
@@ -187,6 +187,8 @@ internal static class AgentCommandLine
       await host.StopAsync(CancellationToken.None);
     }
   }
+
+  private static string Executable => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, $"{Brand.AgentName}.exe");
 
   private static AgentInstallation Installation(string? instanceName) =>
     new(instanceName, AgentBuild.IsDebug, Path.GetFileName(Environment.ProcessPath) ?? $"{Brand.AgentName}.exe");

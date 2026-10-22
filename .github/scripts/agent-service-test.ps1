@@ -37,12 +37,14 @@ function WaitFor([string] $what, [scriptblock] $condition, [int] $seconds = 60) 
 function ServiceProcess { (Get-CimInstance Win32_Service -Filter "Name='$service'").ProcessId }
 
 $admin = @{ email = "admin@example.com"; password = "Service-Test-1" } | ConvertTo-Json
-Invoke-RestMethod "$Server/api/auth/register" -Method Post -Body $admin -ContentType application/json | Out-Null
+# Registering fails when another test signed the administrator up first.
+try { Invoke-RestMethod "$Server/api/auth/register" -Method Post -Body $admin -ContentType application/json | Out-Null } catch { }
 Invoke-RestMethod "$Server/api/auth/login?useCookies=true" -Method Post -Body $admin -ContentType application/json -SessionVariable session | Out-Null
 $key = (Invoke-RestMethod "$Server/api/v1/installer-keys" -Method Post -ContentType application/json -WebSession $session `
   -Body (@{ type = 0; name = "Service test"; allowedUses = 5 } | ConvertTo-Json)).fullKey
 
-function Device { @(Invoke-RestMethod "$Server/api/v1/devices" -WebSession $session) | ForEach-Object { $_ } | Select-Object -First 1 }
+# The device this installation registered, by the id it saved: other tests may have left devices behind.
+function Device { @(Invoke-RestMethod "$Server/api/v1/devices" -WebSession $session) | ForEach-Object { $_ } | Where-Object { $_.id -eq $script:deviceId } }
 function Online { (Device).isOnline -eq $true }
 
 Check "the machine starts without the agent" (-not (Get-Service $service -ErrorAction SilentlyContinue) -and -not (Test-Path $installFolder) -and -not (Test-Path $dataFolder) -and -not (Test-Path $appsKey))
@@ -72,6 +74,7 @@ $apps = Get-ItemProperty $appsKey
 Check "Apps lists it" ($apps.DisplayName -eq "StealthDesk Agent")
 Check "Apps uninstalls it from the install folder" ($apps.UninstallString -eq "`"$installFolder\StealthDesk.Agent.exe`" uninstall") $apps.UninstallString
 
+$script:deviceId = (Get-Content $settingsFile -Raw | ConvertFrom-Json).Agent.DeviceId
 WaitFor "the device to come online" { Online }
 $device = Device
 Check "the device is online" ($device.isOnline -eq $true) "$($device.name) $($device.id)"

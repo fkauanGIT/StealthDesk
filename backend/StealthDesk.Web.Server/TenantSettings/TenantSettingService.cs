@@ -7,7 +7,7 @@ namespace StealthDesk.Web.Server.TenantSettings;
 /// A tenant's settings: its own values, and the server's defaults for those it hasn't set. Only known settings are
 /// kept, each checked and stored the one way it's read back.
 /// </summary>
-public sealed class TenantSettingService(StealthDeskDb db, IOptionsMonitor<TenantDefaultsOptions> defaults)
+public sealed class TenantSettingService(StealthDeskDb db, IOptionsMonitor<TenantDefaultsOptions> defaults, AgentDownloads.AgentDownloadCatalog downloads)
 {
   public async Task<IResult> ListAsync(Guid tenant, CancellationToken cancellationToken)
   {
@@ -52,7 +52,7 @@ public sealed class TenantSettingService(StealthDeskDb db, IOptionsMonitor<Tenan
     var own = await OwnAsync(tenant, cancellationToken);
     var append = Effective(TenantSettingNames.AppendInstanceName, own) == "true";
     var name = Effective(TenantSettingNames.InstanceName, own) ?? InstanceNames.FromHost(serverHost);
-    return Results.Ok(new DeploymentOptions(append ? name : null));
+    return Results.Ok(new DeploymentOptions(append ? name : null, downloads.WindowsAgent()));
   }
 
   private async Task<IResult> SetManyAsync(Guid tenant, IReadOnlyDictionary<string, string?> values, string? single, CancellationToken cancellationToken)

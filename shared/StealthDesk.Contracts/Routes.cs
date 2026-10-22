@@ -54,6 +54,9 @@ public static class Routes
   public static string TenantSetting(string name) => $"{TenantSettings}/{Uri.EscapeDataString(name)}";
   public const string DeploymentOptions = "/api/v1/deployment-options";
 
+  /// <summary>The Windows agent build, for anyone: a machine being installed has no account on the server.</summary>
+  public const string WindowsAgentDownload = "/downloads/agent/windows";
+
   /// <summary>A tenant's installer keys (<c>?tenantId=</c>), and the installs made with each.</summary>
   public const string InstallerKeys = "/api/v1/installer-keys";
   public static string InstallerKey(Guid id) => $"{InstallerKeys}/{id}";

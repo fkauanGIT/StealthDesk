@@ -1,5 +1,6 @@
-# Only what the image builds from: the server, its web client and the shared libraries, never build output,
-# secrets or tests. A smaller context also uploads faster and changes less often, so layers are reused.
+# Only what the image builds from: the server, its web client, the Windows agent it hands out and the shared
+# libraries, never build output, secrets or tests. A smaller context also uploads faster and changes less often,
+# so layers are reused.
 
 # Build output and tool state
 **/bin
@@ -14,7 +15,6 @@
 # Not part of the server
 .git
 .github
-agent
 tests
 plan.md
 **/*.md

@@ -39,10 +39,10 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
   /// Copies the agent out of its install folder and runs the same command from the copy, which then may replace or
   /// delete the folder. The copy deletes itself after uninstalling.
   /// </summary>
-  public int ContinueFromACopy(string startupFolder, IEnumerable<string> arguments)
+  public int ContinueFromACopy(string executable, IEnumerable<string> arguments)
   {
     var copy = Path.Combine(Path.GetTempPath(), $"{CopyPrefix}{Guid.NewGuid():N}");
-    CopyFolder(startupFolder, copy);
+    AgentFiles.Copy(executable, copy);
 
     var start = new ProcessStartInfo(Path.Combine(copy, installation.ExecutableName)) { UseShellExecute = false };
     foreach (var argument in arguments)
@@ -55,7 +55,8 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
     return 0;
   }
 
-  public async Task<int> InstallAsync(Join join, CancellationToken cancellationToken)
+  /// <param name="executable">The agent being installed: it, or its folder's files for a regular build, are copied.</param>
+  public async Task<int> InstallAsync(string executable, Join join, CancellationToken cancellationToken)
   {
     if (!IsElevated())
     {
@@ -86,7 +87,7 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
 
       ServiceManager.Delete(installation.ServiceName);
       DeleteFolder(installation.InstallFolder);
-      CopyFolder(AppContext.BaseDirectory, installation.InstallFolder);
+      AgentFiles.Copy(executable, installation.InstallFolder);
       ServiceManager.Create(installation, $"Keeps this device connected to its {Brand.Name} server.");
       WriteAppsEntry();
       ServiceManager.Start(installation.ServiceName);
@@ -212,16 +213,6 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
   }
 
   private void DeleteAppsEntry() => Registry.LocalMachine.DeleteSubKeyTree(installation.UninstallKeyPath, throwOnMissingSubKey: false);
-
-  private static void CopyFolder(string source, string destination)
-  {
-    foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
-    {
-      var target = Path.Combine(destination, Path.GetRelativePath(source, file));
-      Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-      File.Copy(file, target, overwrite: true);
-    }
-  }
 
   private static void DeleteFolder(string folder)
   {
