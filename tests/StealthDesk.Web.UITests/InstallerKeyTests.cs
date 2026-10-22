@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using StealthDesk.Web.UITests.Infrastructure;
 
 namespace StealthDesk.Web.UITests;
@@ -25,8 +26,13 @@ public class InstallerKeyTests
     var command = (await app.Page.Locator("[data-command]").InnerTextAsync()).Trim();
     await app.ScreenshotAsync("deploy-command");
 
-    var key = command.Split("--installer-key ")[1].Trim();
-    Assert.StartsWith($@".\StealthDesk.Agent.exe install --server {app.Server.BaseAddress.GetLeftPart(UriPartial.Authority)}", command);
+    // The image ships the agent, so its page gives the command that downloads it; a server from the build has none to
+    // give and names an agent copied by hand. Either way the key comes quoted or bare after --installer-key.
+    Assert.StartsWith(UiServer.Image is null ? @".\StealthDesk.Agent.exe install" : "$ProgressPreference", command);
+    var origin = Regex.Escape(app.Server.BaseAddress.GetLeftPart(UriPartial.Authority));
+    var match = Regex.Match(command, $"install --server '?{origin}'? --installer-key '?(?<key>[^'\\s;]+)'?");
+    Assert.True(match.Success, $"No install with this server and a key in: {command}");
+    var key = match.Groups["key"].Value;
     await using var agent = await UiAgent.StartAsync(app.Server, "PC-FRONT", key);
 
     await app.OpenAsync("Integrations", "Installer keys");
