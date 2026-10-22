@@ -30,6 +30,7 @@ public class TenantSettingsTests
     await app.OpenAsync("Devices");
     await app.ClickLinkAsync("Add device");
     await app.ClickAsync("Create key");
-    await Expect(app.Page.Locator("[data-command]")).ToContainTextAsync("--instance office");
+    // Quoted in the command that downloads the agent, which a server with a build of it gives; bare otherwise.
+    await Expect(app.Page.Locator("[data-command]")).ToContainTextAsync(new System.Text.RegularExpressions.Regex("--instance '?office'?(;| |$)"));
   }
 }

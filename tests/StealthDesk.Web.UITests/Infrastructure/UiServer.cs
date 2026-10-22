@@ -11,9 +11,20 @@ namespace StealthDesk.Web.UITests.Infrastructure;
 /// The real server, started as its own process the way it runs for real, on a fresh PostgreSQL database and a free
 /// port. One PostgreSQL container serves the whole run; each server gets an empty database, so every test starts
 /// from a new installation.
+/// <para>
+/// With STEALTHDESK_UI_IMAGE set to a container image, each server is that image instead, run with <c>docker run</c>
+/// in Production on the same kind of fresh database. With STEALTHDESK_UI_SERVER set to an address, tests that need
+/// an installation of their own are skipped: only the deployment tests run, against that server.
+/// </para>
 /// </summary>
 public sealed class UiServer : IAsyncDisposable
 {
+  public static string? Image { get; } = Environment.GetEnvironmentVariable("STEALTHDESK_UI_IMAGE") is { Length: > 0 } image ? image : null;
+
+  public static Uri? Address { get; } = Environment.GetEnvironmentVariable("STEALTHDESK_UI_SERVER") is { Length: > 0 } address
+    ? new Uri(address.TrimEnd('/') + "/")
+    : null;
+
   private static readonly Lazy<Task<PostgreSqlContainer>> Container = new(async () =>
   {
     var container = new PostgreSqlBuilder("postgres:17-alpine").Build();
@@ -21,28 +32,42 @@ public sealed class UiServer : IAsyncDisposable
     return container;
   });
 
-  private readonly Process _process;
-  private readonly StreamWriter _log;
+  private readonly Process? _process;
+  private readonly StreamWriter? _log;
+  private readonly string? _container;
+  private readonly string? _database;
 
-  private UiServer(Process process, StreamWriter log, Uri baseAddress, string database)
+  private UiServer(Process? process, StreamWriter? log, Uri baseAddress, string? database, string? container = null)
   {
     _process = process;
     _log = log;
     BaseAddress = baseAddress;
-    Database = database;
+    _database = database;
+    _container = container;
   }
 
   /// <summary>Where the browser opens the web client, ending with a slash.</summary>
   public Uri BaseAddress { get; }
 
   /// <summary>The connection string of this server's database, for tests that arrange data the pages can't yet.</summary>
-  public string Database { get; }
+  public string Database => _database ?? throw new InvalidOperationException("A server the tests didn't start has no database they can reach.");
+
+  /// <summary>The server at STEALTHDESK_UI_SERVER, which the tests use but don't start or stop.</summary>
+  public static UiServer Existing() =>
+    new(null, null, Address ?? throw new InvalidOperationException("STEALTHDESK_UI_SERVER names no server."), null);
 
   /// <param name="settings">Extra settings, e.g. <c>("Accounts:EnablePublicRegistration", "true")</c>.</param>
   public static async Task<UiServer> StartAsync(string testName, params (string Key, string Value)[] settings)
   {
+    Assert.SkipWhen(Address is not null, "Needs a new installation of its own; STEALTHDESK_UI_SERVER points at a server shared by the deployment tests.");
+
     var (database, connectionString) = await CreateDatabaseAsync();
     var port = FreePort();
+    if (Image is not null)
+    {
+      return await StartImageAsync(testName, port, database, connectionString, settings);
+    }
+
     var baseAddress = new Uri($"http://localhost:{port}/");
 
     // The built server, without `dotnet run`: evaluating the project again would cost seconds on every test.
@@ -78,24 +103,91 @@ public sealed class UiServer : IAsyncDisposable
     process.BeginErrorReadLine();
 
     var server = new UiServer(process, log, baseAddress, connectionString);
-    await server.WaitUntilAliveAsync();
+    await server.ReadyOrGoneAsync();
     return server;
   }
 
   public async ValueTask DisposeAsync()
   {
-    if (!_process.HasExited)
+    // Stopping the docker client leaves its container running: the container goes first.
+    if (_container is not null)
     {
-      _process.Kill(entireProcessTree: true);
-      await _process.WaitForExitAsync();
+      using var remove = Process.Start(new ProcessStartInfo("docker", ["rm", "--force", _container]) { RedirectStandardOutput = true, RedirectStandardError = true });
+      await remove!.WaitForExitAsync();
     }
 
-    _process.Dispose();
-    await _log.DisposeAsync();
+    if (_process is not null)
+    {
+      if (!_process.HasExited)
+      {
+        _process.Kill(entireProcessTree: true);
+        await _process.WaitForExitAsync();
+      }
+
+      _process.Dispose();
+    }
+
+    if (_log is not null)
+    {
+      await _log.DisposeAsync();
+    }
+  }
+
+  // The image as users run it: Production, settings as StealthDesk_ variables, PostgreSQL reached on the host.
+  private static async Task<UiServer> StartImageAsync(
+    string testName, int port, (string Key, string Value)[] database, string connectionString, (string Key, string Value)[] settings)
+  {
+    var container = $"stealthdesk-ui-{Guid.NewGuid():N}"[..32];
+    var arguments = new List<string>
+    {
+      "run", "--rm", "--name", container,
+      "--add-host", "host.docker.internal:host-gateway",
+      "--publish", $"127.0.0.1:{port}:8080",
+    };
+
+    // Nothing in the tests reads email: a server without SMTP settings sends none rather than refusing to start.
+    var all = database.Select(x => x.Key == "POSTGRES_HOST" ? (x.Key, "host.docker.internal") : x)
+      .Append(("Email:DisableSending", "true"))
+      .Concat(settings);
+    foreach (var (key, value) in all)
+    {
+      arguments.Add("--env");
+      arguments.Add($"StealthDesk_{key.Replace(":", "__", StringComparison.Ordinal)}={value}");
+    }
+
+    arguments.Add(Image!);
+
+    var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+    arguments.ForEach(start.ArgumentList.Add);
+
+    var log = new StreamWriter(Path.Combine(UiPaths.Results, $"{testName}.server.log")) { AutoFlush = true };
+    var process = Process.Start(start) ?? throw new InvalidOperationException("docker didn't start.");
+    process.OutputDataReceived += (_, e) => Write(log, e.Data);
+    process.ErrorDataReceived += (_, e) => Write(log, e.Data);
+    process.BeginOutputReadLine();
+    process.BeginErrorReadLine();
+
+    var server = new UiServer(process, log, new Uri($"http://localhost:{port}/"), connectionString, container);
+    await server.ReadyOrGoneAsync();
+    return server;
   }
 
   private static string BuildConfiguration =>
     typeof(UiServer).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+
+  // A server that never became ready is stopped here: thrown before the test got it, it would be left running.
+  private async Task ReadyOrGoneAsync()
+  {
+    try
+    {
+      await WaitUntilAliveAsync();
+    }
+    catch
+    {
+      await DisposeAsync();
+      throw;
+    }
+  }
 
   private async Task WaitUntilAliveAsync()
   {
@@ -103,7 +195,7 @@ public sealed class UiServer : IAsyncDisposable
     var deadline = DateTime.UtcNow.AddSeconds(60);
     while (DateTime.UtcNow < deadline)
     {
-      if (_process.HasExited)
+      if (_process is { HasExited: true })
       {
         throw new InvalidOperationException($"The server stopped with code {_process.ExitCode}; see its log in {UiPaths.Results}.");
       }

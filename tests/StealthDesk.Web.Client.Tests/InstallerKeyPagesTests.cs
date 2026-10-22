@@ -133,6 +133,24 @@ public class InstallerKeyPagesTests : AccountTestContext
   }
 
   [Fact]
+  public void Deploy_OffersNoKeyForm_UntilItKnowsWhichCommandToGive()
+  {
+    // A slow answer about the server's build (it hashes the agent the first time) used to leave the form usable, and a
+    // key made then got the command for an agent copied by hand, on a server that hands one out.
+    var download = new StealthDesk.Contracts.Agents.AgentDownload(Routes.WindowsAgentDownload, "StealthDesk.Agent.exe", 53_000_000, "C0FFEE");
+    Api.RespondWith(Me(PermissionNames.AgentInstall, PermissionNames.InstallerKeyRead, PermissionNames.InstallerKeyWrite));
+    Api.RespondWith(new InstallerKeyList());
+    var page = RenderPage<Pages.Deploy>();
+    page.WaitForAssertion(() => Assert.Equal($"GET {Routes.DeploymentOptions}", Api.Requests[^1]));
+
+    Assert.Empty(page.FindAll("form.sd-deploy-form"));
+    Assert.NotNull(page.Find(".sd-loading"));
+
+    Api.RespondWith(new DeploymentOptions(null, download));
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form.sd-deploy-form")));
+  }
+
+  [Fact]
   public void Deploy_WithoutABuildOnTheServer_SaysSo_AndRunsAnAgentCopiedByHand()
   {
     var key = Key("Lab");

@@ -3,6 +3,7 @@
 </p>
 
 [![CI](https://github.com/fkauanGIT/StealthDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/fkauanGIT/StealthDesk/actions/workflows/ci.yml)
+[![Project board](https://img.shields.io/badge/project-board-blue?logo=github)](https://github.com/users/fkauanGIT/projects/3)
 
 StealthDesk is a self-hosted remote device management platform built with .NET 10 and ASP.NET Core.
 A lightweight agent runs on each managed machine and keeps a signed, real-time SignalR connection to
@@ -515,5 +516,17 @@ tab, and on pull requests that change them.
 
 ## Contributing
 
-Every change starts from an issue and reaches `main` through a pull request. See
+The [project board](https://github.com/users/fkauanGIT/projects/3) shows the backlog and what's in progress, by
+milestone. Every change starts from an issue and reaches `main` through a pull request. See
 [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow.
+
+## License
+
+StealthDesk is source-available under the [Apache License 2.0 with the Commons Clause](./LICENSE). Anyone, people
+and companies alike, may use it, change it and share it for free, under the Apache License's terms. What the Commons
+Clause takes away is the right to **sell** it: to charge others for StealthDesk itself, or for hosting or supporting
+it when its value comes from StealthDesk. Selling it takes a separate commercial license from its author, Francisco
+Kauan; ask through this repository.
+
+Because of that condition, StealthDesk isn't open source in the Open Source Initiative's sense, although its code is
+open to read.

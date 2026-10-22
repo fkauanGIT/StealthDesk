@@ -50,7 +50,8 @@ LABEL org.opencontainers.image.title="StealthDesk server" \
       org.opencontainers.image.description="StealthDesk's server and web client." \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \
-      org.opencontainers.image.source="https://github.com/fkauanGIT/StealthDesk"
+      org.opencontainers.image.source="https://github.com/fkauanGIT/StealthDesk" \
+      org.opencontainers.image.licenses="Apache-2.0 with Commons Clause"
 
 # curl, for the health check below: the runtime image has no HTTP client of its own.
 RUN apt-get update \
@@ -61,6 +62,8 @@ WORKDIR /app
 COPY --from=build /app .
 # Served at /downloads/agent/windows; install commands name its SHA-256.
 COPY --from=agent /agent/StealthDesk.Agent.exe downloads/windows/
+# The terms the image is shared under travel with it.
+COPY LICENSE ./
 
 # The image's own unprivileged "app" user, never root. ASP.NET listens on 8080, a port it may open.
 USER $APP_UID

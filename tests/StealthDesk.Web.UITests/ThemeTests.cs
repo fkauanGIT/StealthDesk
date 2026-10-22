@@ -19,7 +19,7 @@ public class ThemeTests
     await app.RegisterAsync("admin@example.com", Password);
     var html = app.Page.Locator("html");
 
-    await Theme(app, "Dark").ClickAsync();
+    await ChooseAsync(app, "Dark");
     await Expect(html).ToHaveAttributeAsync("data-theme", "dark");
     Assert.Equal(DarkGround, await GroundAsync(app.Page));
     await Capture(app, "dark");
@@ -31,7 +31,7 @@ public class ThemeTests
     Assert.Equal("dark", await bare.Locator("html").GetAttributeAsync("data-theme"));
     await bare.CloseAsync();
 
-    await Theme(app, "Light").ClickAsync();
+    await ChooseAsync(app, "Light");
     await Expect(html).ToHaveAttributeAsync("data-theme", "light");
     await Expect(Theme(app, "Light")).ToHaveAttributeAsync("aria-pressed", "true");
     Assert.Equal(LightGround, await GroundAsync(app.Page));
@@ -73,6 +73,13 @@ public class ThemeTests
 
   private static Task<string> GroundAsync(IPage page) =>
     page.EvaluateAsync<string>("() => getComputedStyle(document.body).backgroundColor");
+
+  // The page shows a theme at once and saves it with the account after: the test waits for the save, as a person
+  // does before reloading or signing in elsewhere, or a reload could find the account's previous theme.
+  private static Task ChooseAsync(UiApp app, string mode) =>
+    app.Page.RunAndWaitForResponseAsync(
+      () => Theme(app, mode).ClickAsync(),
+      response => response.Url.EndsWith(StealthDesk.Contracts.Routes.AccountTheme, StringComparison.Ordinal) && response.Request.Method == "PUT");
 
   private static ILocator Theme(UiApp app, string mode) =>
     app.Page.GetByRole(AriaRole.Group, new() { Name = "Theme" }).First.GetByRole(AriaRole.Button, new() { Name = mode });

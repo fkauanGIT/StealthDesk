@@ -33,7 +33,20 @@ public sealed partial class UiApp : IAsyncDisposable
 
   public static async Task<UiApp> StartAsync(params (string Key, string Value)[] settings)
   {
-    var name = SafeName().Replace(TestContext.Current.Test?.TestDisplayName ?? "test", "_");
+    var name = Name();
+    return await OpenAsync(name, await UiServer.StartAsync(name, settings));
+  }
+
+  /// <summary>
+  /// The deployment at STEALTHDESK_UI_SERVER, as it already runs. Its certificate isn't checked: a test deployment
+  /// behind a reverse proxy uses one of its own making.
+  /// </summary>
+  public static Task<UiApp> AtDeploymentAsync() => OpenAsync(Name(), UiServer.Existing());
+
+  private static string Name() => SafeName().Replace(TestContext.Current.Test?.TestDisplayName ?? "test", "_");
+
+  private static async Task<UiApp> OpenAsync(string name, UiServer server)
+  {
     var channel = Environment.GetEnvironmentVariable("STEALTHDESK_UI_BROWSER") is { Length: > 0 } chosen
       ? chosen
       : OperatingSystem.IsWindows() ? "msedge" : null;
@@ -42,7 +55,6 @@ public sealed partial class UiApp : IAsyncDisposable
       await InstallChromiumAsync();
     }
 
-    var server = await UiServer.StartAsync(name, settings);
     var playwright = await Playwright.CreateAsync();
     var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
     {
@@ -54,6 +66,7 @@ public sealed partial class UiApp : IAsyncDisposable
       BaseURL = server.BaseAddress.ToString(),
       ViewportSize = new ViewportSize { Width = 1440, Height = 900 },
       Locale = "en-US",
+      IgnoreHTTPSErrors = UiServer.Address is not null,
     });
     context.SetDefaultTimeout(30_000);
     SetDefaultExpectTimeout(30_000);

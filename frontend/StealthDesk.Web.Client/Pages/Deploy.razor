@@ -35,7 +35,13 @@
     <SdAlert>@error</SdAlert>
 }
 
-@if (fullKey is null)
+@if (fullKey is null && !ready)
+{
+    <SdCard Title="Installer key">
+        <SdLoading Text="Loading..." />
+    </SdCard>
+}
+else if (fullKey is null)
 {
     <SdCard Title="Installer key">
         <p class="sd-muted">An agent joins with an installer key, and the device belongs to this tenant. Create a key or use one you kept.</p>
@@ -193,6 +199,8 @@ else
     private bool justCreated;
     private bool copied;
     private bool busy;
+    // Until the deployment options and groups are in, a key made would show the command for the wrong agent.
+    private bool ready;
     private string? error;
     private string? createError;
     private string? pasteError;
@@ -254,6 +262,8 @@ else
         {
             groupOptions = [new(string.Empty, "No group"), .. groups.Items.Select(x => new SelectOption(x.Id.ToString(), x.Name))];
         }
+
+        ready = true;
     }
 
     private async Task LoadExistingAsync()

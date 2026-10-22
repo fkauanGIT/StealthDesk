@@ -1,0 +1,21 @@
+# Added to docker-compose/docker-compose.yml by the deployment tests: the server behind an HTTPS reverse proxy,
+# reached at https://localhost:8443. The server trusts the proxy's forwarded headers by its fixed address.
+#   docker compose -f docker-compose.yml -f ../.github/deployment/compose.proxy.yml up -d --wait
+
+services:
+  server:
+    environment:
+      StealthDesk_ReverseProxy__TrustedProxies__0: 172.30.0.10
+
+  proxy:
+    image: caddy:2.8-alpine
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "8443:443"
+    volumes:
+      - ../.github/deployment/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      stealthdesk:
+        ipv4_address: 172.30.0.10
