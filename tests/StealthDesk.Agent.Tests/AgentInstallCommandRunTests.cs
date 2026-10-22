@@ -32,8 +32,8 @@ public sealed class AgentInstallCommandRunTests : IAsyncDisposable
 
     var result = await RunAsync(Convert.ToHexString(SHA256.HashData(StandIn)));
 
-    Assert.Equal("ran", result.Outcome);
-    Assert.False(File.Exists(Path.Combine(Path.GetTempPath(), _fileName)));
+    Assert.True(result.Outcome == "ran", result.ToString());
+    Assert.False(File.Exists(Path.Combine(Path.GetTempPath(), _fileName)), result.ToString());
     Assert.Equal(1, Server.Requests);
   }
 
@@ -47,12 +47,12 @@ public sealed class AgentInstallCommandRunTests : IAsyncDisposable
     Server.Serve([.. real[..^1], (byte)(real[^1] ^ 0xFF)]);
     var result = await RunAsync(Convert.ToHexString(SHA256.HashData(real)));
 
-    Assert.Equal("not run", result.Outcome);
-    Assert.Contains("does not match its SHA-256 hash", result.Errors, StringComparison.Ordinal);
-    Assert.False(File.Exists(Path.Combine(Path.GetTempPath(), _fileName)));
+    Assert.True(result.Outcome == "not run", result.ToString());
+    Assert.True(result.Errors.Contains("does not match its SHA-256 hash", StringComparison.Ordinal), result.ToString());
+    Assert.False(File.Exists(Path.Combine(Path.GetTempPath(), _fileName)), result.ToString());
   }
 
-  private async Task<(string Outcome, string Errors)> RunAsync(string sha256)
+  private async Task<RunResult> RunAsync(string sha256)
   {
     var command = AgentInstallCommand.Windows(Server.Address, new AgentDownload("/agent", _fileName, StandIn.Length, sha256), "id:secret");
 
@@ -64,11 +64,23 @@ public sealed class AgentInstallCommandRunTests : IAsyncDisposable
       start.ArgumentList.Add(argument);
     }
 
+    // Like a new PowerShell window: a module path inherited from PowerShell 7 (which runs these tests in CI) would
+    // make Windows PowerShell load modules it can't use, and lose Invoke-WebRequest and Get-FileHash.
+    start.Environment.Remove("PSModulePath");
+
     using var process = Process.Start(start)!;
     var output = process.StandardOutput.ReadToEndAsync();
     var errors = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync(TestContext.Current.CancellationToken);
-    return ((await output).Trim().Split('\n')[^1].Trim(), await errors);
+    return new RunResult((await output).Trim(), await errors);
+  }
+
+  /// <summary>What Windows PowerShell printed; shown whole when a check fails.</summary>
+  private sealed record RunResult(string Output, string Errors)
+  {
+    public string Outcome => Output.Split('\n')[^1].Trim();
+
+    public override string ToString() => $"Output:\n{Output}\nErrors:\n{Errors}";
   }
 
   /// <summary>Answers every request with one file, over plain HTTP on a free local port.</summary>
