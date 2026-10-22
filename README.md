@@ -517,3 +517,14 @@ tab, and on pull requests that change them.
 
 Every change starts from an issue and reaches `main` through a pull request. See
 [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow.
+
+## License
+
+StealthDesk is source-available under the [Apache License 2.0 with the Commons Clause](./LICENSE). Anyone, people
+and companies alike, may use it, change it and share it for free, under the Apache License's terms. What the Commons
+Clause takes away is the right to **sell** it: to charge others for StealthDesk itself, or for hosting or supporting
+it when its value comes from StealthDesk. Selling it takes a separate commercial license from its author, Francisco
+Kauan; ask through this repository.
+
+Because of that condition, StealthDesk isn't open source in the Open Source Initiative's sense, although its code is
+open to read.
