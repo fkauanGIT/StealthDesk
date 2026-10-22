@@ -3,6 +3,7 @@
 </p>
 
 [![CI](https://github.com/fkauanGIT/StealthDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/fkauanGIT/StealthDesk/actions/workflows/ci.yml)
+[![Project board](https://img.shields.io/badge/project-board-blue?logo=github)](https://github.com/users/fkauanGIT/projects/3)
 
 StealthDesk is a self-hosted remote device management platform built with .NET 10 and ASP.NET Core.
 A lightweight agent runs on each managed machine and keeps a signed, real-time SignalR connection to
@@ -515,7 +516,8 @@ tab, and on pull requests that change them.
 
 ## Contributing
 
-Every change starts from an issue and reaches `main` through a pull request. See
+The [project board](https://github.com/users/fkauanGIT/projects/3) shows the backlog and what's in progress, by
+milestone. Every change starts from an issue and reaches `main` through a pull request. See
 [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow.
 
 ## License
