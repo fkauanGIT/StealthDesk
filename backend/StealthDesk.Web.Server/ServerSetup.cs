@@ -2,6 +2,7 @@ using StealthDesk.Web.Server.ServiceAccounts;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Core.Security;
 using StealthDesk.Web.Server.Accounts;
+using StealthDesk.Web.Server.AgentDownloads;
 using StealthDesk.Web.Server.AuthorizationLogs;
 using StealthDesk.Web.Server.Bootstrap;
 using StealthDesk.Web.Server.Configuration;
@@ -36,6 +37,7 @@ public static class ServerSetup
     builder.AddStealthDeskDataProtection();
     builder.AddStealthDeskEmail();
     builder.AddStealthDeskReverseProxy();
+    builder.AddStealthDeskAgentDownloads();
 
     builder.Services.AddOptions<GatewayOptions>()
       .Bind(builder.Configuration.GetSection(GatewayOptions.Section))
@@ -106,6 +108,7 @@ public static class ServerSetup
     app.MapServiceAccountEndpoints();
     app.MapInstallerKeyEndpoints();
     app.MapTenantSettingEndpoints();
+    app.MapAgentDownloadEndpoints();
     app.MapServerAdministrationEndpoints();
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
