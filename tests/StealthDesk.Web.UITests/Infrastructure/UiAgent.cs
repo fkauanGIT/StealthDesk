@@ -24,23 +24,33 @@ public sealed class UiAgent : IAsyncDisposable
   private readonly MessageSigner _signer = new(TimeProvider.System);
   private readonly SigningKeys _keys;
 
-  private UiAgent(ServiceProvider services, IRealtimeChannel<IAgentGateway> channel, string machineName)
+  private UiAgent(ServiceProvider services, IRealtimeChannel<IAgentGateway> channel, string machineName, AgentIdentity? identity)
   {
     _services = services;
     _channel = channel;
-    _keys = _signer.CreateKeys();
+    _keys = identity is null ? _signer.CreateKeys() : new SigningKeys(_signer.PublicKeyOf(identity.PrivateKey), identity.PrivateKey);
+    DeviceId = identity?.DeviceId ?? Guid.NewGuid();
     MachineName = machineName;
   }
 
-  public Guid DeviceId { get; } = Guid.NewGuid();
+  public Guid DeviceId { get; }
 
   public string MachineName { get; }
 
+  /// <summary>What the agent would keep on disk: with it, the same device reports again, without an installer key.</summary>
+  public AgentIdentity Identity => new(DeviceId, _keys.PrivateKey);
+
   /// <summary>Connects to the server and reports the machine once, as an agent does when it starts.</summary>
   /// <param name="installerKey">The key it joins with; one the test arranges in the database when none is given.</param>
-  public static async Task<UiAgent> StartAsync(UiServer server, string machineName, string? installerKey = null)
+  public static async Task<UiAgent> StartAsync(UiServer server, string machineName, string? installerKey = null) =>
+    await ConnectAsync(server, machineName, installerKey ?? await ArrangeInstallerKeyAsync(server), identity: null);
+
+  /// <summary>The same device again, as after its machine restarted: it signs with its own key and needs no installer key.</summary>
+  public static Task<UiAgent> ReturnAsync(UiServer server, string machineName, AgentIdentity identity) =>
+    ConnectAsync(server, machineName, installerKey: null, identity);
+
+  private static async Task<UiAgent> ConnectAsync(UiServer server, string machineName, string? installerKey, AgentIdentity? identity)
   {
-    installerKey ??= await ArrangeInstallerKeyAsync(server);
 
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
@@ -49,12 +59,12 @@ public sealed class UiAgent : IAsyncDisposable
       .BuildServiceProvider();
 
     var channel = services.GetRequiredService<IRealtimeChannel<IAgentGateway>>();
-    if (!await channel.OpenAsync(new Uri(server.BaseAddress, Routes.AgentGateway.TrimStart('/')), _ => { }, TestContext.Current.CancellationToken))
+    if (!await channel.OpenAsync(new Uri(server.BaseAddress, Routes.AgentGateway.TrimStart('/')), AcceptTestCertificates, TestContext.Current.CancellationToken))
     {
       throw new InvalidOperationException("The test agent could not reach the server.");
     }
 
-    var agent = new UiAgent(services, channel, machineName);
+    var agent = new UiAgent(services, channel, machineName, identity);
     var reply = await channel.Server.SubmitReport(agent._signer.Sign(agent.Report() with { InstallerKey = installerKey }, agent._keys.PrivateKey));
     if (!reply.Accepted)
     {
@@ -70,6 +80,26 @@ public sealed class UiAgent : IAsyncDisposable
   {
     await _channel.DisposeAsync();
     await _services.DisposeAsync();
+  }
+
+  // A deployment under test behind a reverse proxy has a certificate of its own making, which the browser accepts too.
+  private static void AcceptTestCertificates(Microsoft.AspNetCore.Http.Connections.Client.HttpConnectionOptions options)
+  {
+    if (UiServer.Address is null)
+    {
+      return;
+    }
+
+    options.HttpMessageHandlerFactory = handler =>
+    {
+      if (handler is HttpClientHandler client)
+      {
+        client.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+      }
+
+      return handler;
+    };
+    options.WebSocketConfiguration = socket => socket.RemoteCertificateValidationCallback = (_, _, _, _) => true;
   }
 
   // A persistent key of the server's only tenant, stored as the server stores one, for tests that aren't about keys.
@@ -119,3 +149,6 @@ public sealed class UiAgent : IAsyncDisposable
 
   private sealed class NoCallbacks : IAgentCallbacks;
 }
+
+/// <summary>A device's id and private key, the identity an agent keeps between runs.</summary>
+public sealed record AgentIdentity(Guid DeviceId, string PrivateKey);
