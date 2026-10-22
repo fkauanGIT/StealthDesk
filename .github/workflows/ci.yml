@@ -133,12 +133,12 @@ jobs:
 
       - name: Build the server and the agent
         run: |
-          dotnet build backend/StealthDesk.Web.Server --configuration Release
+          dotnet build StealthDesk.Web.Server --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The server didn't build." }
-          dotnet build agent/StealthDesk.Agent --configuration Release
+          dotnet build StealthDesk.Agent --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The agent didn't build." }
           # The single file the server hands out, as the container image builds it.
-          dotnet publish agent/StealthDesk.Agent -p:PublishProfile=Windows --output publish/agent
+          dotnet publish StealthDesk.Agent -p:PublishProfile=Windows --output publish/agent
           if ($LASTEXITCODE -ne 0) { throw "The single-file agent didn't publish." }
 
       # One step: a process a step starts is ended with that step on Windows runners.
@@ -146,7 +146,7 @@ jobs:
         run: |
           $env:ASPNETCORE_ENVIRONMENT = "Development"
           $server = Start-Process dotnet -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
-            "run", "--project", "backend/StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
+            "run", "--project", "StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
             "--urls", "http://localhost:5099", "--UseInMemoryDatabase", "true", "--AgentDownloads:Folder", "$PWD/publish/downloads"
           try {
             $ready = $false
@@ -156,7 +156,7 @@ jobs:
             if (-not $ready) { throw "The server didn't become ready." }
 
             ./.github/scripts/agent-download-test.ps1 -Agent publish/agent/StealthDesk.Agent.exe -Downloads publish/downloads -Server http://localhost:5099
-            ./.github/scripts/agent-service-test.ps1 -Agent agent/StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
+            ./.github/scripts/agent-service-test.ps1 -Agent StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
           }
           catch {
             Write-Host "--- server log"
@@ -180,7 +180,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build the server image
-        run: docker build --file backend/StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
+        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
 
       - name: Start the server before its database
         run: |

@@ -7,7 +7,7 @@
   without administrator rights to read the device key as someone else. Undoes everything it installs.
 
 .EXAMPLE
-  ./agent-service-test.ps1 -Agent agent/StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
+  ./agent-service-test.ps1 -Agent StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
 #>
 param(
   [Parameter(Mandatory)] [string] $Agent,

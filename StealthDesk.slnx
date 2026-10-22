@@ -1,15 +1,4 @@
 <Solution>
-  <Folder Name="/agent/">
-    <Project Path="agent/StealthDesk.Agent/StealthDesk.Agent.csproj" />
-    <Project Path="agent/StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj" />
-    <Project Path="agent/StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj" />
-  </Folder>
-  <Folder Name="/backend/">
-    <Project Path="backend/StealthDesk.Web.Server/StealthDesk.Web.Server.csproj" />
-  </Folder>
-  <Folder Name="/frontend/">
-    <Project Path="frontend/StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
-  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/StealthDesk.Branding/StealthDesk.Branding.csproj" />
     <Project Path="shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj" />
@@ -25,4 +14,9 @@
     <Project Path="tests/StealthDesk.Web.Client.Tests/StealthDesk.Web.Client.Tests.csproj" />
     <Project Path="tests/StealthDesk.Web.UITests/StealthDesk.Web.UITests.csproj" />
   </Folder>
+  <Project Path="StealthDesk.Agent/StealthDesk.Agent.csproj" />
+  <Project Path="StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj" />
+  <Project Path="StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj" />
+  <Project Path="StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
+  <Project Path="StealthDesk.Web.Server/StealthDesk.Web.Server.csproj" />
 </Solution>
