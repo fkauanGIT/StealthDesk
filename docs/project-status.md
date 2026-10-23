@@ -68,4 +68,20 @@ permissions decide what each person, script and agent install can do, and tenant
 - The web app is organized by task (Devices, People & access, Integrations, Activity, Server), with a light theme
 - Every route is tested with and without its permission and from another tenant, on PostgreSQL
 
-Next up: **v0.5**, deployment.
+**v0.5 - Deployment** ([#127](https://github.com/fkauanGIT/StealthDesk/issues/127)) is complete: the server runs
+on a company server, in a container behind HTTPS, and agents install as a Windows service from one command.
+
+- A container image on Docker Hub (`franciscokauan/stealthdesk`), with Docker Compose files for the server and
+  PostgreSQL, health checks and an optional telemetry dashboard
+- Every setting can come from a `StealthDesk_` variable or a Docker secret, a wrong one stops the server at start
+  with the setting named, and a first administrator and access token can be created on the first start
+- Behind a reverse proxy (Caddy, Nginx, Cloudflare) the server sees the client's address and HTTPS
+- Data protection keys encrypted with a certificate, with older certificates kept for rotation
+- The agent installs as a Windows service that starts with Windows, from a PowerShell command on **Add device** that
+  downloads it from the server and checks its SHA-256
+- Browser tests run against the container image, behind an HTTPS proxy and across an upgrade from the version
+  before, and a release publishes its image and agent only after the deployment tests pass on it behind the proxy
+- Guides for deploying, backing up, restoring and upgrading, tested on a new Linux machine, and this documentation
+  as a website
+
+Next up: **v0.6**, the remote terminal.
