@@ -38,7 +38,7 @@ Windows service from a command copied from the web.
 
 ## Getting started
 
-See the [README](https://github.com/fkauanGIT/StealthDesk#with-docker-compose): copy `.env.example` to `.env`, set the
+See [Running with Docker Compose](https://github.com/fkauanGIT/StealthDesk/blob/main/docs/guides/docker-compose.md): copy `.env.example` to `.env`, set the
 database password, run `docker compose up -d` and open `http://localhost:8080`.
 
 ## Known limitations
