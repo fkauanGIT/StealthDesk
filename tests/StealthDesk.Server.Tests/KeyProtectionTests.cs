@@ -172,6 +172,23 @@ public sealed class KeyProtectionTests
     Assert.Contains(message, server.RefusalToStart(), StringComparison.Ordinal);
   }
 
+  // A file the server's user may not read is a permission to fix, not a password: the message says which.
+  [Theory]
+  [InlineData("KeyProtection:Certificate")]
+  [InlineData("KeyProtection:PreviousCertificates:0")]
+  public void ACertificateFileTheServerMayNotRead_StopsIt_SayingSo(string key)
+  {
+    using var certificate = NewCertificate();
+    using var file = UnreadableFile.Create(certificate.Export(X509ContentType.Pkcs12, Password));
+    using var server = Encrypted(ServerHost.InMemory(), certificate).With($"{key}:Base64", string.Empty)
+      .With($"{key}:Path", file.Path).With($"{key}:Password", Password);
+
+    var refusal = server.RefusalToStart();
+
+    Assert.Contains($"{key}:Path is '{file.Path}', which the server may not read: permission denied for the user it runs as, {Environment.UserName}", refusal, StringComparison.Ordinal);
+    Assert.DoesNotContain("Password is wrong", refusal, StringComparison.Ordinal);
+  }
+
   [Theory]
   [InlineData(false, true)]
   [InlineData(true, false)]
@@ -224,5 +241,75 @@ public sealed class KeyProtectionTests
     using var client = TestAccounts.Client(server);
     using var response = await client.SendAsync(TestAccounts.WithCookie(HttpMethod.Get, Routes.CurrentUser, cookie), Cancel);
     return response.StatusCode;
+  }
+
+  /// <summary>
+  /// A file the test's own user may not read, as a certificate given to another user is to the server: denied by an
+  /// access rule on Windows, by its mode elsewhere. Readable again, and deleted, once disposed.
+  /// </summary>
+  private sealed class UnreadableFile : IDisposable
+  {
+    private UnreadableFile(string path) => Path = path;
+
+    public string Path { get; }
+
+    public static UnreadableFile Create(byte[] contents)
+    {
+      var file = new UnreadableFile(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"unreadable-{Guid.NewGuid():N}.pfx"));
+      File.WriteAllBytes(file.Path, contents);
+      file.Deny(true);
+
+      // Root reads whatever the mode says: such a run can't show a denied read.
+      var denied = false;
+      try
+      {
+        File.ReadAllBytes(file.Path);
+      }
+      catch (UnauthorizedAccessException)
+      {
+        denied = true;
+      }
+
+      if (!denied)
+      {
+        file.Dispose();
+        Assert.Skip("This user reads the file whatever its permissions say, as root does.");
+      }
+
+      return file;
+    }
+
+    public void Dispose()
+    {
+      Deny(false);
+      File.Delete(Path);
+    }
+
+    private void Deny(bool deny)
+    {
+      if (OperatingSystem.IsWindows())
+      {
+        var info = new FileInfo(Path);
+        var acl = info.GetAccessControl();
+        var rule = new System.Security.AccessControl.FileSystemAccessRule(
+          System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+          System.Security.AccessControl.FileSystemRights.ReadData,
+          System.Security.AccessControl.AccessControlType.Deny);
+        if (deny)
+        {
+          acl.AddAccessRule(rule);
+        }
+        else
+        {
+          acl.RemoveAccessRule(rule);
+        }
+
+        info.SetAccessControl(acl);
+      }
+      else
+      {
+        File.SetUnixFileMode(Path, deny ? UnixFileMode.None : UnixFileMode.UserRead | UnixFileMode.UserWrite);
+      }
+    }
   }
 }
