@@ -56,8 +56,9 @@ Its pages are also in [`docs/`](docs/index.md), grouped by what you came to do:
 
 - **Getting started**: [your first server](docs/getting-started/first-server.md) and
   [your first agent](docs/getting-started/first-agent.md)
-- **Guides**: [Docker Compose](docs/guides/docker-compose.md), [reverse proxy](docs/guides/reverse-proxy.md),
+- **Guides**: [deploying on a company server](docs/guides/deploying.md), [Docker Compose](docs/guides/docker-compose.md), [reverse proxy](docs/guides/reverse-proxy.md),
   [encrypting the keys](docs/guides/encrypting-keys.md), [installing agents](docs/guides/installing-agents.md),
+  [backups](docs/guides/backup-and-restore.md), [upgrading](docs/guides/upgrading.md),
   [accounts](docs/guides/accounts.md), [email](docs/guides/email.md),
   [tenant settings](docs/guides/tenant-settings.md), [running the tests](docs/guides/running-the-tests.md) and
   [releasing](docs/guides/releasing.md)

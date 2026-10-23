@@ -51,6 +51,8 @@ markdown_extensions:
   - admonition
   - pymdownx.highlight
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 nav:
   - Home: index.md
@@ -58,10 +60,13 @@ nav:
       - Your first server: getting-started/first-server.md
       - Your first agent: getting-started/first-agent.md
   - Guides:
+      - Deploying on a company server: guides/deploying.md
       - Running with Docker Compose: guides/docker-compose.md
       - Behind a reverse proxy: guides/reverse-proxy.md
       - Encrypting the data protection keys: guides/encrypting-keys.md
       - Installing agents: guides/installing-agents.md
+      - Backing up and restoring: guides/backup-and-restore.md
+      - Upgrading and rolling back: guides/upgrading.md
       - Accounts and sign-in: guides/accounts.md
       - Email: guides/email.md
       - Tenant settings: guides/tenant-settings.md

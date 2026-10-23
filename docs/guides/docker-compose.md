@@ -46,7 +46,8 @@ docker compose up -d
 (`0.5.0`, `0.5` or `latest`); a tag that can't be pulled is built from this repository. The server listens on
 `SERVER_PORT` (8080) and trusts forwarded headers from the network's gateway (`DOCKER_GATEWAY`, 172.30.0.1), which a
 reverse proxy on the same host comes through. To encrypt the [data protection keys](encrypting-keys.md), put the `.pfx`
-in `docker-compose/certificates`: the server sees that folder, read-only, as `/certificates`.
+in a `docker-compose/certificates` folder, which you create (it isn't in the repository): the server sees that
+folder, read-only, as `/certificates`.
 
 ## Passwords as Docker secrets
 

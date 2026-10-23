@@ -17,10 +17,13 @@ Step by step, from nothing to a device in the list.
 
 One task each, for a server you already know how to start.
 
+- [Deploying on a company server](guides/deploying.md): from nothing to HTTPS, agents and backups, step by step
 - [Running with Docker Compose](guides/docker-compose.md): the server and PostgreSQL in containers
 - [Behind a reverse proxy](guides/reverse-proxy.md): HTTPS in front of the server
 - [Encrypting the data protection keys](guides/encrypting-keys.md): with a certificate, and rotating it
 - [Installing agents](guides/installing-agents.md): as a Windows service, from the command Add device gives
+- [Backing up and restoring](guides/backup-and-restore.md): the database, the key certificate, and a restore drill
+- [Upgrading and rolling back](guides/upgrading.md): to a new version, and back
 - [Accounts and sign-in](guides/accounts.md): registration, the first administrator, Microsoft and GitHub sign-in
 - [Email](guides/email.md): sending account emails by SMTP
 - [Tenant settings](guides/tenant-settings.md): what each tenant can change
