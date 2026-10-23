@@ -51,6 +51,10 @@ public static class KeyProtectionSetup
     return builder;
   }
 
+  // The ASP.NET images name their unprivileged user's id in APP_UID: the number a chown of the file needs.
+  private static string RunningAs =>
+    Environment.GetEnvironmentVariable("APP_UID") is { Length: > 0 } uid ? $"{Environment.UserName} (uid {uid})" : Environment.UserName;
+
   private static X509Certificate2 Load(KeyCertificate certificate, string key)
   {
     if (!certificate.IsSet)
@@ -77,6 +81,14 @@ public static class KeyProtectionSetup
     catch (FormatException)
     {
       throw new InvalidOperationException($"{key}:{nameof(KeyCertificate.Base64)} isn't base64.");
+    }
+    // A file the server may not open comes wrapped in a CryptographicException, like a wrong password: told apart
+    // here, so the message points at the file's permissions and not at the password.
+    catch (Exception ex) when (ex is UnauthorizedAccessException || ex.InnerException is UnauthorizedAccessException)
+    {
+      throw new InvalidOperationException(
+        $"{key}:{nameof(KeyCertificate.Path)} is '{certificate.Path}', which the server may not read: permission denied for the " +
+        $"user it runs as, {RunningAs}. Let that user read the file.", ex);
     }
     catch (CryptographicException ex)
     {
