@@ -9,3 +9,5 @@ to start with `Accounts:RequireConfirmedEmail` on and sending disabled.
 
 Server administrators can check the settings from the **Server** page, which sends a test message to their own address
 (`/api/v1/server/test-email`).
+
+See [a page that does not exist](no-such-page.md).
