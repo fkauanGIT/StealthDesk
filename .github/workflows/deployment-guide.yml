@@ -97,6 +97,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq nginx > /dev/null
+          # The runner comes with Nginx installed but stopped; installing it on a new machine also starts it.
+          sudo systemctl start nginx
           sudo mkdir -p /etc/letsencrypt/live/desk.example.com
           sudo openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=desk.example.com \
             -addext subjectAltName=DNS:desk.example.com \
