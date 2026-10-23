@@ -230,7 +230,9 @@ jobs:
             docker push "${env:IMAGE}:$tag"
             if ($LASTEXITCODE -ne 0) { throw "Pushing ${env:IMAGE}:$tag failed." }
           }
-          "**Image:** $(($tags | ForEach-Object { "``${env:IMAGE}:$_``" }) -join ', ')" >> $env:GITHUB_STEP_SUMMARY
+          # Each tag in backticks, so the summary shows it as code.
+          $pushed = ($tags | ForEach-Object { '`' + "${env:IMAGE}:$_" + '`' }) -join ', '
+          "**Image:** $pushed" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Make the release public
         run: |
@@ -287,4 +289,6 @@ jobs:
             $compare = "${{ github.server_url }}/${{ github.repository }}/compare/main...$branch"
             Write-Host "::warning::Open the pull request that archives the notes: $compare"
             "**Release notes:** open the pull request from [$branch]($compare)." >> $env:GITHUB_STEP_SUMMARY
+            # The release itself went out: the step ends well, not with gh's exit code.
+            exit 0
           }
