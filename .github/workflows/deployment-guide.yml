@@ -81,7 +81,8 @@ jobs:
           chmod 600 certificates/stealthdesk-keys.pfx
           if docker compose up -d --wait --wait-timeout 90; then echo "The server started without reading its certificate"; exit 1; fi
           docker compose logs server > refused.log || true
-          grep -i -m 3 -E "certificate|denied" refused.log || true
+          # The reason, with the user to give the file to: not a wrong password.
+          grep -m 1 "which the server may not read: permission denied for the user it runs as, app (uid 1654)" refused.log
           docker compose down
 
       - name: 3. (the file to the container's user) and 4. Start
