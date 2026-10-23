@@ -1,0 +1,39 @@
+name: Docs
+
+# Links between the documentation's pages, and to their sections, must lead somewhere: a page moved or a heading
+# renamed without updating what points to it fails here. Offline: outside links aren't followed, so a site that is
+# down for a moment can't fail a pull request.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/*.md"
+      - .github/workflows/docs.yml
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.md"
+      - .github/workflows/docs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Links
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check the links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          lycheeVersion: v0.24.2
+          args: >-
+            --offline --include-fragments --no-progress
+            README.md CONTRIBUTING.md 'docs/**/*.md' 'release-notes/*.md'
+          fail: true
