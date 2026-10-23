@@ -3,19 +3,26 @@ name: Docs
 # Links between the documentation's pages, and to their sections, must lead somewhere: a page moved or a heading
 # renamed without updating what points to it fails here. Offline: outside links aren't followed, so a site that is
 # down for a moment can't fail a pull request.
+#
+# The site is built from docs/ on every change, failing on any warning, and published on GitHub Pages from main.
 on:
   pull_request:
     branches:
       - main
     paths:
       - "**/*.md"
+      - mkdocs.yml
+      - docs/**
       - .github/workflows/docs.yml
   push:
     branches:
       - main
     paths:
       - "**/*.md"
+      - mkdocs.yml
+      - docs/**
       - .github/workflows/docs.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -37,3 +44,53 @@ jobs:
             --offline --include-fragments --no-progress
             README.md CONTRIBUTING.md 'docs/**/*.md' 'release-notes/*.md'
           fail: true
+
+  # --strict turns every warning into a failure: a link to a page or a section that isn't there, or a page left out
+  # of the navigation.
+  site:
+    name: Site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install MkDocs
+        run: pip install -r docs/requirements.txt
+
+      - name: Build the site
+        run: mkdocs build --strict --site-dir site
+
+      - name: Keep the site for GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  publish:
+    name: Publish
+    needs: [links, site]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # One publication at a time, and never one cancelled half way.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Publish on GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5

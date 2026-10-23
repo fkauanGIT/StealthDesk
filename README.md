@@ -51,7 +51,8 @@ Open the server (`http://localhost:8080` with Docker, `http://localhost:5099` fr
 
 ## Documentation
 
-The [documentation](docs/index.md) is grouped by what you came to do:
+The documentation is a website, with search: **[fkauangit.github.io/StealthDesk](https://fkauangit.github.io/StealthDesk/)**.
+Its pages are also in [`docs/`](docs/index.md), grouped by what you came to do:
 
 - **Getting started**: [your first server](docs/getting-started/first-server.md) and
   [your first agent](docs/getting-started/first-agent.md)

@@ -6,10 +6,10 @@ such as `0.5.0-rc.1` gets only its own tag, and `latest` stays where it was.
 
 ## What the Release workflow does
 
-The [Release workflow](../../.github/workflows/release.yml) runs on version tags:
+The [Release workflow](https://github.com/fkauanGIT/StealthDesk/blob/main/.github/workflows/release.yml) runs on version tags:
 
 1. It checks that the tag matches `<Version>` in `Directory.Build.props` and the heading of
-   [`release-notes/current.md`](../../release-notes/current.md), such as `# v0.5.0 — Deployment`, which becomes the
+   [`release-notes/current.md`](https://github.com/fkauanGIT/StealthDesk/blob/main/release-notes/current.md), such as `# v0.5.0 — Deployment`, which becomes the
    release's title.
 2. It builds the image once and runs the deployment tests on it, behind an HTTPS proxy. Nothing is published unless
    they pass.

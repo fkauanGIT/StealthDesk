@@ -1,0 +1,78 @@
+# The documentation site, built from docs/ by the Docs workflow and published on GitHub Pages.
+# Locally: pip install -r docs/requirements.txt, then mkdocs serve.
+site_name: StealthDesk
+site_description: Self-hosted remote device management, with an agent on each machine and a web dashboard.
+site_url: https://fkauangit.github.io/StealthDesk/
+repo_url: https://github.com/fkauanGIT/StealthDesk
+repo_name: fkauanGIT/StealthDesk
+edit_uri: edit/main/docs/
+copyright: Apache License 2.0 with the Commons Clause
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark theme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light theme
+
+# Settings are found by their names: words split at spaces and punctuation such as the colon in
+# KeyProtection:EncryptKeys, but not inside a name. Split there too, as by default, and a search for EncryptKeys
+# finds nothing, since the query is lowercased before it is split.
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)'
+
+# A page or a section that isn't there fails the build: the workflow builds with --strict.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Your first server: getting-started/first-server.md
+      - Your first agent: getting-started/first-agent.md
+  - Guides:
+      - Running with Docker Compose: guides/docker-compose.md
+      - Behind a reverse proxy: guides/reverse-proxy.md
+      - Encrypting the data protection keys: guides/encrypting-keys.md
+      - Installing agents: guides/installing-agents.md
+      - Accounts and sign-in: guides/accounts.md
+      - Email: guides/email.md
+      - Tenant settings: guides/tenant-settings.md
+      - Running the tests: guides/running-the-tests.md
+      - Releasing a version: guides/releasing.md
+  - Reference:
+      - Server settings: reference/server-settings.md
+      - Endpoints: reference/endpoints.md
+      - Agent command line: reference/agent-command-line.md
+  - Explanation:
+      - Architecture: explanation/architecture.md
+      - Permissions: explanation/permissions.md
+      - How agents are trusted: explanation/agent-trust.md
+  - Project status: project-status.md

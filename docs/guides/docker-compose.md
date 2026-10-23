@@ -32,7 +32,7 @@ database migrations as it starts; to apply them another way (for instance from a
 
 ## With Docker Compose
 
-[`docker-compose/`](../../docker-compose) runs the server and PostgreSQL together. The server waits for the database to
+[`docker-compose/`](https://github.com/fkauanGIT/StealthDesk/tree/main/docker-compose) runs the server and PostgreSQL together. The server waits for the database to
 be healthy, both restart unless stopped, and the database lives in the `stealthdesk-database` volume. Users,
 devices and the data protection keys are kept there, so removing and recreating the containers loses nothing.
 
