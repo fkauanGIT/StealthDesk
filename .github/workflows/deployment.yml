@@ -37,6 +37,7 @@ jobs:
   ui-against-image:
     name: UI tests against the image
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         shell: pwsh
@@ -78,6 +79,7 @@ jobs:
   behind-a-proxy:
     name: Behind an HTTPS reverse proxy
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         shell: pwsh
@@ -142,6 +144,7 @@ jobs:
   upgrade:
     name: Upgrade from the version before
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         shell: pwsh

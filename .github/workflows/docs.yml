@@ -31,6 +31,7 @@ jobs:
   links:
     name: Links
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -50,6 +51,7 @@ jobs:
   site:
     name: Site
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -79,6 +81,7 @@ jobs:
     needs: [links, site]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
