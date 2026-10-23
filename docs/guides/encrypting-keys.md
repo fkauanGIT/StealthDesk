@@ -32,7 +32,19 @@ file and its password out of the database backups, or encrypting gains nothing. 
 certificate is missing, can't be read or has no private key. Keys written before stay readable; new ones are
 encrypted. The certificate's expiry date doesn't matter.
 
-With [Docker Compose](docker-compose.md), the certificate goes in `docker-compose/certificates`, or in a Docker secret.
+With [Docker Compose](docker-compose.md), the certificate goes in a `docker-compose/certificates` folder you create, or in a Docker secret.
+
+## Keeping it safe
+
+- **Keep a copy of the `.pfx` and its password off the server**, in a password manager or a vault. Lost with the
+  server, the keys in a database backup can't be read again: everyone signs in again, and emailed links stop working.
+- **Keep them apart from the database backups.** Together, they let anyone who has them forge a sign-in.
+- **Let only the server read it.** The container runs as the image's `app` user, uid 1654, so on Linux give the file
+  to that user and nobody else: `sudo chown 1654:1654 certificates/stealthdesk-keys.pfx` and
+  `sudo chmod 400 certificates/stealthdesk-keys.pfx`. Made readable only by your own account instead, the server can't
+  read it and doesn't start. The password belongs in `.env` (itself `chmod 600`) or in a Docker secret, never in a
+  file under version control.
+- **Rotate it** when someone who had it leaves, or if it may have leaked, as below.
 
 ## Rotating the certificate
 
