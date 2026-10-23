@@ -1,0 +1,215 @@
+name: Deployment guide
+
+# The deployment guide followed on a new Linux machine: the commands of docs/guides/deploying.md and
+# backup-and-restore.md, and the Nginx and Caddy configurations taken from reverse-proxy.md as written. A guide whose
+# steps stop working fails here. On pull requests that change the guide or the compose files, and by hand.
+#
+# Bash runs with pipefail: output goes to a variable or a file before grep, since a grep that stops early would cut
+# the pipe and fail the step, or quietly turn a check around.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docs/guides/deploying.md
+      - docs/guides/backup-and-restore.md
+      - docs/guides/reverse-proxy.md
+      - docs/guides/encrypting-keys.md
+      - docker-compose/**
+      - .github/workflows/deployment-guide.yml
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  SITE: https://desk.example.com
+  LOGIN: '{"email":"admin@example.com","password":"Deployment-Test-1"}'
+
+jobs:
+  linux:
+    name: On a new Linux machine
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: docker-compose
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: What you need
+        run: |
+          # The guide asks for Compose 2.24 or later.
+          version=$(docker compose version --short)
+          echo "Compose $version"
+          oldest=$(printf '%s\n' 2.24.0 "$version" | sort -V | sed -n 1p)
+          [ "$oldest" = 2.24.0 ] || { echo "Compose $version is older than 2.24"; exit 1; }
+          echo "127.0.0.1 desk.example.com" | sudo tee -a /etc/hosts
+
+      # The image this change builds, under the name compose runs: the guide pins a released version instead.
+      - name: Build the image
+        working-directory: .
+        run: docker build --file StealthDesk.Web.Server/Dockerfile --tag franciscokauan/stealthdesk:guide .
+
+      - name: 2. Configure
+        run: |
+          cp .env.example .env
+          chmod 600 .env
+          password=$(openssl rand -base64 24)
+          sed -i "s|^StealthDesk_POSTGRES_PASSWORD=$|StealthDesk_POSTGRES_PASSWORD=$password|" .env
+          printf '%s\n' 'SERVER_IMAGE_TAG=guide' 'SERVER_PORT=127.0.0.1:8080' >> .env
+
+      - name: 3. Encrypt the data protection keys
+        run: |
+          # The certificate, with the OpenSSL commands of encrypting-keys.md.
+          openssl req -x509 -newkey rsa:3072 -nodes -keyout keys.pem -out keys.crt -days 3650 -subj "/CN=StealthDesk keys"
+          openssl pkcs12 -export -inkey keys.pem -in keys.crt -out stealthdesk-keys.pfx -passout pass:guide-keys
+          rm keys.pem keys.crt
+          mkdir certificates
+          mv stealthdesk-keys.pfx certificates/
+          printf '%s\n' 'StealthDesk_KeyProtection__EncryptKeys=true' \
+            'StealthDesk_KeyProtection__Certificate__Path=/certificates/stealthdesk-keys.pfx' \
+            'StealthDesk_KeyProtection__Certificate__Password=guide-keys' >> .env
+
+      # What the guide warns about: a certificate only its owner on the host can read stops the server.
+      - name: A certificate the container can't read stops the server
+        run: |
+          chmod 600 certificates/stealthdesk-keys.pfx
+          if docker compose up -d --wait --wait-timeout 90; then echo "The server started without reading its certificate"; exit 1; fi
+          docker compose logs server > refused.log || true
+          grep -i -m 3 -E "certificate|denied" refused.log || true
+          docker compose down
+
+      - name: 3. (the file to the container's user) and 4. Start
+        run: |
+          sudo chown 1654:1654 certificates/stealthdesk-keys.pfx
+          sudo chmod 400 certificates/stealthdesk-keys.pfx
+          docker compose up -d --wait
+          docker compose ps
+          docker compose logs server > server.log
+          grep -m 1 "Data protection keys are encrypted" server.log
+
+      - name: 5. Nginx in front, with the guide's configuration
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nginx > /dev/null
+          sudo mkdir -p /etc/letsencrypt/live/desk.example.com
+          sudo openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=desk.example.com \
+            -addext subjectAltName=DNS:desk.example.com \
+            -keyout /etc/letsencrypt/live/desk.example.com/privkey.pem -out /etc/letsencrypt/live/desk.example.com/fullchain.pem
+          # The nginx block of reverse-proxy.md, as written.
+          awk '/^```nginx/{on=1; next} /^```/{on=0} on' ../docs/guides/reverse-proxy.md > stealthdesk.conf
+          sudo cp stealthdesk.conf /etc/nginx/conf.d/stealthdesk.conf
+          cat stealthdesk.conf
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Build the browser tests
+        working-directory: .
+        shell: pwsh
+        run: |
+          dotnet build tests/StealthDesk.Web.UITests --configuration Release
+          ./tests/StealthDesk.Web.UITests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      # An administrator, a user with a permission and an agent online, all through Nginx and its WebSockets.
+      - name: 6. and 7. A first account and an agent, through Nginx
+        working-directory: .
+        env:
+          STEALTHDESK_UI_SERVER: ${{ env.SITE }}
+          STEALTHDESK_UI_PHASE: before
+          STEALTHDESK_UI_STATE: ${{ runner.temp }}/guide.json
+        run: dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+
+      - name: The server takes Nginx's HTTPS as its own
+        run: |
+          headers=$(curl --insecure --silent --output /dev/null --dump-header - --header 'Content-Type: application/json' \
+            --data "$LOGIN" "$SITE/api/auth/login?useCookies=true")
+          cookie=$(grep -i -m 1 '^set-cookie:' <<< "$headers")
+          echo "$cookie"
+          grep -q '; secure' <<< "$cookie" || { echo "Not secure: the server didn't trust Nginx"; exit 1; }
+
+      - name: 8. Back up, as the guide says
+        run: |
+          docker compose exec -T database pg_dump -U postgres -d stealthdesk -Fc > stealthdesk-$(date +%F).dump
+          ls -l stealthdesk-*.dump
+          cp stealthdesk-$(date +%F).dump stealthdesk.dump
+
+      - name: A change after the backup
+        run: |
+          curl --insecure --silent --fail --cookie-jar jar --output /dev/null --header 'Content-Type: application/json' \
+            --data "$LOGIN" "$SITE/api/auth/login?useCookies=true"
+          curl --insecure --silent --fail --cookie jar --output /dev/null --header 'Content-Type: application/json' \
+            --data '{"userName":"after-backup","email":"after-backup@example.com","password":"Deployment-Test-1"}' "$SITE/api/v1/users"
+          users=$(curl --insecure --silent --fail --cookie jar "$SITE/api/v1/users")
+          grep -q after-backup <<< "$users"
+
+      - name: Restore, as the guide says
+        run: |
+          docker compose stop server
+          docker compose exec -T database pg_restore -U postgres -d stealthdesk --clean --if-exists < stealthdesk.dump
+          docker compose start server
+          docker compose up -d --wait
+
+      - name: Caddy in front instead, with the guide's configuration
+        run: |
+          sudo systemctl stop nginx
+          sudo apt-get install -y -qq caddy > /dev/null
+          # The Caddyfile of reverse-proxy.md, with tls internal: Let's Encrypt can't reach a test machine.
+          awk '/Caddyfile`:/{f=1} f' ../docs/guides/reverse-proxy.md > after-caddy.md
+          awk '/^```$/ && !done {if (on) {done=1} on=!on; next} on && !done' after-caddy.md \
+            | sed 's|^\(desk.example.com {\)$|\1\n\ttls internal|' > Caddyfile
+          cat Caddyfile
+          sudo cp Caddyfile /etc/caddy/Caddyfile
+          sudo systemctl restart caddy
+          for i in $(seq 1 30); do curl --insecure --silent --fail --output /dev/null "$SITE/health/ready" && break; sleep 2; done
+
+      - name: The change is gone
+        run: |
+          curl --insecure --silent --fail --cookie-jar jar2 --output /dev/null --header 'Content-Type: application/json' \
+            --data "$LOGIN" "$SITE/api/auth/login?useCookies=true"
+          users=$(curl --insecure --silent --fail --cookie jar2 "$SITE/api/v1/users")
+          echo "$users"
+          if grep -q after-backup <<< "$users"; then echo "The restore kept a user made after the backup"; exit 1; fi
+
+      # The session from before the backup, the user and permission, signing in in a browser, and the same device
+      # back online, now through Caddy.
+      - name: Everything from the backup is back, through Caddy
+        working-directory: .
+        env:
+          STEALTHDESK_UI_SERVER: ${{ env.SITE }}
+          STEALTHDESK_UI_PHASE: after
+          STEALTHDESK_UI_STATE: ${{ runner.temp }}/guide.json
+        run: dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.DeploymentTests
+
+      - name: The server takes Caddy's HTTPS as its own
+        run: |
+          headers=$(curl --insecure --silent --output /dev/null --dump-header - --header 'Content-Type: application/json' \
+            --data "$LOGIN" "$SITE/api/auth/login?useCookies=true")
+          cookie=$(grep -i -m 1 '^set-cookie:' <<< "$headers")
+          echo "$cookie"
+          grep -q '; secure' <<< "$cookie" || { echo "Not secure: the server didn't trust Caddy"; exit 1; }
+
+      - name: Logs
+        if: failure()
+        run: |
+          docker compose logs server > failed.log || true
+          tail -80 failed.log
+          sudo journalctl -u nginx -u caddy --no-pager > proxy.log || true
+          tail -40 proxy.log
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-guide
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
