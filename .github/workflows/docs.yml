@@ -31,9 +31,12 @@ jobs:
   links:
     name: Links
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 1
 
     steps:
+      - name: Hang
+        run: sleep 300
+
       - name: Checkout code
         uses: actions/checkout@v7
 
