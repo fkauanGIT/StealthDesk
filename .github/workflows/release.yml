@@ -38,6 +38,7 @@ jobs:
   prepare:
     name: Version and image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         shell: pwsh
@@ -100,6 +101,7 @@ jobs:
     name: Deployment tests on the image
     needs: prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         shell: pwsh
@@ -162,6 +164,7 @@ jobs:
     needs: [prepare, smoke]
     if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     defaults:
@@ -249,6 +252,7 @@ jobs:
     needs: [prepare, publish]
     if: needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
