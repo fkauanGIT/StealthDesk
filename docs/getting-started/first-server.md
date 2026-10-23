@@ -29,7 +29,7 @@ return `Healthy`.
 ### With PostgreSQL
 
 The connection is built from the `POSTGRES_*` [settings](../reference/server-settings.md).
-[`appsettings.Development.json`](../../StealthDesk.Web.Server/appsettings.Development.json) points them at
+[`appsettings.Development.json`](https://github.com/fkauanGIT/StealthDesk/blob/main/StealthDesk.Web.Server/appsettings.Development.json) points them at
 `localhost:5432`, database `stealthdesk`, user `postgres` and password `password`. Change them to match your
 PostgreSQL instance, or override them without editing the file through environment variables
 (`StealthDesk_POSTGRES_PASSWORD`) or command-line arguments (`--POSTGRES_PASSWORD=...`). Then start the server. It

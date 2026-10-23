@@ -27,7 +27,7 @@ report. Both are saved and reused on every later run: that is the device's ident
 
 | What | Where |
 |---|---|
-| Server address | `Agent:ServerUrl` in [`StealthDesk.Agent/appsettings.json`](../../StealthDesk.Agent/appsettings.json), or `--server <url>` |
+| Server address | `Agent:ServerUrl` in [`StealthDesk.Agent/appsettings.json`](https://github.com/fkauanGIT/StealthDesk/blob/main/StealthDesk.Agent/appsettings.json), or `--server <url>` |
 | Installer key (never saved by the agent) | `Agent:InstallerKey`, or `--installer-key <key>` (`-k`) |
 | Identity (device id, tenant, private key) | `C:\ProgramData\StealthDesk\Debug\default\agent-settings.json` |
 | Logs (one file per day, kept for 7 days) | `C:\ProgramData\StealthDesk\Debug\default\logs\` |
