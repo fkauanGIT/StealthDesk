@@ -9,14 +9,14 @@ StealthDesk is a self-hosted remote device management platform built with .NET 1
 A lightweight agent runs on each managed machine and keeps a signed, real-time SignalR connection to
 the server, which tracks every device and, in later versions, lets technicians reach them from the browser.
 
-> **Early development:** until v1.0 there may be breaking changes between versions. Permissions decide what each
-> user can see and do since v0.4, but the server has not been hardened for the internet yet.
+> **Early development:** until v1.0 there may be breaking changes between versions. Since v0.5 the server runs in a
+> container behind HTTPS with its keys encrypted, but it has not had a security review yet.
 
 ## Project Status
 
-v0.1 to v0.4 are complete: agents report their devices live to the browser, people sign in to their own tenant, and
-permissions decide what each of them can do. **v0.5**, deployment, is under way. See
-[what each version brought](docs/project-status.md).
+v0.1 to v0.5 are complete: agents report their devices live to the browser, people sign in to their own tenant,
+permissions decide what each of them can do, and the server runs on a company server with agents installed as a
+Windows service. **v0.6**, the remote terminal, is next. See [what each version brought](docs/project-status.md).
 
 | Version | Goal | Epic |
 |---|---|---|

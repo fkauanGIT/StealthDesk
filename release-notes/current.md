@@ -20,6 +20,7 @@ Windows service from a command copied from the web.
   address and HTTPS
 - Data protection keys encrypted with a certificate, with older certificates kept for rotation: sessions survive a
   restart or an upgrade
+- A certificate the server may not read stops it with a message that names the file and the user to give it to
 
 **Agents**
 - The agent installs as a Windows service that starts with Windows, and uninstalls without leaving anything behind
@@ -30,7 +31,12 @@ Windows service from a command copied from the web.
 **Quality**
 - The browser tests run against the container image, behind an HTTPS proxy, and across an upgrade from the version
   before, with encrypted keys
-- Releases publish only an image that passed those tests
+- A release publishes its image and agent only after the deployment tests pass on that image behind an HTTPS proxy
+
+**Documentation**
+- The documentation is a website with search: [fkauangit.github.io/StealthDesk](https://fkauangit.github.io/StealthDesk/)
+- Guides to deploying on a company server, behind Caddy or Nginx, backing up and restoring, and upgrading and
+  rolling back, tested on a new Linux machine
 
 **License**
 - StealthDesk is source-available under the Apache License 2.0 with the Commons Clause: free to use, change and
@@ -38,8 +44,9 @@ Windows service from a command copied from the web.
 
 ## Getting started
 
-See [Running with Docker Compose](https://github.com/fkauanGIT/StealthDesk/blob/main/docs/guides/docker-compose.md): copy `.env.example` to `.env`, set the
-database password, run `docker compose up -d` and open `http://localhost:8080`.
+To try it, [your first server](https://fkauangit.github.io/StealthDesk/getting-started/first-server/): copy
+`.env.example` to `.env`, set the database password, run `docker compose up -d` and open `http://localhost:8080`. For
+a company server, follow [Deploying on a company server](https://fkauangit.github.io/StealthDesk/guides/deploying/).
 
 ## Known limitations
 
