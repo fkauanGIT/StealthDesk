@@ -105,7 +105,8 @@ internal sealed class RealtimeChannel<TServer, TCallbacks>(
     _connection = null;
   }
 
-  // Every method of TCallbacks becomes a handler the server can call by name.
+  // Every method of TCallbacks becomes a handler the server can call by name. A new connection gets them again, and
+  // one that reconnects on its own keeps them.
   private void ListenForCallbacks(HubConnection connection)
   {
     var methods = typeof(TCallbacks).GetMethods(BindingFlags.Public | BindingFlags.Instance);
@@ -117,9 +118,23 @@ internal sealed class RealtimeChannel<TServer, TCallbacks>(
     var target = services.GetRequiredService<TCallbacks>();
     foreach (var method in methods)
     {
-      var parameterTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
-      connection.On(method.Name, parameterTypes, args => RunCallback(target, method, args));
+      // The server never sends a cancellation token: it only stops waiting on its side.
+      var parameters = method.GetParameters();
+      var sentTypes = parameters.Select(p => p.ParameterType).Where(x => x != typeof(CancellationToken)).ToArray();
+      connection.On(method.Name, sentTypes, sent => RunCallback(target, method, WithTokens(parameters, sent)));
     }
+  }
+
+  private static object?[] WithTokens(ParameterInfo[] parameters, object?[] sent)
+  {
+    var args = new object?[parameters.Length];
+    var next = 0;
+    for (var i = 0; i < parameters.Length; i++)
+    {
+      args[i] = parameters[i].ParameterType == typeof(CancellationToken) ? CancellationToken.None : sent[next++];
+    }
+
+    return args;
   }
 
   private async Task<object?> RunCallback(TCallbacks target, MethodInfo method, object?[] args)
@@ -136,8 +151,10 @@ internal sealed class RealtimeChannel<TServer, TCallbacks>(
     }
     catch (Exception ex)
     {
+      // Thrown on, so a server waiting for the answer hears that it failed instead of getting nothing back. The
+      // details stay here: SignalR sends the server a generic error.
       logger.LogError(ex, "Callback {Method} failed.", method.Name);
-      return null;
+      throw;
     }
   }
 
