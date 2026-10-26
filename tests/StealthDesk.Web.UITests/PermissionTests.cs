@@ -8,6 +8,24 @@ public class PermissionTests
   private const string Password = "Choose-a-Passw0rd";
 
   [Fact]
+  public async Task TheTerminalPermission_IsListedWithWhatItAllows_AndANewTenantsCreatorHoldsIt()
+  {
+    await using var app = await UiApp.StartAsync();
+    await app.RegisterAsync("admin@example.com", Password);
+
+    await app.OpenAsync("People & access", "Permissions");
+    await app.Page.GetByLabel("User", new() { Exact = true }).SelectOptionAsync(new SelectOptionValue { Label = "admin@example.com" });
+    await Expect(app.Page.Locator("tr[data-assignment='device.terminal.use']")).ToBeVisibleAsync();
+
+    await app.ClickAsync("Add permission");
+    await Expect(Dialog(app).GetByLabel("Permission", new() { Exact = true }).Locator("option[value='device.terminal.use']")).ToHaveTextAsync("Devices · Use the terminal");
+    await Dialog(app).GetByLabel("Permission", new() { Exact = true }).SelectOptionAsync("device.terminal.use");
+    await Expect(Dialog(app).Locator("[data-permission-description]")).ToHaveTextAsync(
+      "Open a terminal on a device and run commands on it as the agent's account, LocalSystem on Windows.");
+    await app.ScreenshotAsync("terminal-permission");
+  }
+
+  [Fact]
   public async Task AGroupsGrant_ReachesItsMember_UntilADirectDenyTakesItAway()
   {
     await using var app = await UiApp.StartAsync();

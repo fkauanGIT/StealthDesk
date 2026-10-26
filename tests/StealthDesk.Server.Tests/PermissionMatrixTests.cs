@@ -161,7 +161,7 @@ public class PermissionMatrixTests
     return client;
   }
 
-  // The dashboard's only method that needs a permission; the hub itself only needs sign-in.
+  // The hub itself only needs sign-in; each method that needs a permission checks it.
   [Fact]
   public async Task DashboardSubscription_RefusesWithoutDeviceRead_AndWorksWithIt()
   {
@@ -176,9 +176,10 @@ public class PermissionMatrixTests
 
     Assert.Empty(refused);
     Assert.Equal([world.Device], allowed);
+    // The other one, GetDeviceActions, has its own tests: DeviceActionsTests.
     Assert.Equal(
-      [nameof(DashboardHub.SubscribeToDevices)],
-      typeof(DashboardHub).GetMethods().Where(x => x.GetCustomAttribute<ChecksPermissionAttribute>() is not null).Select(x => x.Name));
+      [nameof(DashboardHub.GetDeviceActions), nameof(DashboardHub.SubscribeToDevices)],
+      typeof(DashboardHub).GetMethods().Where(x => x.GetCustomAttribute<ChecksPermissionAttribute>() is not null).Select(x => x.Name).Order());
   }
 
   private static async Task<IReadOnlyList<Guid>> SubscribeAsync(TestDashboard dashboard, Guid device)

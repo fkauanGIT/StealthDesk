@@ -31,7 +31,8 @@ public sealed class TestDashboard : IAsyncDisposable
   }
 
   /// <param name="cookie">A session cookie from <see cref="TestAccounts.SignInForCookieAsync"/>, to connect as that user.</param>
-  public static async Task<TestDashboard> ConnectAsync(ServerHost server, string? cookie = null)
+  /// <param name="headers">Other headers to connect with, e.g. a service account's key.</param>
+  public static async Task<TestDashboard> ConnectAsync(ServerHost server, string? cookie = null, IReadOnlyDictionary<string, string>? headers = null)
   {
     var connection = new HubConnectionBuilder()
       .WithUrl(new Uri(server.Server.BaseAddress, Routes.Dashboard), options =>
@@ -41,6 +42,11 @@ public sealed class TestDashboard : IAsyncDisposable
         if (cookie is not null)
         {
           options.Headers["Cookie"] = cookie;
+        }
+
+        foreach (var (name, value) in headers ?? new Dictionary<string, string>())
+        {
+          options.Headers[name] = value;
         }
       })
       .Build();

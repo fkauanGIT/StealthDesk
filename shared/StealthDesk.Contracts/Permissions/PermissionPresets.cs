@@ -73,6 +73,7 @@ public static class PermissionPresets
     [DeviceSuperuser] =
     [
       PermissionNames.DeviceRead,
+      PermissionNames.DeviceTerminalUse,
     ],
     [AgentInstaller] =
     [
