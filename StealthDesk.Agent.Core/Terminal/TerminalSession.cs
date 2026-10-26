@@ -252,8 +252,9 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
     using var shell = PowerShell.Create();
     shell.Runspace = _runspace;
     // As the console runs what is typed: errors go along with results, and Out-Default shows them all through the
-    // host, formatted as PowerShell's console would.
-    shell.AddScript(command).AddCommand("Out-Default");
+    // host, formatted as PowerShell's console would. Write-Output in between takes what programs (whoami, ping)
+    // write: a program whose output goes straight to Out-Default writes to the agent's own console instead.
+    shell.AddScript(command).AddCommand("Write-Output").AddCommand("Out-Default");
     shell.Commands.Commands[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
     lock (_gate)
     {

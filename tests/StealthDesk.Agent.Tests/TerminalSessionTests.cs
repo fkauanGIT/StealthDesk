@@ -51,6 +51,30 @@ public class TerminalSessionTests
     Assert.Contains("disk   12", table);
   }
 
+  // Programs (whoami, ipconfig, ping) aren't PowerShell commands: unless their output is taken, PowerShell lets them
+  // write to the agent's own console, where nobody sees it.
+  [Fact]
+  public async Task Programs_ShowTheirOutputAndErrorStreamInTheTerminal_AsTheyWriteIt()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    var shown = await terminal.RunAsync(Program("echo from-a-program"));
+    var errorStream = await terminal.RunAsync(Program("echo to-the-error-stream 1>&2"));
+    var before = terminal.Screen.Length;
+    terminal.Send(Program(OperatingSystem.IsWindows() ? "echo first& ping -n 4 127.0.0.1 >nul& echo second" : "echo first; sleep 3; echo second"));
+    await terminal.ShowsAsync("first", before);
+    var whileRunning = terminal.Screen[before..];
+    await terminal.ShowsAsync("second", before);
+
+    Assert.Equal("from-a-program\n", shown);
+    // As PowerShell's console shows a program's error stream: as its text, not as an error of PowerShell's own.
+    Assert.Equal("to-the-error-stream", errorStream.Trim());
+    Assert.DoesNotContain("second", whileRunning);
+  }
+
+  private static string Program(string line) => OperatingSystem.IsWindows() ? $"cmd /c \"{line}\"" : $"sh -c '{line}'";
+
   [Fact]
   public async Task Errors_AreSentAsErrorOutput()
   {
