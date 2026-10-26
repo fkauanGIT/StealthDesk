@@ -27,7 +27,7 @@ public sealed class TerminalSessions(
   IAgentPaths paths,
   IOptions<TerminalOptions> options,
   TimeProvider clock,
-  ILoggerFactory loggers) : ITerminalSessions, IAsyncDisposable
+  ILoggerFactory loggers) : ITerminalSessions, IAsyncDisposable, IDisposable
 {
   private const string Ended = "The terminal session has ended.";
 
@@ -92,6 +92,16 @@ public sealed class TerminalSessions(
     }
 
     _opening.Dispose();
+  }
+
+  // For a host disposed without waiting, as the command that joins a device to a server does: the sessions end, which
+  // stops what they run, and let go of PowerShell in the background.
+  public void Dispose()
+  {
+    foreach (var session in _sessions.Values)
+    {
+      session.End("The session was closed.");
+    }
   }
 
   // A session that ended, whatever ended it, lets go of its runspace in the background.

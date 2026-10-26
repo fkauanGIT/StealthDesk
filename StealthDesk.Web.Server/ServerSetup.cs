@@ -17,6 +17,7 @@ using StealthDesk.Web.Server.InstallerKeys;
 using StealthDesk.Web.Server.KeyProtection;
 using StealthDesk.Web.Server.TenantSettings;
 using StealthDesk.Web.Server.Tenants;
+using StealthDesk.Web.Server.Terminal;
 using StealthDesk.Web.Server.Invites;
 using StealthDesk.Web.Server.UserGroups;
 using StealthDesk.Web.Server.Permissions;
@@ -51,6 +52,7 @@ public static class ServerSetup
     builder.Services.AddScoped<IDeviceRegistry, DeviceRegistry>();
     builder.Services.AddScoped<IDeviceAccess, DeviceAccess>();
     builder.Services.AddScoped<IAgentCalls, AgentCalls>();
+    builder.Services.AddSingleton<ITerminalRelay, TerminalRelay>();
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<IPasswordHasher<PersonalAccessTokenRecord>, PasswordHasher<PersonalAccessTokenRecord>>();
     builder.Services.AddScoped<PersonalAccessTokenService>();

@@ -160,14 +160,14 @@ public class AgentCallTests
   private static Task<string> ConnectionOfAsync(ServerHost server, Guid deviceId) =>
     server.WithDbAsync(async db => (await db.Devices.SingleAsync(x => x.Id == deviceId)).ConnectionId);
 
-  private sealed class AnsweringAgent(string version) : IAgentCallbacks
+  private sealed class AnsweringAgent(string version) : RefusingAgent
   {
-    public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
+    public override Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(version));
   }
 
   /// <summary>Takes the call and never answers it until the test lets go.</summary>
-  private sealed class SilentAgent : IAgentCallbacks
+  private sealed class SilentAgent : RefusingAgent
   {
     private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -175,7 +175,7 @@ public class AgentCallTests
 
     public void Release() => _released.TrySetResult();
 
-    public async Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken)
+    public override async Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken)
     {
       WasCalled = true;
       await _released.Task;
@@ -183,9 +183,9 @@ public class AgentCallTests
     }
   }
 
-  private sealed class FailingAgent : IAgentCallbacks
+  private sealed class FailingAgent : RefusingAgent
   {
-    public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
+    public override Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
       throw new InvalidOperationException("C:\\secret\\path is locked");
   }
 }

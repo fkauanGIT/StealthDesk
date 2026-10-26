@@ -59,8 +59,8 @@ public sealed class TestAgent : IAsyncDisposable
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
       .AddTransient<IHubConnectionBuilder>(_ => new HubConnectionBuilder().AddMessagePackProtocol())
-      .AddSingleton<IAgentCallbacks>(callbacks ?? new NoCallbacks())
-      .AddRealtimeChannel<IAgentGateway, IAgentCallbacks, NoCallbacks>()
+      .AddSingleton(callbacks ?? new RefusingAgent())
+      .AddRealtimeChannel<IAgentGateway, IAgentCallbacks, RefusingAgent>()
       .BuildServiceProvider();
 
     var channel = services.GetRequiredService<IRealtimeChannel<IAgentGateway>>();
@@ -121,10 +121,4 @@ public sealed class TestAgent : IAsyncDisposable
     LocalIpV4 = "10.0.0.20",
     Disks = [new DiskInfo { Name = @"C:\", Format = "NTFS", SizeGb = 512, FreeGb = 302 }],
   };
-
-  private sealed class NoCallbacks : IAgentCallbacks
-  {
-    public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
-      Task.FromResult(GatewayReply.Refuse<string>("This test agent has no answers."));
-  }
 }

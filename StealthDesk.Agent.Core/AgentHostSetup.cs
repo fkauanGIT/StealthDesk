@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using StealthDesk.Agent.Core.Connection;
 using StealthDesk.Agent.Core.Heartbeat;
 using StealthDesk.Agent.Core.Settings;
+using StealthDesk.Agent.Core.Terminal;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Core;
 using StealthDesk.Core.Security;
@@ -74,6 +75,9 @@ public static class AgentHostSetup
     services.AddSingleton<ISettingsStore, SettingsStore>();
     services.AddSingleton<IMessageSigner, MessageSigner>();
     services.AddRealtimeChannel<IAgentGateway, IAgentCallbacks, AgentCallbacks>();
+    services.AddSingleton<ITerminalOutputSink, GatewayTerminalSink>();
+    services.AddSingleton<TerminalSessions>();
+    services.AddSingleton<ITerminalSessions>(provider => provider.GetRequiredService<TerminalSessions>());
 
     services.AddSingleton(new Backoff(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(15)));
     services.AddSingleton<HeartbeatService>();

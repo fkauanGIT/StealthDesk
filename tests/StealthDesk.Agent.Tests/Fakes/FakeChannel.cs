@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 using StealthDesk.Realtime;
 
 namespace StealthDesk.Agent.Tests.Fakes;
 
-/// <summary>A realtime channel with a scripted server: it records every report and answers as told.</summary>
+/// <summary>A realtime channel with a scripted server: it records every report and terminal output, and answers as told.</summary>
 internal sealed class FakeChannel : IRealtimeChannel<IAgentGateway>, IAgentGateway
 {
   private readonly Queue<bool> _openResults = new();
@@ -50,6 +51,18 @@ internal sealed class FakeChannel : IRealtimeChannel<IAgentGateway>, IAgentGatew
     }
 
     return Task.FromResult(Answer(envelope.Payload));
+  }
+
+  public List<TerminalOutput> TerminalOutput { get; } = [];
+
+  public Task SendTerminalOutput(TerminalOutput output)
+  {
+    lock (TerminalOutput)
+    {
+      TerminalOutput.Add(output);
+    }
+
+    return Task.CompletedTask;
   }
 
   public int Closes { get; private set; }

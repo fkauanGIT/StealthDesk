@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
+using StealthDesk.Web.Server.Terminal;
 
 namespace StealthDesk.Web.Server.Gateway;
 
@@ -13,6 +15,7 @@ public sealed class AgentGatewayHub(
   ReportProcessor processor,
   IDeviceRegistry registry,
   IDeviceNotifier notifier,
+  ITerminalRelay terminals,
   TimeProvider clock,
   ILogger<AgentGatewayHub> logger) : Hub<IAgentCallbacks>, IAgentGateway
 {
@@ -40,6 +43,25 @@ public sealed class AgentGatewayHub(
     {
       logger.LogError(ex, "Failed to process a report on connection {ConnectionId}.", Context.ConnectionId);
       return GatewayReply.Refuse<ReportReceipt>("The report could not be processed.");
+    }
+  }
+
+  // The device is the one this connection reported as, proven by its signature: output can't be sent as another one.
+  public async Task SendTerminalOutput(TerminalOutput output)
+  {
+    if (!Context.Items.TryGetValue(DeviceIdItem, out var value) || value is not Guid deviceId)
+    {
+      logger.LogWarning("Dropped output of terminal {TerminalId} from connection {ConnectionId}, which hasn't reported a device.", output.TerminalId, Context.ConnectionId);
+      return;
+    }
+
+    try
+    {
+      await terminals.DeliverAsync(deviceId, output);
+    }
+    catch (Exception ex)
+    {
+      logger.LogWarning(ex, "Failed to deliver output of terminal {TerminalId}.", output.TerminalId);
     }
   }
 
