@@ -88,8 +88,6 @@ public static class AgentHostSetup
 
     return builder;
   }
-
-  private sealed class AgentCallbacks : IAgentCallbacks;
 }
 
 /// <summary>Whether this is a debug build, which keeps its own folders and service so it never touches an installed agent.</summary>

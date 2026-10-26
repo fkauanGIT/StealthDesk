@@ -30,6 +30,7 @@ public class ServerConfigurationTests
   [InlineData("Email:SmtpPort", "70000", "Email:SmtpPort")]
   [InlineData("Email:SenderAddress", "not an address", "Email:SenderAddress")]
   [InlineData("Gateway:ClockTolerance", "-00:01:00", "Gateway:ClockTolerance")]
+  [InlineData("Gateway:AgentCallTimeout", "00:00:00", "Gateway:AgentCallTimeout")]
   [InlineData("ServiceAccounts:AuthFailureLimit", "0", "ServiceAccounts:AuthFailureLimit")]
   [InlineData("ServiceAccounts:AuthFailureWindowMinutes", "0", "ServiceAccounts:AuthFailureWindowMinutes")]
   [InlineData("InstallerKeys:UsageHistoryDays", "ninety", "InstallerKeys:UsageHistoryDays")]

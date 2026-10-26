@@ -78,6 +78,7 @@ See [Tenant settings](../guides/tenant-settings.md) and [Installing agents](../g
 | `TenantDefaults:AppendInstanceName` | `false` | Install commands name an agent instance (`--instance`), so agents of several servers can share a machine. |
 | `TenantDefaults:InstanceName` | empty | The instance they name; empty makes one from the server's address (`desk.example.com` becomes `desk-example-com`). |
 | `Gateway:ClockTolerance` | `00:01:00` | How far an agent's clock may be from the server's before its reports are refused as replays. Empty turns the check off. |
+| `Gateway:AgentCallTimeout` | `00:00:30` | How long the server waits for an agent to answer before telling the user the device didn't respond. |
 | `InstallerKeys:UsageHistoryDays` | `90` | How long each key's installs are kept. Zero keeps them all. |
 | `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.exe` in it. The container image ships one. |
 

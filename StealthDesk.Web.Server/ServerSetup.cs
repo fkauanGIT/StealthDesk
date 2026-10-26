@@ -42,6 +42,7 @@ public static class ServerSetup
     builder.Services.AddOptions<GatewayOptions>()
       .Bind(builder.Configuration.GetSection(GatewayOptions.Section))
       .Validate(x => x.ClockTolerance is null || x.ClockTolerance > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.ClockTolerance)} must be longer than zero, or empty to turn the check off.")
+      .Validate(x => x.AgentCallTimeout > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.AgentCallTimeout)} must be longer than zero.")
       .ValidateOnStart();
     builder.Services.AddSignalR().AddMessagePackProtocol();
 
@@ -49,6 +50,7 @@ public static class ServerSetup
     builder.Services.AddSingleton<IMessageSigner, MessageSigner>();
     builder.Services.AddScoped<IDeviceRegistry, DeviceRegistry>();
     builder.Services.AddScoped<IDeviceAccess, DeviceAccess>();
+    builder.Services.AddScoped<IAgentCalls, AgentCalls>();
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<IPasswordHasher<PersonalAccessTokenRecord>, PasswordHasher<PersonalAccessTokenRecord>>();
     builder.Services.AddScoped<PersonalAccessTokenService>();

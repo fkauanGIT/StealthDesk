@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.Messaging;
@@ -16,10 +17,20 @@ namespace StealthDesk.Server.Tests.Infrastructure;
 public sealed class TestAgent : IAsyncDisposable
 {
   private readonly ServiceProvider _services;
+  private readonly Uri _endpoint;
+  private readonly Action<HttpConnectionOptions> _configure;
 
-  private TestAgent(ServiceProvider services, IRealtimeChannel<IAgentGateway> channel, SigningKeys keys, string? installerKey)
+  private TestAgent(
+    ServiceProvider services,
+    IRealtimeChannel<IAgentGateway> channel,
+    Uri endpoint,
+    Action<HttpConnectionOptions> configure,
+    SigningKeys keys,
+    string? installerKey)
   {
     _services = services;
+    _endpoint = endpoint;
+    _configure = configure;
     Channel = channel;
     Keys = keys;
     InstallerKey = installerKey;
@@ -34,7 +45,13 @@ public sealed class TestAgent : IAsyncDisposable
 
   /// <param name="withInstallerKey">False for an agent that was given no installer key.</param>
   /// <param name="through">A proxy the agent reaches the server through; none connects straight to it.</param>
-  public static async Task<TestAgent> ConnectAsync(ServerHost server, SigningKeys? keys = null, bool withInstallerKey = true, TestProxy? through = null)
+  /// <param name="callbacks">What the agent answers when the server calls it; none refuses every call.</param>
+  public static async Task<TestAgent> ConnectAsync(
+    ServerHost server,
+    SigningKeys? keys = null,
+    bool withInstallerKey = true,
+    TestProxy? through = null,
+    IAgentCallbacks? callbacks = null)
   {
     // A key belongs to a tenant, as a server has once its first user registered.
     var installerKey = withInstallerKey ? await TestInstallerKeys.CreateAsync(server, await TestTenants.EnsureAsync(server)) : null;
@@ -42,20 +59,29 @@ public sealed class TestAgent : IAsyncDisposable
     var services = new ServiceCollection()
       .AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
       .AddTransient<IHubConnectionBuilder>(_ => new HubConnectionBuilder().AddMessagePackProtocol())
+      .AddSingleton<IAgentCallbacks>(callbacks ?? new NoCallbacks())
       .AddRealtimeChannel<IAgentGateway, IAgentCallbacks, NoCallbacks>()
       .BuildServiceProvider();
 
     var channel = services.GetRequiredService<IRealtimeChannel<IAgentGateway>>();
     var endpoint = new Uri(server.Server.BaseAddress, Routes.AgentGateway);
-
-    var opened = await channel.OpenAsync(endpoint, options =>
+    void Configure(HttpConnectionOptions options)
     {
       options.HttpMessageHandlerFactory = _ => through?.Handler(server) ?? server.Server.CreateHandler();
       options.Transports = HttpTransportType.LongPolling;
-    }, TestContext.Current.CancellationToken);
+    }
+
+    var opened = await channel.OpenAsync(endpoint, Configure, TestContext.Current.CancellationToken);
 
     Assert.True(opened, "The test agent could not reach the gateway.");
-    return new TestAgent(services, channel, keys ?? new MessageSigner(TimeProvider.System).CreateKeys(), installerKey);
+    return new TestAgent(services, channel, endpoint, Configure, keys ?? new MessageSigner(TimeProvider.System).CreateKeys(), installerKey);
+  }
+
+  /// <summary>Closes the connection and opens a new one, as the agent does when the server was gone for good.</summary>
+  public async Task ReconnectAsync()
+  {
+    await Channel.CloseAsync();
+    Assert.True(await Channel.OpenAsync(_endpoint, _configure, TestContext.Current.CancellationToken), "The test agent could not reconnect.");
   }
 
   public Task<GatewayReply<ReportReceipt>> ReportAsync(DeviceReport report) =>
@@ -96,5 +122,9 @@ public sealed class TestAgent : IAsyncDisposable
     Disks = [new DiskInfo { Name = @"C:\", Format = "NTFS", SizeGb = 512, FreeGb = 302 }],
   };
 
-  private sealed class NoCallbacks : IAgentCallbacks;
+  private sealed class NoCallbacks : IAgentCallbacks
+  {
+    public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<string>("This test agent has no answers."));
+  }
 }

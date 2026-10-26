@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts;
 using StealthDesk.Contracts.Devices;
+using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Core.Security;
 using Npgsql;
@@ -147,7 +148,11 @@ public sealed class UiAgent : IAsyncDisposable
     Disks = [new DiskInfo { Name = @"C:\", Format = "NTFS", SizeGb = 512, FreeGb = 312 }],
   };
 
-  private sealed class NoCallbacks : IAgentCallbacks;
+  private sealed class NoCallbacks : IAgentCallbacks
+  {
+    public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<string>("This test agent has no answers."));
+  }
 }
 
 /// <summary>A device's id and private key, the identity an agent keeps between runs.</summary>
