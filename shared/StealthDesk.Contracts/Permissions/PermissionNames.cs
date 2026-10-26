@@ -38,6 +38,7 @@ public static class PermissionNames
   // Devices.
   public const string DeviceGroupAssignDevices = "device-group.assign-devices";
   public const string DeviceRead = "device.read";
+  public const string DeviceTerminalUse = "device.terminal.use";
 
   // Credentials and agents.
   public const string AgentInstall = "agent.install";

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.Realtime;
@@ -19,6 +20,7 @@ namespace StealthDesk.Web.Server.Dashboard;
 public sealed class DashboardHub(
   UserManager<UserRecord> users,
   IDeviceAccess access,
+  IAuthorizationService authorization,
   StealthDeskDb db,
   TimeProvider clock,
   ILogger<DashboardHub> logger)
@@ -70,6 +72,22 @@ public sealed class DashboardHub(
 
     return GatewayReply.Accept<IReadOnlyList<Guid>>(readable);
   }
+
+  // The actions the web client shows; each one is checked again when used, so this only spares offering what fails.
+  [ChecksPermission(PermissionNames.DeviceRead)]
+  public async Task<GatewayReply<DeviceActions>> GetDeviceActions(Guid deviceId)
+  {
+    var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == deviceId, Context.ConnectionAborted);
+    if (device is null || !await MayAsync(device, PermissionNames.DeviceRead))
+    {
+      return GatewayReply.Refuse<DeviceActions>("Device not found.");
+    }
+
+    return GatewayReply.Accept(new DeviceActions(UseTerminal: await MayAsync(device, PermissionNames.DeviceTerminalUse)));
+  }
+
+  private async Task<bool> MayAsync(DeviceRecord device, string permission) =>
+    (await authorization.AuthorizeAsync(Context.User!, device, PermissionPolicies.For(permission))).Succeeded;
 
   [NoPermission("It only stops updates the connection already receives.")]
   public async Task UnsubscribeFromDevices(IReadOnlyList<Guid> deviceIds)

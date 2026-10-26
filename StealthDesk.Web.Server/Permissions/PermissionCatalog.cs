@@ -79,6 +79,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceGroupAssignDevices, Categories.DeviceGroups, "Assign devices to a group", "Add devices to a device group, remove them and move them to another group.", DeviceGroups),
 
     new(PermissionNames.DeviceRead, Categories.Devices, "Read devices", "View devices, their details and their live status.", Devices),
+    new(PermissionNames.DeviceTerminalUse, Categories.Devices, "Use the terminal", "Open a terminal on a device and run commands on it as the agent's account, LocalSystem on Windows.", Devices),
 
     new(PermissionNames.PersonalAccessTokenSelfRead, Categories.PersonalAccessTokens, "Read own tokens", "View your own personal access tokens.", TenantOnly),
     new(PermissionNames.PersonalAccessTokenSelfWrite, Categories.PersonalAccessTokens, "Manage own tokens", "Create and revoke your own personal access tokens.", TenantOnly),

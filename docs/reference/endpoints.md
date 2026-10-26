@@ -8,7 +8,7 @@ and the hubs until they change it.
 | Path | Transport | Purpose |
 |------|-----------|---------|
 | `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports. |
-| `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices. |
+| `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices, and to ask which actions they may use on one. |
 
 ## Devices, tenants and the server
 

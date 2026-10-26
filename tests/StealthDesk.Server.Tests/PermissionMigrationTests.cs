@@ -7,10 +7,14 @@ using StealthDesk.Server.Tests.Infrastructure;
 
 namespace StealthDesk.Server.Tests;
 
-/// <summary>Upgrading a v0.3 database: the administrator markers become permission assignments, and back.</summary>
+/// <summary>
+/// Upgrading older databases: the v0.3 administrator markers become permission assignments, and back; the terminal
+/// reaches those who received Device Superuser from the system before it included it.
+/// </summary>
 public class PermissionMigrationTests
 {
   private const string BeforePermissions = "20261003020144_AddUsers";
+  private const string BeforeTerminal = "20261016110021_AddDeviceGroups";
   private const string ServerMarker = "stealthdesk:server_admin";
   private const string TenantMarker = "stealthdesk:tenant_admin";
 
@@ -48,6 +52,85 @@ public class PermissionMigrationTests
 
     Assert.Equal([(admin.Id, ServerMarker), (admin.Id, TenantMarker)], restored.Order());
   }
+
+  [Fact]
+  public async Task DeviceReadTheSystemGave_BringsTheTerminal_AndUndoingTakesItAway()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var tenant = await TestTenants.CreateAsync(server, "Tenant");
+    var creator = await TestAccounts.CreateUserAsync(server, "creator@example.com", tenant);
+    var operatorUser = await TestAccounts.CreateUserAsync(server, "operator@example.com", tenant);
+    var disabled = await TestAccounts.CreateUserAsync(server, "disabled@example.com", tenant);
+    var oneDevice = await TestAccounts.CreateUserAsync(server, "one-device@example.com", tenant);
+    var denied = await TestAccounts.CreateUserAsync(server, "denied@example.com", tenant);
+    var holder = await TestAccounts.CreateUserAsync(server, "holder@example.com", tenant);
+    var group = Guid.NewGuid();
+    await MigrateAsync(server, BeforeTerminal);
+
+    // As the version before left them: device.read given by the system, by a person, switched off, on one device,
+    // denied; one who already holds the terminal; and a user group.
+    await server.WithDbAsync(db =>
+    {
+      db.PermissionAssignments.AddRange(
+        Assignment(PermissionPrincipalKind.User, creator.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, operatorUser.Id, PermissionNames.DeviceRead, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.User, disabled.Id, PermissionNames.DeviceRead, tenant, enabled: false),
+        Assignment(PermissionPrincipalKind.User, oneDevice.Id, PermissionNames.DeviceRead, tenant, scope: PermissionScopeKind.Device, scopeId: Guid.NewGuid()),
+        Assignment(PermissionPrincipalKind.User, denied.Id, PermissionNames.DeviceRead, tenant, effect: PermissionEffect.Deny),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceTerminalUse, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.UserGroup, group, PermissionNames.DeviceRead, tenant));
+      return db.SaveChangesAsync();
+    });
+
+    await MigrateAsync(server, null);
+    var terminal = await TerminalRowsAsync(server);
+
+    Assert.Equal(
+      new[] { creator.Id, group, holder.Id }.Order(),
+      terminal.Select(x => x.PrincipalId).Order());
+    Assert.All(terminal.Where(x => x.PrincipalId != holder.Id), x =>
+    {
+      Assert.Equal(PermissionEffect.Allow, x.Effect);
+      Assert.Equal(PermissionScopeKind.Tenant, x.ScopeKind);
+      Assert.Equal(tenant, x.ScopeId);
+      Assert.Equal(tenant, x.OwningTenantId);
+      Assert.True(x.IsEnabled);
+      Assert.Equal(PermissionAssignmentRecord.System, x.CreatedByKind);
+    });
+    Assert.Equal(PermissionPrincipalKind.UserGroup, Assert.Single(terminal, x => x.PrincipalId == group).PrincipalKind);
+    Assert.Equal("User", Assert.Single(terminal, x => x.PrincipalId == holder.Id).CreatedByKind);
+
+    await MigrateAsync(server, BeforeTerminal);
+
+    Assert.Empty(await TerminalRowsAsync(server));
+    Assert.Equal(7, await server.WithDbAsync(db => db.PermissionAssignments.CountAsync(x => x.Permission == PermissionNames.DeviceRead && x.OwningTenantId == tenant)));
+  }
+
+  private static PermissionAssignmentRecord Assignment(
+    PermissionPrincipalKind kind,
+    Guid principal,
+    string permission,
+    Guid tenant,
+    string createdBy = PermissionAssignmentRecord.System,
+    bool enabled = true,
+    PermissionScopeKind scope = PermissionScopeKind.Tenant,
+    Guid? scopeId = null,
+    PermissionEffect effect = PermissionEffect.Allow) => new()
+  {
+    PrincipalKind = kind,
+    PrincipalId = principal,
+    Permission = permission,
+    Effect = effect,
+    ScopeKind = scope,
+    ScopeId = scopeId ?? tenant,
+    OwningTenantId = tenant,
+    IsEnabled = enabled,
+    CreatedByKind = createdBy,
+  };
+
+  private static Task<List<PermissionAssignmentRecord>> TerminalRowsAsync(ServerHost server) =>
+    server.WithDbAsync(db => db.PermissionAssignments.AsNoTracking().Where(x => x.Permission == PermissionNames.DeviceTerminalUse).ToListAsync());
 
   private static async Task MigrateAsync(ServerHost server, string? target)
   {

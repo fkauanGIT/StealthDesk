@@ -1,3 +1,4 @@
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 
 namespace StealthDesk.Contracts.Realtime;
@@ -16,4 +17,10 @@ public interface IDashboardHub
 
   /// <summary>Stops sending changes of these devices.</summary>
   Task UnsubscribeFromDevices(IReadOnlyList<Guid> deviceIds);
+
+  /// <summary>
+  /// The actions the user may use on this device, decided now, denies first. A device they may not read is refused
+  /// the same way as one that doesn't exist.
+  /// </summary>
+  Task<GatewayReply<DeviceActions>> GetDeviceActions(Guid deviceId);
 }
