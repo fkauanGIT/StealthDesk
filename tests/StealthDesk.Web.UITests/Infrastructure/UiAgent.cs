@@ -150,8 +150,19 @@ public sealed class UiAgent : IAsyncDisposable
 
   private sealed class NoCallbacks : IAgentCallbacks
   {
+    private const string NoAnswers = "This test agent has no answers.";
+
     public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
-      Task.FromResult(GatewayReply.Refuse<string>("This test agent has no answers."));
+      Task.FromResult(GatewayReply.Refuse<string>(NoAnswers));
+
+    public Task<GatewayReply<Guid>> OpenTerminal(Guid terminalId, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+    public Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+    public Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
   }
 }
 

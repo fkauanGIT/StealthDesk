@@ -10,6 +10,12 @@ public interface IDashboardHub
   public const int MaxDevicesPerSubscription = 100;
 
   /// <summary>
+  /// The most characters one terminal input may carry: even written in three bytes each, they fit in the 32 KB a
+  /// realtime message may carry by default.
+  /// </summary>
+  public const int MaxTerminalInputLength = 8 * 1024;
+
+  /// <summary>
   /// Starts sending <see cref="IDashboardCallbacks.DeviceChanged"/> for these devices. Answers the ids subscribed:
   /// those the user may read; the others are left out without saying why.
   /// </summary>
@@ -23,4 +29,16 @@ public interface IDashboardHub
   /// the same way as one that doesn't exist.
   /// </summary>
   Task<GatewayReply<DeviceActions>> GetDeviceActions(Guid deviceId);
+
+  /// <summary>
+  /// Opens a terminal on the device and answers its id. Its output comes through
+  /// <see cref="IDashboardCallbacks.ReceiveTerminalOutput"/>, to this connection only, starting before the answer.
+  /// </summary>
+  Task<GatewayReply<Guid>> OpenTerminal(Guid deviceId);
+
+  /// <summary>A line typed in a terminal this connection opened.</summary>
+  Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line);
+
+  /// <summary>Closes a terminal this connection opened; its last output says it ended.</summary>
+  Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId);
 }

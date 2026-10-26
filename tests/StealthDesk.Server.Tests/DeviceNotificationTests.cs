@@ -108,5 +108,7 @@ public class DeviceNotificationTests
     IDashboardCallbacks IHubClients<IDashboardCallbacks>.Users(IReadOnlyList<string> userIds) => this;
 
     public Task DeviceChanged(DeviceSummary device) => throw new IOException("Connection lost.");
+
+    public Task ReceiveTerminalOutput(StealthDesk.Contracts.Terminal.TerminalOutput output) => throw new IOException("Connection lost.");
   }
 }

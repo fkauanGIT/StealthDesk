@@ -3,24 +3,46 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
 
 /// <summary>
 /// A browser stand-in: JSON, as a browser would use, over long polling because the in-memory server can't
-/// upgrade to WebSockets. Keeps every <see cref="IDashboardCallbacks.DeviceChanged"/> it receives, in order.
+/// upgrade to WebSockets. Keeps every <see cref="IDashboardCallbacks.DeviceChanged"/> and terminal output it receives,
+/// in order.
 /// </summary>
 public sealed class TestDashboard : IAsyncDisposable
 {
   private readonly Channel<DeviceSummary> _changes = Channel.CreateUnbounded<DeviceSummary>();
+  private readonly List<TerminalOutput> _terminalOutput = [];
 
   private TestDashboard(HubConnection connection)
   {
     Connection = connection;
     Connection.On<DeviceSummary>(nameof(IDashboardCallbacks.DeviceChanged), device => _changes.Writer.TryWrite(device));
+    Connection.On<TerminalOutput>(nameof(IDashboardCallbacks.ReceiveTerminalOutput), output =>
+    {
+      lock (_terminalOutput)
+      {
+        _terminalOutput.Add(output);
+      }
+    });
   }
 
   public HubConnection Connection { get; }
+
+  /// <summary>Every terminal output received so far, in order.</summary>
+  public IReadOnlyList<TerminalOutput> TerminalOutput
+  {
+    get
+    {
+      lock (_terminalOutput)
+      {
+        return [.. _terminalOutput];
+      }
+    }
+  }
 
   /// <summary>Connects as a new user of the test tenant, the one test agents join, who can read its devices.</summary>
   public static async Task<TestDashboard> ConnectSignedInAsync(ServerHost server)
