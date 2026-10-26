@@ -179,6 +179,31 @@ public class GatewayTests
     Assert.True(device.IsOnline);
   }
 
+  [Fact]
+  public async Task ReconnectingAgainAndAgain_NeverLeavesTheDeviceOffline()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server);
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+
+    // The old connection closing races the new one's report; marking it offline after a read let the report it raced
+    // be overwritten, about once in ten rounds.
+    var offline = 0;
+    for (var round = 0; round < 40; round++)
+    {
+      await agent.ReconnectAsync();
+      Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+      await Task.Delay(300, TestContext.Current.CancellationToken);
+      if (!await server.WithDbAsync(async db => (await db.Devices.SingleAsync(x => x.Id == deviceId)).IsOnline))
+      {
+        offline++;
+      }
+    }
+
+    Assert.Equal(0, offline);
+  }
+
   private sealed class ShiftedClock(TimeSpan shift) : TimeProvider
   {
     public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + shift;

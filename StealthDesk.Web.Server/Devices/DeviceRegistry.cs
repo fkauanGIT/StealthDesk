@@ -73,21 +73,42 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
 
   public async Task<DeviceRecord?> MarkOfflineAsync(Guid deviceId, string connectionId, DateTimeOffset lastSeen, CancellationToken cancellationToken = default)
   {
-    var device = await db.Devices.Include(x => x.GroupMemberships).FirstOrDefaultAsync(
-      x => x.Id == deviceId && x.ConnectionId == connectionId,
-      cancellationToken);
+    var onThisConnection = db.Devices.Where(x => x.Id == deviceId && x.ConnectionId == connectionId);
 
-    if (device is null)
+    // One conditional update, not a read and then a write: a report on the newer connection landing between the two
+    // would be overwritten, and a connected device shown offline.
+    var changed = db.Database.IsRelational()
+      ? await onThisConnection.ExecuteUpdateAsync(
+        set => set
+          .SetProperty(x => x.IsOnline, false)
+          .SetProperty(x => x.ConnectionId, string.Empty)
+          .SetProperty(x => x.LastSeen, lastSeen),
+        cancellationToken)
+      : await MarkOfflineInMemoryAsync(onThisConnection, lastSeen, cancellationToken);
+
+    if (changed == 0)
     {
       logger.LogDebug("Device {DeviceId} already moved to a newer connection; leaving it online.", deviceId);
       return null;
+    }
+
+    return await db.Devices.AsNoTracking().Include(x => x.GroupMemberships).FirstAsync(x => x.Id == deviceId, cancellationToken);
+  }
+
+  // The in-memory provider can't run a conditional update, so it keeps the race; tests that race connections run on
+  // PostgreSQL.
+  private async Task<int> MarkOfflineInMemoryAsync(IQueryable<DeviceRecord> onThisConnection, DateTimeOffset lastSeen, CancellationToken cancellationToken)
+  {
+    if (await onThisConnection.FirstOrDefaultAsync(cancellationToken) is not { } device)
+    {
+      return 0;
     }
 
     device.IsOnline = false;
     device.ConnectionId = string.Empty;
     device.LastSeen = lastSeen;
     await db.SaveChangesAsync(cancellationToken);
-    return device;
+    return 1;
   }
 
   // Reports come from machines we don't control: oversized text is cut to fit instead of failing the save.

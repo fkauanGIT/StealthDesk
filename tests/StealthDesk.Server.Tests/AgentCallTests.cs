@@ -6,7 +6,10 @@ using StealthDesk.Web.Server.Gateway;
 
 namespace StealthDesk.Server.Tests;
 
-/// <summary>End to end: the server calling a test agent over the connection the agent opened, and waiting for its answer.</summary>
+/// <summary>
+/// End to end: the server calling a test agent over the connection the agent opened, and waiting for its answer. The
+/// tests that reconnect need Docker.
+/// </summary>
 public class AgentCallTests
 {
   [Fact]
@@ -102,10 +105,11 @@ public class AgentCallTests
     Assert.Equal("The device couldn't carry out the request.", reply.Error);
   }
 
+  // On PostgreSQL: the old connection closing races the new one's report, which only a relational database settles.
   [Fact]
   public async Task AfterTheAgentReconnects_CallsReachTheNewConnection()
   {
-    using var server = ServerHost.InMemory();
+    using var server = await ServerHost.OnPostgresAsync();
     await using var agent = await TestAgent.ConnectAsync(server, callbacks: new AnsweringAgent("1.2.3"));
     var deviceId = await ReportAsync(agent);
     var before = await ConnectionOfAsync(server, deviceId);
@@ -123,7 +127,7 @@ public class AgentCallTests
   [Fact]
   public async Task ANewConnectionForTheSameDevice_TakesOverItsCalls()
   {
-    using var server = ServerHost.InMemory();
+    using var server = await ServerHost.OnPostgresAsync();
     var first = await TestAgent.ConnectAsync(server, callbacks: new AnsweringAgent("first"));
     var deviceId = await ReportAsync(first);
     await using var second = await TestAgent.ConnectAsync(server, keys: first.Keys, callbacks: new AnsweringAgent("second"));
@@ -133,6 +137,7 @@ public class AgentCallTests
 
     // The old connection closing doesn't take the device offline: the new one still answers.
     await first.DisposeAsync();
+    await Task.Delay(500, TestContext.Current.CancellationToken);
     var reply = await CallAsync(server, deviceId);
     Assert.True(reply.Accepted, reply.Error);
     Assert.Equal("second", reply.Value);
