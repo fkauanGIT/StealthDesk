@@ -16,7 +16,10 @@ public sealed class TerminalOptions
   /// <summary>A session with no command running and nothing typed for this long is closed.</summary>
   public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(10);
 
-  /// <summary>A command asking a question (Read-Host, a confirmation) is stopped when it gets no answer for this long.</summary>
+  /// <summary>
+  /// A question (Read-Host, a confirmation) with no answer for this long goes on as if Enter was pressed: an empty
+  /// line, or the choice's default.
+  /// </summary>
   public TimeSpan AnswerTimeout { get; set; } = TimeSpan.FromMinutes(5);
 }
 
@@ -38,7 +41,6 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
   private Task _running = Task.CompletedTask;
   private PowerShell? _current;
   private TaskCompletionSource<string>? _answer;
-  private string? _stopReason;
   private int? _exitCode;
   private bool _busy;
   private Task? _disposing;
@@ -134,7 +136,6 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       }
 
       HasEnded = true;
-      _stopReason ??= string.Empty;
       _idle.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
       _answer?.TrySetException(new PromptingException("The session ended."));
       _answer = null;
@@ -169,7 +170,7 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
   void ITerminalConsole.Write(TerminalOutputKind kind, string text) => Write(kind, text);
 
-  string ITerminalConsole.ReadLine()
+  string? ITerminalConsole.ReadLine()
   {
     var answer = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
     lock (_gate)
@@ -193,11 +194,10 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       lock (_gate)
       {
         _answer = null;
-        _stopReason = $"No answer within {_options.AnswerTimeout.TotalMinutes:0} minutes: the command was stopped.";
-        StopCurrent();
       }
 
-      throw new PromptingException(_stopReason);
+      Write(TerminalOutputKind.Output, $"\nNo answer within {_options.AnswerTimeout.TotalMinutes:0} minutes: went on as if Enter was pressed.\n");
+      return null;
     }
   }
 
@@ -217,7 +217,6 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       lock (_gate)
       {
         _busy = true;
-        _stopReason = null;
       }
 
       await RunAsync(command);
@@ -267,10 +266,7 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
     }
     catch (PipelineStoppedException)
     {
-      if (!string.IsNullOrEmpty(_stopReason))
-      {
-        Write(TerminalOutputKind.Error, _stopReason + "\n");
-      }
+      // Stopped because the session ended: its last output says why.
     }
     catch (RuntimeException ex) when (ex.ErrorRecord is not null)
     {

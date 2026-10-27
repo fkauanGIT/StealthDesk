@@ -15,10 +15,10 @@ internal interface ITerminalConsole
   void Write(TerminalOutputKind kind, string text);
 
   /// <summary>
-  /// Waits for the next line typed in the terminal. Throws <see cref="PromptingException"/> when nobody answers in
-  /// time or the session ends.
+  /// Waits for the next line typed in the terminal; null when nobody answered in time. Throws
+  /// <see cref="PromptingException"/> when the session ends.
   /// </summary>
-  string ReadLine();
+  string? ReadLine();
 
   /// <summary>The script ran <c>exit</c>.</summary>
   void RequestExit(int exitCode);
@@ -84,9 +84,10 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
     WriteLine(line);
   }
 
-  public override string ReadLine() => console.ReadLine();
+  // A question nobody answered goes on as if Enter was pressed.
+  public override string ReadLine() => console.ReadLine() ?? string.Empty;
 
-  public override SecureString ReadLineAsSecureString() => Secure(console.ReadLine());
+  public override SecureString ReadLineAsSecureString() => Secure(ReadLine());
 
   public override Dictionary<string, PSObject> Prompt(string caption, string message, Collection<FieldDescription> descriptions)
   {
@@ -109,7 +110,7 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
         continue;
       }
 
-      var answer = console.ReadLine();
+      var answer = ReadLine();
       answers[field.Name] = new PSObject(LanguagePrimitives.TryConvertTo(answer, type, CultureInfo.InvariantCulture, out var converted) ? converted : answer);
     }
 
@@ -132,11 +133,17 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
       options.Append($" (default is \"{keys[defaultChoice]}\")");
     }
 
-    // Asked again until the answer is one of the choices, as the console does.
+    // Asked again until the answer is one of the choices, as the console does; nobody answering gets the default,
+    // or no choice (-1) when there is none, rather than the question again.
     while (true)
     {
       Write($"{options}: ");
-      var answer = console.ReadLine().Trim();
+      if (console.ReadLine() is not { } typed)
+      {
+        return defaultChoice;
+      }
+
+      var answer = typed.Trim();
       if (answer.Length == 0 && defaultChoice >= 0 && defaultChoice < choices.Count)
       {
         return defaultChoice;
@@ -180,7 +187,7 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
     if (string.IsNullOrEmpty(userName))
     {
       Write("User: ");
-      userName = console.ReadLine();
+      userName = ReadLine();
     }
 
     Write($"Password for user {userName}: ");

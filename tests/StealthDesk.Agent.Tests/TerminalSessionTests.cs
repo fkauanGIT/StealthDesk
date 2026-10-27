@@ -185,13 +185,13 @@ public class TerminalSessionTests
   }
 
   [Fact]
-  public async Task AQuestionNobodyAnswers_StopsTheCommandAfterItsTime()
+  public async Task AQuestionNobodyAnswers_GoesOnWithAnEmptyAnswerAfterItsTime()
   {
     var clock = new FakeTimeProvider();
     await using var terminal = new TerminalHarness(clock);
     await terminal.OpenAsync();
 
-    terminal.Send("Read-Host 'Continue'; 'after the question'");
+    terminal.Send("$name = Read-Host 'Continue'; \"answered [$name]\"");
     await terminal.ShowsAsync("Continue: ");
     var before = terminal.Screen.Length;
     clock.Advance(TimeSpan.FromMinutes(4));
@@ -200,9 +200,30 @@ public class TerminalSessionTests
     clock.Advance(TimeSpan.FromMinutes(1));
     await terminal.UntilAsync(() => terminal.Screen.EndsWith("> ", StringComparison.Ordinal) && terminal.Screen.Length > before);
 
-    Assert.Contains("No answer within 5 minutes", terminal.Errors);
-    Assert.DoesNotContain("after the question", terminal.Screen);
+    Assert.Contains("No answer within 5 minutes: went on as if Enter was pressed.\n", terminal.Screen[before..]);
+    Assert.Contains("answered []\n", terminal.Screen[before..]);
+    Assert.Empty(terminal.Errors);
     Assert.Contains("still here", await terminal.RunAsync("'still here'"));
+  }
+
+  [Theory]
+  [InlineData("1", "1")]
+  [InlineData("-1", "-1")]
+  public async Task AChoiceNobodyAnswers_GetsItsDefault_OrNoChoiceWithoutAskingAgain(string defaultChoice, string expected)
+  {
+    var clock = new FakeTimeProvider();
+    await using var terminal = new TerminalHarness(clock);
+    await terminal.OpenAsync();
+
+    terminal.Send($"\"chose [$($host.UI.PromptForChoice('Fruit', 'Which one?', [System.Management.Automation.Host.ChoiceDescription[]]@('&Apple', '&Banana'), {defaultChoice}))]\"");
+    await terminal.ShowsAsync("[?] Help");
+    var before = terminal.Screen.Length;
+    clock.Advance(TimeSpan.FromMinutes(5));
+    await terminal.UntilAsync(() => terminal.Screen.EndsWith("> ", StringComparison.Ordinal) && terminal.Screen.Length > before);
+
+    Assert.Contains($"chose [{expected}]\n", terminal.Screen[before..]);
+    // Answered once: the question wasn't asked again.
+    Assert.DoesNotContain("[?] Help", terminal.Screen[before..]);
   }
 
   [Fact]
