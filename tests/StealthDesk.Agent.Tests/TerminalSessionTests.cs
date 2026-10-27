@@ -73,6 +73,34 @@ public class TerminalSessionTests
     Assert.DoesNotContain("\nsecond", whileRunning);
   }
 
+  // Programs write in the OEM code page when the agent has no console, as a service, and PowerShell read them as
+  // ANSI. With a console, as here, they follow its code page: this proves the session reads the OEM one whatever it
+  // was before. A session without a console was checked by hand (#200).
+  [Fact]
+  public async Task Sessions_ReadProgramsInTheOemCodePage_AndAccentsShowUnchanged()
+  {
+    Assert.SkipUnless(OperatingSystem.IsWindows(), "Code pages are how Windows programs write.");
+    var before = Console.OutputEncoding;
+    Console.OutputEncoding = new UTF8Encoding(false);
+    try
+    {
+      await using var terminal = new TerminalHarness();
+      await terminal.OpenAsync();
+
+      var readAs = await terminal.RunAsync("[Console]::OutputEncoding.CodePage");
+      var fromAProgram = await terminal.RunAsync("cmd /c echo çé");
+      var fromPowerShell = await terminal.RunAsync("'ação'");
+
+      Assert.Equal($"{ProgramOutput.OemCodePage}\n", readAs);
+      Assert.Equal("çé\n", fromAProgram);
+      Assert.Equal("ação\n", fromPowerShell);
+    }
+    finally
+    {
+      Console.OutputEncoding = before;
+    }
+  }
+
   private static string Program(string line) => OperatingSystem.IsWindows() ? $"cmd /c \"{line}\"" : $"sh -c '{line}'";
 
   [Fact]

@@ -109,6 +109,8 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
     // Opening loads PowerShell: about a second, off the caller's thread.
     await Task.Run(runspace.Open);
+    // After PowerShell loaded, which sets the console's encoding its own way.
+    ProgramOutput.UseOemCodePage(_logger);
     lock (_gate)
     {
       _runspace = runspace;
