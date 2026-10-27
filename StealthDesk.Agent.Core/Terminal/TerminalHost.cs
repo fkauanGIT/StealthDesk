@@ -15,10 +15,11 @@ internal interface ITerminalConsole
   void Write(TerminalOutputKind kind, string text);
 
   /// <summary>
-  /// Waits for the next line typed in the terminal; null when nobody answered in time. Throws
-  /// <see cref="PromptingException"/> when the session ends.
+  /// Waits for the next line typed in the terminal and shows it, as a console does; null when nobody answered in
+  /// time. Throws <see cref="PromptingException"/> when the session ends.
   /// </summary>
-  string? ReadLine();
+  /// <param name="secret">A password or other secret: shown as one <c>*</c> per character.</param>
+  string? ReadLine(bool secret = false);
 
   /// <summary>The script ran <c>exit</c>.</summary>
   void RequestExit(int exitCode);
@@ -87,7 +88,7 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
   // A question nobody answered goes on as if Enter was pressed.
   public override string ReadLine() => console.ReadLine() ?? string.Empty;
 
-  public override SecureString ReadLineAsSecureString() => Secure(ReadLine());
+  public override SecureString ReadLineAsSecureString() => Secure(console.ReadLine(secret: true) ?? string.Empty);
 
   public override Dictionary<string, PSObject> Prompt(string caption, string message, Collection<FieldDescription> descriptions)
   {

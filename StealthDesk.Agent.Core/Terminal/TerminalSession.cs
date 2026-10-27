@@ -66,6 +66,9 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
   public bool HasEnded { get; private set; }
 
+  /// <summary>The state of the session's PowerShell, once it was created.</summary>
+  internal RunspaceState? PowerShellState => _runspace?.RunspaceStateInfo.State;
+
   /// <summary>Opens the runspace in <paramref name="startFolder"/> and shows the banner and the first prompt.</summary>
   /// <param name="modulesFolder">PowerShell's built-in modules (<see cref="PowerShellModules"/>).</param>
   public async Task StartAsync(string startFolder, string modulesFolder)
@@ -93,8 +96,18 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
     // Opening loads PowerShell: about a second, off the caller's thread.
     await Task.Run(runspace.Open);
+    lock (_gate)
+    {
+      _runspace = runspace;
+      if (HasEnded)
+      {
+        // Closed while PowerShell loaded, before disposing could reach it: nothing will use it now.
+        runspace.Dispose();
+        return;
+      }
+    }
+
     runspace.SessionStateProxy.Path.SetLocation(WildcardPattern.Escape(startFolder));
-    _runspace = runspace;
 
     Write(TerminalOutputKind.Output, $"PowerShell {PSVersionInfo.PSVersion} on {RuntimeInformation.OSDescription}\n");
     WritePrompt();
@@ -103,14 +116,14 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
   }
 
   /// <summary>A line typed in the terminal: the answer to the question waiting, or the next command.</summary>
-  /// <returns>False when the session is over.</returns>
-  public bool Submit(string line)
+  /// <returns>What the line was taken as; null when the session is over.</returns>
+  public TerminalInputReceipt? Submit(string line)
   {
     lock (_gate)
     {
       if (HasEnded)
       {
-        return false;
+        return null;
       }
 
       _idle.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -118,10 +131,10 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       {
         _answer = null;
         answer.TrySetResult(line);
-        return true;
+        return new TerminalInputReceipt(Id, AnsweredQuestion: true);
       }
 
-      return _commands.Writer.TryWrite(line);
+      return _commands.Writer.TryWrite(line) ? new TerminalInputReceipt(Id, AnsweredQuestion: false) : null;
     }
   }
 
@@ -170,7 +183,7 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
   void ITerminalConsole.Write(TerminalOutputKind kind, string text) => Write(kind, text);
 
-  string? ITerminalConsole.ReadLine()
+  string? ITerminalConsole.ReadLine(bool secret)
   {
     var answer = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
     lock (_gate)
@@ -187,7 +200,9 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
     _output.Flush();
     try
     {
-      return answer.Task.WaitAsync(_options.AnswerTimeout, _clock).GetAwaiter().GetResult();
+      var line = answer.Task.WaitAsync(_options.AnswerTimeout, _clock).GetAwaiter().GetResult();
+      Write(TerminalOutputKind.Output, (secret ? new string('*', line.Length) : line) + "\n");
+      return line;
     }
     catch (TimeoutException)
     {
@@ -219,6 +234,8 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
         _busy = true;
       }
 
+      // After the prompt it was typed at, as a console shows it.
+      Write(TerminalOutputKind.Output, command + "\n");
       await RunAsync(command);
       if (_exitCode is { } code)
       {

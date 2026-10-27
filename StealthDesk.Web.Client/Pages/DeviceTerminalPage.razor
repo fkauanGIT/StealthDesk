@@ -1,0 +1,251 @@
+@page "/devices/{Id:guid}/terminal"
+@attribute [Authorize]
+@implements IDisposable
+@using StealthDesk.Contracts.Terminal
+@using StealthDesk.Web.Client.Terminal
+@inject DeviceStore Store
+@inject ILiveUpdates Live
+@inject IDeviceHub Hub
+@inject DeviceTerminal Terminal
+@inject ITerminalKeys Keys
+
+<PageTitle>Terminal · @(device?.Name ?? "Device") · StealthDesk</PageTitle>
+
+<a class="sd-back" href="devices/@Id">
+    <SdIcon Name="IconName.Back" Size="16" />
+    @(device?.Name ?? "Device")
+</a>
+
+@if (lookup is null)
+{
+    <SdLoading Text="Loading device..." />
+}
+else if (lookup.IsNotFound)
+{
+    <SdEmptyState Title="Device not found">It may have been removed, or the link is wrong.</SdEmptyState>
+}
+else if (device is null)
+{
+    <SdAlert>Could not load the device. Check that the server is running.</SdAlert>
+}
+else
+{
+    <header class="sd-page-header">
+        <div class="sd-device-icon"><SdIcon Name="IconName.Terminal" Size="26" /></div>
+        <div>
+            <h1 class="sd-page-title">Terminal</h1>
+            <p class="sd-muted">PowerShell on @device.Name</p>
+        </div>
+        <DeviceStatus IsOnline="device.IsOnline" />
+        <div class="sd-push sd-terminal-actions">
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => showingShortcuts = true">Keyboard shortcuts</SdButton>
+            @if (Terminal.Status is TerminalStatus.Open or TerminalStatus.Opening)
+            {
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="Terminal.CloseAsync">Close session</SdButton>
+            }
+            else if (canUse == true)
+            {
+                <SdButton Disabled="!device.IsOnline" OnClick="OpenAsync">@(Terminal.Lines.Count > 0 ? "New session" : "Open session")</SdButton>
+            }
+        </div>
+    </header>
+
+    @if (canUse is null)
+    {
+        <SdLoading Text="Checking access..." />
+    }
+    else if (canUse == false)
+    {
+        <SdEmptyState Title="No terminal access">@accessError</SdEmptyState>
+    }
+    else
+    {
+        @if (!device.IsOnline)
+        {
+            <SdAlert Tone="Tone.Warning">
+                @(Terminal.Status == TerminalStatus.Open
+                    ? "The device is offline: commands can't reach it until it is back."
+                    : "The device is offline. A session can open once it is back.")
+            </SdAlert>
+        }
+
+        @if (Terminal.Notice is { } notice)
+        {
+            <SdAlert Tone="@(Terminal.Status == TerminalStatus.Ended ? Tone.Info : Tone.Danger)">@notice</SdAlert>
+        }
+
+        <div class="sd-terminal">
+            <div class="sd-terminal-screen" role="log" aria-label="Terminal output" aria-live="polite" tabindex="0">
+                <div>
+                    @foreach (var line in Terminal.Lines)
+                    {
+                        <div class="sd-terminal-line">@foreach (var span in line.Spans)
+                        {<span class="@(span.Kind == TerminalOutputKind.Error ? "sd-terminal-error" : null)">@span.Text</span>}</div>
+                    }
+                    @if (Terminal.Status == TerminalStatus.Opening)
+                    {
+                        <div class="sd-terminal-line sd-muted">Starting PowerShell on the device...</div>
+                    }
+                </div>
+            </div>
+            <div class="sd-terminal-input">
+                <textarea @ref="input" rows="@(Terminal.Multiline ? 4 : 1)" aria-label="Command"
+                          placeholder="@(Terminal.Status == TerminalStatus.Open ? "Type a command and press Enter" : "No session open")"
+                          spellcheck="false" autocomplete="off" autocapitalize="off"
+                          data-multiline="@(Terminal.Multiline ? "true" : "false")"
+                          disabled="@(Terminal.Status != TerminalStatus.Open)"
+                          @bind="Terminal.Input" @bind:event="oninput" @onkeydown="KeyDownAsync"></textarea>
+                <div class="sd-terminal-input-options">
+                    <SdCheckbox Label="Multiline" Checked="Terminal.Multiline" CheckedChanged="SetMultiline" />
+                    <SdButton Disabled="@(Terminal.Status != TerminalStatus.Open || Terminal.Sending)" OnClick="Terminal.SubmitAsync">Run</SdButton>
+                </div>
+            </div>
+        </div>
+    }
+
+    <SdDialog Open="showingShortcuts" Title="Keyboard shortcuts" OnClose="() => showingShortcuts = false">
+        <ChildContent>
+            <dl class="sd-details sd-shortcuts">
+                @foreach (var (keys, does) in Shortcuts)
+                {
+                    <dt><kbd>@keys</kbd></dt>
+                    <dd>@does</dd>
+                }
+            </dl>
+        </ChildContent>
+        <Footer>
+            <SdButton OnClick="() => showingShortcuts = false">Close</SdButton>
+        </Footer>
+    </SdDialog>
+}
+
+@code {
+    /// <summary>Every key the terminal handles, as the shortcuts dialog lists them.</summary>
+    public static readonly IReadOnlyList<(string Keys, string Does)> Shortcuts =
+    [
+        ("Enter", "Run the command, or answer the question asked"),
+        ("Shift + Enter", "New line, in multiline mode"),
+        ("Up", "Previous command"),
+        ("Down", "Next command, then back to what you were typing"),
+        ("Escape", "Clear what is typed"),
+    ];
+
+    private DeviceLookup? lookup;
+    private DeviceSummary? device;
+    private bool? canUse;
+    private string accessError = string.Empty;
+    private bool showingShortcuts;
+    private bool openedOnce;
+    private bool keysAttached;
+    private ElementReference input;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Store.Changed += OnChanged;
+        Live.StateChanged += OnLiveChanged;
+        Terminal.Changed += OnChanged;
+        _ = Live.StartAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        lookup = await Store.FindAsync(Id);
+        device = lookup.Device;
+        await CheckAccessAndOpenAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!keysAttached && Terminal.Status == TerminalStatus.Open)
+        {
+            keysAttached = true;
+            await Keys.AttachAsync(input);
+            await input.FocusAsync();
+        }
+    }
+
+    // Asked once the live connection is up, since the terminal goes through it; opened by itself the first time only,
+    // so a refusal isn't retried on every change.
+    private async Task CheckAccessAndOpenAsync()
+    {
+        if (device is null || Live.State != LiveState.Live)
+        {
+            return;
+        }
+
+        if (canUse is null)
+        {
+            var actions = await Hub.GetDeviceActionsAsync(Id);
+            canUse = actions is { Accepted: true, Value.UseTerminal: true };
+            accessError = actions.Accepted ? "You may not use the terminal on this device." : actions.Error ?? "The server refused.";
+        }
+
+        if (canUse == true && device.IsOnline && !openedOnce)
+        {
+            openedOnce = true;
+            if (Terminal.DeviceId != Id || Terminal.Status == TerminalStatus.Closed)
+            {
+                await Terminal.OpenAsync(Id);
+            }
+        }
+    }
+
+    private Task OpenAsync() => Terminal.OpenAsync(Id);
+
+    private async Task KeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter" when !e.ShiftKey || !Terminal.Multiline:
+                await Terminal.SubmitAsync();
+                break;
+            case "ArrowUp" when !Terminal.Multiline:
+                Terminal.Previous();
+                break;
+            case "ArrowDown" when !Terminal.Multiline:
+                Terminal.Next();
+                break;
+            case "Escape":
+                Terminal.ClearInput();
+                break;
+        }
+    }
+
+    private void SetMultiline(bool on)
+    {
+        Terminal.Multiline = on;
+        _ = input.FocusAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(() =>
+    {
+        if (Store.Get(Id) is { } current)
+        {
+            device = current;
+            lookup = DeviceLookup.Found(current);
+        }
+
+        if (Terminal.Status != TerminalStatus.Open)
+        {
+            keysAttached = false;
+        }
+
+        StateHasChanged();
+    });
+
+    private void OnLiveChanged() => InvokeAsync(async () =>
+    {
+        await CheckAccessAndOpenAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Store.Changed -= OnChanged;
+        Live.StateChanged -= OnLiveChanged;
+        Terminal.Changed -= OnChanged;
+    }
+}

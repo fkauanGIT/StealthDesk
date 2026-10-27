@@ -5,6 +5,7 @@ using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
 using StealthDesk.Web.Server.Permissions;
@@ -132,18 +133,18 @@ public sealed class DashboardHub(
   }
 
   [ChecksPermission(PermissionNames.DeviceTerminalUse)]
-  public async Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line)
+  public async Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line)
   {
     if (line.Length > IDashboardHub.MaxTerminalInputLength)
     {
-      return GatewayReply.Refuse<Guid>(
+      return GatewayReply.Refuse<TerminalInputReceipt>(
         $"The input is too long ({line.Length} characters); send at most {IDashboardHub.MaxTerminalInputLength} at a time.");
     }
 
     var (terminal, refused) = await TerminalOfAsync(terminalId);
     if (terminal is null)
     {
-      return GatewayReply.Refuse<Guid>(refused!);
+      return GatewayReply.Refuse<TerminalInputReceipt>(refused!);
     }
 
     return await agents.CallAsync(terminal.DeviceId, (agent, token) => agent.SendTerminalInput(terminalId, line, token), Context.ConnectionAborted);

@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
 
@@ -14,8 +15,8 @@ public class RefusingAgent : IAgentCallbacks
   public virtual Task<GatewayReply<Guid>> OpenTerminal(Guid terminalId, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
 
-  public virtual Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
-    Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+  public virtual Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<TerminalInputReceipt>(NoAnswers));
 
   public virtual Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));

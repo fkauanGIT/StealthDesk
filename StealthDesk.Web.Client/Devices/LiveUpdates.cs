@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Web.Client.Devices;
 
@@ -34,7 +35,7 @@ public sealed class LiveUpdates(
   DeviceStore store,
   Uri endpoint,
   ILogger<LiveUpdates> logger,
-  Action<HttpConnectionOptions>? configure = null) : ILiveUpdates, IAsyncDisposable
+  Action<HttpConnectionOptions>? configure = null) : ILiveUpdates, IDeviceHub, IAsyncDisposable
 {
   private static readonly TimeSpan[] _retryDelays =
     [TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10)];
@@ -45,6 +46,10 @@ public sealed class LiveUpdates(
   private HashSet<Guid> _subscribed = [];
 
   public event Action? StateChanged;
+
+  public event Action<TerminalOutput>? TerminalOutputReceived;
+
+  public event Action? ConnectionLost;
 
   public LiveState State { get; private set; } = LiveState.Connecting;
 
@@ -64,7 +69,12 @@ public sealed class LiveUpdates(
       .Build();
 
     _connection.On<DeviceSummary>(nameof(IDashboardCallbacks.DeviceChanged), store.Apply);
-    _connection.Reconnecting += _ => SetState(LiveState.Reconnecting);
+    _connection.On<TerminalOutput>(nameof(IDashboardCallbacks.ReceiveTerminalOutput), output => TerminalOutputReceived?.Invoke(output));
+    _connection.Reconnecting += _ =>
+    {
+      ConnectionLost?.Invoke();
+      return SetState(LiveState.Reconnecting);
+    };
     _connection.Reconnected += async _ =>
     {
       // A new connection is in no group: everything is subscribed again.
@@ -125,6 +135,38 @@ public sealed class LiveUpdates(
     await StopAsync();
     _stopping.Dispose();
     _syncing.Dispose();
+  }
+
+  public Task<GatewayReply<DeviceActions>> GetDeviceActionsAsync(Guid deviceId) =>
+    CallAsync<DeviceActions>(nameof(IDashboardHub.GetDeviceActions), deviceId);
+
+  public Task<GatewayReply<Guid>> OpenTerminalAsync(Guid deviceId) =>
+    CallAsync<Guid>(nameof(IDashboardHub.OpenTerminal), deviceId);
+
+  public Task<GatewayReply<TerminalInputReceipt>> SendTerminalInputAsync(Guid terminalId, string line) =>
+    CallAsync<TerminalInputReceipt>(nameof(IDashboardHub.SendTerminalInput), terminalId, line);
+
+  public Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId) =>
+    CallAsync<Guid>(nameof(IDashboardHub.CloseTerminal), terminalId);
+
+  // A call that can't be made, or fails on the way, is answered like a refusal, with a reason to show.
+  private async Task<GatewayReply<T>> CallAsync<T>(string method, params object[] args)
+  {
+    if (_connection is not { State: HubConnectionState.Connected } connection)
+    {
+      return GatewayReply.Refuse<T>("Not connected to the server; trying again.");
+    }
+
+    try
+    {
+      return await connection.InvokeCoreAsync<GatewayReply<T>>(method, args, _stopping.Token)
+        ?? GatewayReply.Refuse<T>("The server gave no answer.");
+    }
+    catch (Exception ex)
+    {
+      logger.LogWarning(ex, "The call {Method} failed.", method);
+      return GatewayReply.Refuse<T>("The connection to the server failed during the call.");
+    }
   }
 
   private void OnStoreChanged() => Subscribed = SyncSubscriptionsAsync();

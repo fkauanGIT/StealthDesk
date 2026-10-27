@@ -31,6 +31,7 @@ public class DeviceGroupPagesTests : AccountTestContext
     Services.AddSingleton<SessionGuard>();
     Services.AddSingleton<DeviceStore>();
     Services.AddSingleton<ILiveUpdates>(new FakeLiveUpdates());
+    Services.AddSingleton<IDeviceHub>(new FakeDeviceHub());
     Services.AddSingleton<InstallerKeyApi>();
     Services.AddSingleton<TenantSettingApi>();
     Services.AddSingleton(TimeProvider.System);

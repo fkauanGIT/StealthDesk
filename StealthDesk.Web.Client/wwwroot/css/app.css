@@ -1690,3 +1690,92 @@ a.sd-btn:hover {
 .sd-theme-picker--compact + .sd-user {
   margin-top: calc(-1 * var(--sd-space-5));
 }
+
+/* ---------- Terminal ---------- */
+
+.sd-device-actions,
+.sd-terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-2);
+}
+
+.sd-terminal {
+  display: flex;
+  flex-direction: column;
+  height: min(70vh, 720px);
+  min-height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-sunken);
+}
+
+/* Reversed, the screen stays scrolled to its end as output arrives, unless the user scrolled up to read. */
+.sd-terminal-screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column-reverse;
+  overflow: auto;
+  padding: var(--sd-space-3) var(--sd-space-4);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-sm);
+  line-height: 1.5;
+}
+
+.sd-terminal-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sd-terminal-line:empty::before {
+  content: "\200b";
+}
+
+.sd-terminal-error {
+  color: var(--sd-danger-text);
+}
+
+.sd-terminal-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border-top: 1px solid var(--sd-border);
+  background: var(--sd-surface);
+}
+
+.sd-terminal-input textarea {
+  width: 100%;
+  resize: none;
+  padding: var(--sd-space-2) var(--sd-space-3);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-raised);
+  color: var(--sd-text);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-sm);
+}
+
+.sd-terminal-input textarea:focus-visible {
+  outline: 2px solid var(--sd-focus);
+  outline-offset: 1px;
+}
+
+.sd-terminal-input-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+}
+
+.sd-shortcuts kbd {
+  padding: 1px var(--sd-space-2);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-sunken);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-sm);
+}

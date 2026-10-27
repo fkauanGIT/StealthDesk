@@ -32,6 +32,7 @@ public class TerminalRelayTests
 
     var sent = await world.InputAsync(terminal, "Get-Date");
     Assert.True(sent.Accepted, sent.Error);
+    Assert.Equal(new TerminalInputReceipt(terminal, AnsweredQuestion: false), sent.Value);
     await world.ShowsAsync(terminal, "ran Get-Date\n");
 
     var closed = await world.CloseAsync(terminal);
@@ -109,7 +110,7 @@ public class TerminalRelayTests
     var terminal = (await world.OpenAsync()).Value;
     await using var other = await world.ConnectAgainAsync();
 
-    var sent = await other.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.SendTerminalInput), terminal, "dir", Cancel);
+    var sent = await other.Connection.InvokeAsync<GatewayReply<TerminalInputReceipt>>(nameof(IDashboardHub.SendTerminalInput), terminal, "dir", Cancel);
     var closed = await other.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.CloseTerminal), terminal, Cancel);
 
     Assert.Equal("The terminal isn't open.", sent.Error);
@@ -260,11 +261,11 @@ public class TerminalRelayTests
       return GatewayReply.Accept(terminalId);
     }
 
-    public override Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken)
+    public override Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken)
     {
       _calls.Enqueue($"input {terminalId} {line}");
       Send(new(terminalId, TerminalOutputKind.Output, $"ran {line}\n"));
-      return Task.FromResult(GatewayReply.Accept(terminalId));
+      return Task.FromResult(GatewayReply.Accept(new TerminalInputReceipt(terminalId, AnsweredQuestion: false)));
     }
 
     public override Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken)
@@ -358,8 +359,8 @@ public class TerminalRelayTests
     public Task<GatewayReply<Guid>> OpenAsync(Guid? device = null) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.OpenTerminal), device ?? Device, Cancel);
 
-    public Task<GatewayReply<Guid>> InputAsync(Guid terminal, string line) =>
-      Dashboard.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.SendTerminalInput), terminal, line, Cancel);
+    public Task<GatewayReply<TerminalInputReceipt>> InputAsync(Guid terminal, string line) =>
+      Dashboard.Connection.InvokeAsync<GatewayReply<TerminalInputReceipt>>(nameof(IDashboardHub.SendTerminalInput), terminal, line, Cancel);
 
     public Task<GatewayReply<Guid>> CloseAsync(Guid terminal) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.CloseTerminal), terminal, Cancel);

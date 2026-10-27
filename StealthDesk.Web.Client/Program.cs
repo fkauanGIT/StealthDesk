@@ -6,6 +6,7 @@ using StealthDesk.Web.Client;
 using StealthDesk.Web.Client.Accounts;
 using StealthDesk.Web.Client.AuthorizationLogs;
 using StealthDesk.Web.Client.Devices;
+using StealthDesk.Web.Client.Terminal;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -37,9 +38,13 @@ builder.Services.AddScoped<StealthDesk.Web.Client.ServerAdministration.IServerAl
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<DeviceStore>();
-builder.Services.AddScoped<ILiveUpdates>(sp => new LiveUpdates(
+builder.Services.AddScoped(sp => new LiveUpdates(
   sp.GetRequiredService<DeviceStore>(),
   new Uri(new Uri(builder.HostEnvironment.BaseAddress), Routes.Dashboard),
   sp.GetRequiredService<ILogger<LiveUpdates>>()));
+builder.Services.AddScoped<ILiveUpdates>(sp => sp.GetRequiredService<LiveUpdates>());
+builder.Services.AddScoped<IDeviceHub>(sp => sp.GetRequiredService<LiveUpdates>());
+builder.Services.AddScoped<ITerminalKeys, TerminalKeys>();
+builder.Services.AddScoped<DeviceTerminal>();
 
 await builder.Build().RunAsync();
