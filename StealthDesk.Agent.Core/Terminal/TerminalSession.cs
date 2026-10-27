@@ -84,6 +84,12 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
     // Loaded up front from the agent's copy: PowerShell only loads its built-in modules on demand from the folder it
     // runs from, which an agent made of one executable doesn't have.
     state.ImportPSModulesFromPath(modulesFolder);
+    // cls asks the host to clear its screen on every system. PowerShell's own Clear-Host does that on Windows only;
+    // elsewhere it runs the system's `clear`, which has no terminal to clear here.
+    state.Commands.Remove("Clear-Host", typeof(SessionStateFunctionEntry));
+    state.Commands.Add(new SessionStateFunctionEntry(
+      "Clear-Host",
+      "$Host.UI.RawUI.SetBufferContents(@{ Top = -1; Bottom = -1; Right = -1; Left = -1 }, @{ Character = ' ' })"));
     if (OperatingSystem.IsWindows())
     {
       // For this process only, as `Set-ExecutionPolicy RemoteSigned -Scope Process` would: local scripts run,

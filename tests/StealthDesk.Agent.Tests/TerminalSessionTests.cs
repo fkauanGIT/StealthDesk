@@ -120,30 +120,34 @@ public class TerminalSessionTests
     await using var terminal = new TerminalHarness();
     await terminal.OpenAsync();
 
-    var pages = new List<TerminalCompletions>();
-    for (var page = 0; pages.Count == 0 || pages[^1].HasMorePages; page++)
-    {
-      pages.Add(Complete(terminal, "Get-", forward: null, page));
-    }
-
-    var all = pages.SelectMany(x => x.Matches).Select(x => x.CompletionText).ToList();
+    // Files of a folder made for the test: what completes doesn't depend on what the machine has installed.
     var folder = Directory.CreateTempSubdirectory("sd-many-");
     foreach (var i in Enumerable.Range(0, TerminalCompletions.MaxListed + 100))
     {
-      File.WriteAllText(Path.Combine(folder.FullName, $"f-{i:000}.txt"), string.Empty);
+      File.WriteAllText(Path.Combine(folder.FullName, $"{(i < 120 ? "some" : "more")}-{i:000}.txt"), string.Empty);
     }
 
+    var pages = new List<TerminalCompletions>();
     TerminalCompletions many;
     try
     {
-      many = Complete(terminal, $"Get-Item '{folder.FullName}{Path.DirectorySeparatorChar}f-", forward: null);
+      var prefix = $"Get-Item '{folder.FullName}{Path.DirectorySeparatorChar}";
+      for (var page = 0; pages.Count == 0 || pages[^1].HasMorePages; page++)
+      {
+        pages.Add(Complete(terminal, prefix + "some-", forward: null, page));
+      }
+
+      many = Complete(terminal, prefix, forward: null);
     }
     finally
     {
       folder.Delete(recursive: true);
     }
 
-    Assert.True(pages.Count > 1, $"Only {pages.Count} page of Get- commands.");
+    var all = pages.SelectMany(x => x.Matches).Select(x => x.CompletionText).ToList();
+
+    Assert.Equal(3, pages.Count);
+    Assert.Equal(120, all.Count);
     Assert.Equal(pages[0].TotalCount, all.Count);
     Assert.Equal(all.Count, all.Distinct().Count());
     Assert.All(pages.SkipLast(1), x => Assert.Equal(TerminalCompletionRequest.PageSize, x.Matches.Count));
