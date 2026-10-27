@@ -83,6 +83,22 @@ internal sealed class TerminalOutputBuffer : IAsyncDisposable
     }
   }
 
+  /// <summary>Empties the screen: what wasn't sent yet would be cleared anyway, so it is dropped.</summary>
+  public void Clear()
+  {
+    lock (_gate)
+    {
+      if (_ended)
+      {
+        return;
+      }
+
+      _flushTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+      _pending.Clear();
+      _queue.Writer.TryWrite(new TerminalOutput(_terminalId, TerminalOutputKind.Cleared, string.Empty));
+    }
+  }
+
   /// <summary>Sends what is left and then the end of the session; nothing written afterwards is sent.</summary>
   public void End(string reason)
   {

@@ -23,6 +23,9 @@ internal interface ITerminalConsole
 
   /// <summary>The script ran <c>exit</c>.</summary>
   void RequestExit(int exitCode);
+
+  /// <summary>The script cleared the screen (<c>cls</c>).</summary>
+  void Clear();
 }
 
 /// <summary>
@@ -50,7 +53,7 @@ internal sealed class TerminalHost(ITerminalConsole console) : PSHost
 
 internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHostUserInterface
 {
-  private readonly TerminalRawUserInterface _raw = new();
+  private readonly TerminalRawUserInterface _raw = new(console);
   private readonly Dictionary<long, string> _lastProgress = [];
 
   public override PSHostRawUserInterface RawUI => _raw;
@@ -234,7 +237,7 @@ internal sealed class TerminalHostUserInterface(ITerminalConsole console) : PSHo
 /// A fixed 120 by 50 window for PowerShell's formatting; reading single keys isn't possible in a terminal that sends
 /// whole lines.
 /// </summary>
-internal sealed class TerminalRawUserInterface : PSHostRawUserInterface
+internal sealed class TerminalRawUserInterface(ITerminalConsole console) : PSHostRawUserInterface
 {
   private static readonly Size Window = new(120, 50);
 
@@ -260,5 +263,12 @@ internal sealed class TerminalRawUserInterface : PSHostRawUserInterface
 
   public override void ScrollBufferContents(Rectangle source, Coordinates destination, Rectangle clip, BufferCell fill) { }
   public override void SetBufferContents(Coordinates origin, BufferCell[,] contents) { }
-  public override void SetBufferContents(Rectangle rectangle, BufferCell fill) { }
+  // Clear-Host (cls) fills the whole screen, told by a rectangle of -1s, with blanks: the terminal empties its screen.
+  public override void SetBufferContents(Rectangle rectangle, BufferCell fill)
+  {
+    if (rectangle is { Left: -1, Top: -1, Right: -1, Bottom: -1 })
+    {
+      console.Clear();
+    }
+  }
 }

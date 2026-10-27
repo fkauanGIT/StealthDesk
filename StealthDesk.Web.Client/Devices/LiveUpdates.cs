@@ -146,6 +146,9 @@ public sealed class LiveUpdates(
   public Task<GatewayReply<TerminalInputReceipt>> SendTerminalInputAsync(Guid terminalId, string line) =>
     CallAsync<TerminalInputReceipt>(nameof(IDashboardHub.SendTerminalInput), terminalId, line);
 
+  public Task<GatewayReply<TerminalCompletions>> GetTerminalCompletionsAsync(Guid terminalId, TerminalCompletionRequest request) =>
+    CallAsync<TerminalCompletions>(nameof(IDashboardHub.GetTerminalCompletions), terminalId, request);
+
   public Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId) =>
     CallAsync<Guid>(nameof(IDashboardHub.CloseTerminal), terminalId);
 

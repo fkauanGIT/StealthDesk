@@ -123,6 +123,36 @@ public class DeviceTerminalPageTests : BunitContext
   }
 
   [Fact]
+  public async Task TabAndCtrlSpace_Complete_AndTheListFiltersAndPicks()
+  {
+    await LoadAsync(_device);
+    var page = Render<DeviceTerminalPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.Equal(TerminalStatus.Open, Terminal.Status));
+
+    page.Find("textarea").Input("Get-C");
+    await page.Find("textarea").KeyDownAsync(new KeyboardEventArgs { Key = "Tab" });
+    page.WaitForAssertion(() => Assert.Equal("Get-ChildItem", page.Find("textarea").GetAttribute("value")));
+    await page.Find("textarea").KeyDownAsync(new KeyboardEventArgs { Key = "Tab", ShiftKey = true });
+    page.WaitForAssertion(() => Assert.Equal("Get-Content", page.Find("textarea").GetAttribute("value")));
+
+    page.Find("textarea").Input("Get-C");
+    await page.Find("textarea").KeyDownAsync(new KeyboardEventArgs { Key = " ", CtrlKey = true });
+    page.WaitForAssertion(() => Assert.Equal(3, page.FindAll(".sd-terminal-completions li").Count));
+    // Escape closes the list and keeps what is typed; Ctrl+. opens it again.
+    await page.Find("textarea").KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
+    Assert.Empty(page.FindAll(".sd-terminal-completions"));
+    Assert.Equal("Get-C", page.Find("textarea").GetAttribute("value"));
+    await page.Find("textarea").KeyDownAsync(new KeyboardEventArgs { Key = ".", CtrlKey = true });
+    page.WaitForAssertion(() => Assert.Equal(3, page.FindAll(".sd-terminal-completions li").Count));
+    page.Find(".sd-terminal-filter").Input("cont");
+    Assert.Equal("Get-Content", Assert.Single(page.FindAll(".sd-terminal-completions li")).QuerySelector(".sd-mono")!.TextContent);
+    await page.Find(".sd-terminal-filter").KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
+
+    page.WaitForAssertion(() => Assert.Empty(page.FindAll(".sd-terminal-completions")));
+    Assert.Equal("Get-Content", page.Find("textarea").GetAttribute("value"));
+  }
+
+  [Fact]
   public async Task WithoutThePermission_ThePageSaysSo_AndOpensNothing()
   {
     _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false));
@@ -165,7 +195,7 @@ public class DeviceTerminalPageTests : BunitContext
 
     var keys = page.FindAll(".sd-shortcuts kbd").Select(x => x.TextContent).ToList();
     Assert.Equal(DeviceTerminalPage.Shortcuts.Select(x => x.Keys), keys);
-    Assert.Equal(["Enter", "Shift + Enter", "Up", "Down", "Escape"], keys);
+    Assert.Equal(["Enter", "Shift + Enter", "Up", "Down", "Tab", "Shift + Tab", "Ctrl + Space", "Ctrl + .", "Escape"], keys);
   }
 
   private Task LoadAsync(DeviceSummary device)
@@ -174,8 +204,15 @@ public class DeviceTerminalPageTests : BunitContext
     return Services.GetRequiredService<DeviceStore>().LoadAsync();
   }
 
+  // The caret is always at the end of the input, as after typing.
   private sealed class NoKeys : ITerminalKeys
   {
     public Task AttachAsync(ElementReference input) => Task.CompletedTask;
+
+    public Task<int> CaretAsync(ElementReference input) => Task.FromResult(int.MaxValue);
+
+    public Task PlaceCaretAsync(ElementReference input, int position) => Task.CompletedTask;
+
+    public Task HoldEnterAsync(ElementReference element) => Task.CompletedTask;
   }
 }

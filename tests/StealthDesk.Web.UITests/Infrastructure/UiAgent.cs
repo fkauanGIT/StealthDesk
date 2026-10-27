@@ -161,6 +161,9 @@ public sealed class UiAgent : IAsyncDisposable
     public Task<GatewayReply<StealthDesk.Contracts.Terminal.TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.Terminal.TerminalInputReceipt>(NoAnswers));
 
+    public Task<GatewayReply<StealthDesk.Contracts.Terminal.TerminalCompletions>> GetTerminalCompletions(Guid terminalId, StealthDesk.Contracts.Terminal.TerminalCompletionRequest request, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.Terminal.TerminalCompletions>(NoAnswers));
+
     public Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
   }

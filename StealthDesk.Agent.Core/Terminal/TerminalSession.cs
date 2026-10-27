@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Management.Automation;
 using System.Management.Automation.Host;
 using System.Management.Automation.Runspaces;
@@ -7,6 +8,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerShell;
 using StealthDesk.Contracts.Terminal;
+using StealthDesk.Core;
 
 namespace StealthDesk.Agent.Core.Terminal;
 
@@ -37,11 +39,16 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
   private readonly Channel<string> _commands = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
   private readonly Lock _gate = new();
   private readonly ITimer _idle;
+
+  // PowerShell runs one thing at a time: a command, or working out completions.
+  private readonly SemaphoreSlim _runspaceInUse = new(1, 1);
   private Runspace? _runspace;
   private Task _running = Task.CompletedTask;
   private PowerShell? _current;
   private TaskCompletionSource<string>? _answer;
   private int? _exitCode;
+  private CommandCompletion? _completion;
+  private (string Input, int Cursor) _completed;
   private bool _busy;
   private Task? _disposing;
 
@@ -138,6 +145,89 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
     }
   }
 
+  /// <summary>
+  /// Completions for what is typed, from this session: its commands, variables and folder. The same input asked again
+  /// walks the same matches, so Tab after Tab goes through them. Not while a command runs: PowerShell is taken.
+  /// </summary>
+  public Outcome<TerminalCompletions> Complete(TerminalCompletionRequest request)
+  {
+    const string Busy = "Completions aren't available while a command runs.";
+    lock (_gate)
+    {
+      if (HasEnded)
+      {
+        return Outcome.Failure<TerminalCompletions>("The terminal session has ended.");
+      }
+
+      if (_runspace is null)
+      {
+        return Outcome.Failure<TerminalCompletions>(Busy);
+      }
+    }
+
+    // Taken for as long as a command runs, questions it asks included.
+    if (!_runspaceInUse.Wait(0))
+    {
+      return Outcome.Failure<TerminalCompletions>(Busy);
+    }
+
+    try
+    {
+      var cursor = Math.Clamp(request.Cursor, 0, request.Input.Length);
+      if (_completion is null || _completed != (request.Input, cursor))
+      {
+        using var shell = PowerShell.Create();
+        shell.Runspace = _runspace;
+        _completion = CommandCompletion.CompleteInput(request.Input, cursor, new Hashtable(), shell);
+        _completed = (request.Input, cursor);
+      }
+
+      return Answer(_completion, request);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Completing input failed in terminal {TerminalId}.", Id);
+      return Outcome.Failure<TerminalCompletions>("PowerShell couldn't complete that.");
+    }
+    finally
+    {
+      _runspaceInUse.Release();
+    }
+  }
+
+  private static TerminalCompletions Answer(CommandCompletion completion, TerminalCompletionRequest request)
+  {
+    if (request.Forward is { } forward)
+    {
+      var next = completion.GetNextResult(forward);
+      return new TerminalCompletions(
+        completion.ReplacementIndex,
+        completion.ReplacementLength,
+        next is null ? [] : [Match(next)],
+        next is null ? 0 : 1,
+        Page: 0,
+        HasMorePages: false);
+    }
+
+    var total = completion.CompletionMatches.Count;
+    var page = Math.Max(0, request.Page);
+    if (total > TerminalCompletions.MaxListed)
+    {
+      return new TerminalCompletions(completion.ReplacementIndex, completion.ReplacementLength, [], total, page, HasMorePages: false);
+    }
+
+    return new TerminalCompletions(
+      completion.ReplacementIndex,
+      completion.ReplacementLength,
+      [.. completion.CompletionMatches.Skip(page * TerminalCompletionRequest.PageSize).Take(TerminalCompletionRequest.PageSize).Select(Match)],
+      total,
+      page,
+      HasMorePages: (page + 1) * TerminalCompletionRequest.PageSize < total);
+  }
+
+  private static TerminalCompletionMatch Match(CompletionResult result) =>
+    new(result.CompletionText, result.ListItemText, (TerminalCompletionKind)result.ResultType, result.ToolTip);
+
   /// <summary>Ends the session: stops the command running and sends <paramref name="reason"/> as its last output.</summary>
   public void End(string reason)
   {
@@ -218,6 +308,8 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
 
   void ITerminalConsole.RequestExit(int exitCode) => _exitCode = exitCode;
 
+  void ITerminalConsole.Clear() => _output.Clear();
+
   // The terminal shows what it receives as it is: PowerShell's color codes would show as stray characters.
   private void Write(TerminalOutputKind kind, string text) => _output.Write(kind, AnsiCodes().Replace(text, string.Empty));
 
@@ -265,6 +357,7 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       return;
     }
 
+    await _runspaceInUse.WaitAsync();
     using var shell = PowerShell.Create();
     shell.Runspace = _runspace;
     // As the console runs what is typed: errors go along with results, and Out-Default shows them all through the
@@ -300,6 +393,8 @@ internal sealed partial class TerminalSession : ITerminalConsole, IAsyncDisposab
       {
         _current = null;
       }
+
+      _runspaceInUse.Release();
     }
   }
 

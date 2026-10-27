@@ -19,6 +19,9 @@ public sealed class AgentCallbacks(ITerminalSessions terminals) : IAgentCallback
   public Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
     Task.FromResult(Reply(terminals.Send(terminalId, line)));
 
+  public Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request, CancellationToken cancellationToken) =>
+    Task.FromResult(Reply(terminals.Complete(terminalId, request)));
+
   public Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken)
   {
     // Told apart so the server can let go of a session this agent no longer has, e.g. after a restart.

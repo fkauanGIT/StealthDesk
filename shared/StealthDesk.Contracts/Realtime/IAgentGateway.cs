@@ -35,6 +35,9 @@ public interface IAgentCallbacks
   /// <summary>A line typed in the terminal: the answer to a question waiting, or the next command.</summary>
   Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken);
 
+  /// <summary>Completions for what is typed in the session; refused while a command runs.</summary>
+  Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request, CancellationToken cancellationToken);
+
   /// <summary>Ends the session, stopping what it runs; its last output says so. Refused for one that isn't running.</summary>
   Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken);
 }
