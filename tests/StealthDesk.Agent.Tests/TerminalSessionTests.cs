@@ -70,10 +70,55 @@ public class TerminalSessionTests
     Assert.Equal("from-a-program\n", shown);
     // As PowerShell's console shows a program's error stream: as its text, not as an error of PowerShell's own.
     Assert.Equal("to-the-error-stream", errorStream.Trim());
-    Assert.DoesNotContain("second", whileRunning);
+    Assert.DoesNotContain("\nsecond", whileRunning);
   }
 
   private static string Program(string line) => OperatingSystem.IsWindows() ? $"cmd /c \"{line}\"" : $"sh -c '{line}'";
+
+  [Fact]
+  public async Task EachLine_SaysWhetherItAnsweredAQuestion()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    var command = terminal.Sessions.Send(terminal.Terminal, "$pin = Read-Host 'PIN' -AsSecureString");
+    await terminal.ShowsAsync("PIN: ");
+    var answer = terminal.Sessions.Send(terminal.Terminal, "1234");
+
+    Assert.Equal(new TerminalInputReceipt(terminal.Terminal, AnsweredQuestion: false), command.Value);
+    Assert.Equal(new TerminalInputReceipt(terminal.Terminal, AnsweredQuestion: true), answer.Value);
+  }
+
+  // A browser that leaves while PowerShell loads closes the session before it has its PowerShell.
+  [Fact]
+  public async Task ClosedWhileItOpens_LetsGoOfItsPowerShell()
+  {
+    await using var output = new TerminalHarness();
+    var modules = PowerShellModules.Prepare(Path.Combine(Path.GetTempPath(), $"sd-modules-{Guid.NewGuid():N}"));
+    var session = new TerminalSession(Guid.NewGuid(), output, new TerminalOptions(), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, _ => { });
+
+    var starting = session.StartAsync(AppContext.BaseDirectory, modules);
+    session.End("The session was closed.");
+    await starting;
+
+    Assert.Equal(System.Management.Automation.Runspaces.RunspaceState.Closed, session.PowerShellState);
+    await session.DisposeAsync();
+  }
+
+  [Fact]
+  public async Task WhatIsTyped_IsShownAfterThePrompt_AndAnswersAsTyped()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    await terminal.RunAsync("$x = 1");
+    terminal.Send("Read-Host 'Name'");
+    await terminal.ShowsAsync("Name: ");
+    await terminal.AnswerAsync("Ana");
+
+    Assert.Contains("> $x = 1\nPS ", terminal.Screen);
+    Assert.Contains("> Read-Host 'Name'\nName: Ana\nAna\nPS ", terminal.Screen);
+  }
 
   [Fact]
   public async Task Errors_AreSentAsErrorOutput()
@@ -88,7 +133,9 @@ public class TerminalSessionTests
     Assert.Contains("no-such-file-here", terminal.Errors);
     Assert.Contains("boom", terminal.Errors);
     Assert.Contains("You must provide a value expression", terminal.Errors);
-    Assert.DoesNotContain("no-such-file-here", string.Concat(terminal.Received.Where(x => x.Kind == TerminalOutputKind.Output).Select(x => x.Text)));
+    // Beyond the command shown as typed.
+    var output = string.Concat(terminal.Received.Where(x => x.Kind == TerminalOutputKind.Output).Select(x => x.Text));
+    Assert.DoesNotContain("no-such-file-here", output.Replace("Get-Item 'no-such-file-here'\n", string.Empty, StringComparison.Ordinal));
   }
 
   [Fact]
@@ -116,9 +163,9 @@ public class TerminalSessionTests
 
     terminal.Send("Start-Sleep -Milliseconds 500; 'first'");
     terminal.Send("'second'");
-    await terminal.ShowsAsync("second");
+    await terminal.ShowsAsync("\nsecond\n");
 
-    Assert.True(terminal.Screen.IndexOf("first", StringComparison.Ordinal) < terminal.Screen.IndexOf("second", StringComparison.Ordinal));
+    Assert.True(terminal.Screen.IndexOf("\nfirst\n", StringComparison.Ordinal) is > 0 and var first && first < terminal.Screen.IndexOf("\nsecond\n", StringComparison.Ordinal));
   }
 
   [Fact]
@@ -142,13 +189,14 @@ public class TerminalSessionTests
 
     terminal.Send("$secret = Read-Host 'PIN' -AsSecureString; [System.Net.NetworkCredential]::new('', $secret).Password");
     await terminal.ShowsAsync("PIN: ");
-    var pin = await terminal.RunAsync("4321");
+    var pin = await terminal.AnswerAsync("4321");
     terminal.Send("$credential = Get-Credential -UserName 'bob'; $credential.UserName + ':' + $credential.GetNetworkCredential().Password");
     await terminal.ShowsAsync("Password for user bob: ");
-    var credential = await terminal.RunAsync("s3cret");
+    var credential = await terminal.AnswerAsync("s3cret");
 
-    Assert.Contains("4321", pin);
-    Assert.Contains("bob:s3cret", credential);
+    // Shown as stars as they are typed; the commands themselves print them back.
+    Assert.Equal("****\n4321\n", pin);
+    Assert.Equal("******\nbob:s3cret\n", credential);
   }
 
   [Fact]

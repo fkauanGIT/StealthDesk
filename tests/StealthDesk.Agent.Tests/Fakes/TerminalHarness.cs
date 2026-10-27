@@ -63,11 +63,25 @@ public sealed class TerminalHarness : ITerminalOutputSink, IAsyncDisposable
     await UntilAsync(() => Screen.EndsWith("> ", StringComparison.Ordinal));
   }
 
-  /// <summary>Types a line and waits until the next prompt; answers what the command showed in between.</summary>
+  /// <summary>
+  /// Types a line and waits until the next prompt; answers what the command showed in between, after the line
+  /// itself, which the session shows first.
+  /// </summary>
   public async Task<string> RunAsync(string line)
   {
     var before = Screen.Length;
     Send(line);
+    await UntilAsync(() => Screen.Length > before && Screen.EndsWith("> ", StringComparison.Ordinal) && Screen[before..].Contains("PS ", StringComparison.Ordinal));
+    var shown = Screen[before..];
+    Assert.StartsWith(line + "\n", shown);
+    return shown[(line.Length + 1)..shown.LastIndexOf("PS ", StringComparison.Ordinal)];
+  }
+
+  /// <summary>Answers the question waiting and waits until the next prompt; answers everything shown in between.</summary>
+  public async Task<string> AnswerAsync(string answer)
+  {
+    var before = Screen.Length;
+    Send(answer);
     await UntilAsync(() => Screen.Length > before && Screen.EndsWith("> ", StringComparison.Ordinal) && Screen[before..].Contains("PS ", StringComparison.Ordinal));
     var shown = Screen[before..];
     return shown[..shown.LastIndexOf("PS ", StringComparison.Ordinal)];

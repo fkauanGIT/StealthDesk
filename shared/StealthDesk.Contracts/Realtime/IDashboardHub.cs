@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
+using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Contracts.Realtime;
 
@@ -36,8 +37,8 @@ public interface IDashboardHub
   /// </summary>
   Task<GatewayReply<Guid>> OpenTerminal(Guid deviceId);
 
-  /// <summary>A line typed in a terminal this connection opened.</summary>
-  Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line);
+  /// <summary>A line typed in a terminal this connection opened; the receipt says whether it answered a question.</summary>
+  Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line);
 
   /// <summary>Closes a terminal this connection opened; its last output says it ended.</summary>
   Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId);

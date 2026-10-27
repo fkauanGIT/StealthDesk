@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StealthDesk.Agent.Core.Settings;
+using StealthDesk.Contracts.Terminal;
 using StealthDesk.Core;
 
 namespace StealthDesk.Agent.Core.Terminal;
@@ -13,7 +14,7 @@ public interface ITerminalSessions
   Task<Outcome<Guid>> OpenAsync(Guid terminalId, CancellationToken cancellationToken = default);
 
   /// <summary>A line typed in the terminal: the answer to a question waiting, or the next command.</summary>
-  Outcome<Guid> Send(Guid terminalId, string line);
+  Outcome<TerminalInputReceipt> Send(Guid terminalId, string line);
 
   /// <summary>Ends the session, stopping what it runs; nothing happens for one that isn't running.</summary>
   void Close(Guid terminalId);
@@ -71,10 +72,10 @@ public sealed class TerminalSessions(
     }
   }
 
-  public Outcome<Guid> Send(Guid terminalId, string line) =>
-    _sessions.TryGetValue(terminalId, out var session) && session.Submit(line)
-      ? terminalId
-      : Outcome.Failure<Guid>(Ended);
+  public Outcome<TerminalInputReceipt> Send(Guid terminalId, string line) =>
+    _sessions.TryGetValue(terminalId, out var session) && session.Submit(line) is { } receipt
+      ? receipt
+      : Outcome.Failure<TerminalInputReceipt>(Ended);
 
   public void Close(Guid terminalId)
   {

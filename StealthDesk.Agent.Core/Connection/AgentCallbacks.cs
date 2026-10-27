@@ -2,6 +2,7 @@ using StealthDesk.Agent.Core.Inventory;
 using StealthDesk.Agent.Core.Terminal;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.Terminal;
 using StealthDesk.Core;
 
 namespace StealthDesk.Agent.Core.Connection;
@@ -15,7 +16,7 @@ public sealed class AgentCallbacks(ITerminalSessions terminals) : IAgentCallback
   public async Task<GatewayReply<Guid>> OpenTerminal(Guid terminalId, CancellationToken cancellationToken) =>
     Reply(await terminals.OpenAsync(terminalId, cancellationToken));
 
-  public Task<GatewayReply<Guid>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
+  public Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
     Task.FromResult(Reply(terminals.Send(terminalId, line)));
 
   public Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken)
@@ -30,6 +31,6 @@ public sealed class AgentCallbacks(ITerminalSessions terminals) : IAgentCallback
     return Task.FromResult(GatewayReply.Accept(terminalId));
   }
 
-  private static GatewayReply<Guid> Reply(Outcome<Guid> outcome) =>
-    outcome.Succeeded ? GatewayReply.Accept(outcome.Value) : GatewayReply.Refuse<Guid>(outcome.Error);
+  private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
+    outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);
 }

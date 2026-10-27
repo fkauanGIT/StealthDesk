@@ -23,4 +23,5 @@ public enum IconName
   Users,
   Group,
   Settings,
+  Terminal,
 }
