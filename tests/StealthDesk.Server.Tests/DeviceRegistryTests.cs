@@ -1,5 +1,8 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using StealthDesk.Server.Tests.Infrastructure;
+using StealthDesk.Web.Server.Accounts;
 using StealthDesk.Web.Server.Devices;
 
 namespace StealthDesk.Server.Tests;
@@ -94,6 +97,28 @@ public class DeviceRegistryTests
     Assert.False(await server.WithDbAsync(db => db.Devices.Select(x => x.IsOnline).SingleAsync()));
   }
 
+  // The old connection closing lands between the new connection's report reading the device and saving it.
+  [Fact]
+  public async Task SaveReport_KeepsTheDeviceOnline_WhenTheOldConnectionClosesWhileItSaves()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var report = TestAgent.Report(Guid.NewGuid()) with { TenantId = await DefaultTenant(server) };
+    await Save(server, report, allowNew: true, connectionId: "old");
+
+    await using var scope = server.Services.CreateAsyncScope();
+    var options = new DbContextOptionsBuilder<StealthDeskDb>(scope.ServiceProvider.GetRequiredService<DbContextOptions<StealthDeskDb>>())
+      .AddInterceptors(new BeforeSaving(() => Registry(server, registry => registry.MarkOfflineAsync(report.DeviceId, "old", DateTimeOffset.UtcNow))))
+      .Options;
+    await using var db = new StealthDeskDb(options, scope.ServiceProvider.GetRequiredService<ITenantScope>());
+    var saved = await new DeviceRegistry(db, NullLogger<DeviceRegistry>.Instance)
+      .SaveReportAsync(report, new ReportOrigin("new", null, DateTimeOffset.UtcNow), Key, allowNew: true, TestContext.Current.CancellationToken);
+
+    Assert.True(saved.Succeeded, saved.Error);
+    var device = await server.WithDbAsync(x => x.Devices.SingleAsync());
+    Assert.Equal("new", device.ConnectionId);
+    Assert.True(device.IsOnline);
+  }
+
   private static Task<Guid> DefaultTenant(ServerHost server) =>
     TestTenants.EnsureAsync(server);
 
@@ -109,6 +134,26 @@ public class DeviceRegistryTests
       new ReportOrigin(connectionId, remote, DateTimeOffset.UtcNow),
       Key,
       allowNew));
+  }
+
+  // Runs something once, as the first save starts: after the device was read, before anything is written.
+  private sealed class BeforeSaving(Func<Task> action) : SaveChangesInterceptor
+  {
+    private bool _done;
+
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+      DbContextEventData eventData,
+      InterceptionResult<int> result,
+      CancellationToken cancellationToken = default)
+    {
+      if (!_done)
+      {
+        _done = true;
+        await action();
+      }
+
+      return result;
+    }
   }
 
   private static async Task<T> Registry<T>(ServerHost server, Func<IDeviceRegistry, Task<T>> action)

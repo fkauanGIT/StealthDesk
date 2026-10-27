@@ -66,6 +66,12 @@ public sealed class DeviceRegistry(StealthDeskDb db, ILogger<DeviceRegistry> log
     device.IsOnline = true;
     device.LastSeen = connection.ReceivedAt;
     RecordPublicAddress(device, connection);
+    if (db.Entry(device).State != EntityState.Added)
+    {
+      // Written even when it was already online when read: the old connection closing may have marked it offline
+      // since, and only properties that changed since the read would be saved.
+      db.Entry(device).Property(x => x.IsOnline).IsModified = true;
+    }
 
     await db.SaveChangesAsync(cancellationToken);
     return device;
