@@ -12,6 +12,9 @@ public enum TerminalOutputKind
 
   /// <summary>The session is over; the text says why. Nothing follows it.</summary>
   Ended,
+
+  /// <summary>The screen was cleared (<c>cls</c>): what was shown goes; the session goes on. No text.</summary>
+  Cleared,
 }
 
 /// <summary>

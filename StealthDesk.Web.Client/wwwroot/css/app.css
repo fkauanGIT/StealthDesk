@@ -1779,3 +1779,52 @@ a.sd-btn:hover {
   font-family: var(--sd-font-mono);
   font-size: var(--sd-text-sm);
 }
+
+.sd-terminal-hint {
+  font-size: var(--sd-text-sm);
+}
+
+.sd-terminal-completions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-2);
+  max-height: 240px;
+}
+
+.sd-terminal-filter {
+  padding: var(--sd-space-1) var(--sd-space-3);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-raised);
+  color: var(--sd-text);
+  font-size: var(--sd-text-sm);
+}
+
+.sd-terminal-completions ul {
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+}
+
+.sd-terminal-completions button {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sd-space-3);
+  width: 100%;
+  padding: var(--sd-space-1) var(--sd-space-3);
+  border: 0;
+  background: none;
+  color: var(--sd-text);
+  font-size: var(--sd-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sd-terminal-completions button:hover,
+.sd-terminal-completions button:focus-visible {
+  background: var(--sd-selected);
+  color: var(--sd-on-selected);
+}

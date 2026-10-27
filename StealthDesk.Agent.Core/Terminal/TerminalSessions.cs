@@ -19,6 +19,9 @@ public interface ITerminalSessions
   /// <summary>Ends the session, stopping what it runs; nothing happens for one that isn't running.</summary>
   void Close(Guid terminalId);
 
+  /// <summary>Completions for what is typed in the session.</summary>
+  Outcome<TerminalCompletions> Complete(Guid terminalId, TerminalCompletionRequest request);
+
   /// <summary>The ids of the sessions running.</summary>
   IReadOnlyCollection<Guid> Running { get; }
 }
@@ -76,6 +79,9 @@ public sealed class TerminalSessions(
     _sessions.TryGetValue(terminalId, out var session) && session.Submit(line) is { } receipt
       ? receipt
       : Outcome.Failure<TerminalInputReceipt>(Ended);
+
+  public Outcome<TerminalCompletions> Complete(Guid terminalId, TerminalCompletionRequest request) =>
+    _sessions.TryGetValue(terminalId, out var session) ? session.Complete(request) : Outcome.Failure<TerminalCompletions>(Ended);
 
   public void Close(Guid terminalId)
   {

@@ -200,6 +200,36 @@ public class TerminalRelayTests
   }
 
   [Fact]
+  public async Task Completions_ReachTheAgent_WithThePermission_AndNotAfterADeny()
+  {
+    await using var world = await World.CreateAsync();
+    var terminal = (await world.OpenAsync()).Value;
+
+    var completed = await world.CompleteAsync(terminal, "Get-Chi");
+    await world.AssignAsync(PermissionNames.DeviceTerminalUse, PermissionScopeKind.Device, PermissionEffect.Deny);
+    var refused = await world.CompleteAsync(terminal, "Get-Chi");
+
+    Assert.True(completed.Accepted, completed.Error);
+    Assert.Equal("Get-ChildItem", Assert.Single(completed.Value!.Matches).CompletionText);
+    Assert.Equal("You may not use the terminal on this device.", refused.Error);
+    Assert.Equal([$"open {terminal}", $"complete {terminal} Get-Chi", $"close {terminal}"], world.Agent.Calls);
+  }
+
+  [Fact]
+  public async Task Completions_ForASessionThisBrowserDidNotOpen_AreRefused()
+  {
+    await using var world = await World.CreateAsync();
+    var terminal = (await world.OpenAsync()).Value;
+    await using var other = await world.ConnectAgainAsync();
+
+    var refused = await other.Connection.InvokeAsync<GatewayReply<TerminalCompletions>>(
+      nameof(IDashboardHub.GetTerminalCompletions), terminal, new TerminalCompletionRequest("Get-Chi", 7, Forward: true), Cancel);
+
+    Assert.Equal("The terminal isn't open.", refused.Error);
+    Assert.Equal([$"open {terminal}"], world.Agent.Calls);
+  }
+
+  [Fact]
   public async Task ClosingASessionTheAgentNoLongerHas_LetsGoOfIt()
   {
     await using var world = await World.CreateAsync();
@@ -266,6 +296,13 @@ public class TerminalRelayTests
       _calls.Enqueue($"input {terminalId} {line}");
       Send(new(terminalId, TerminalOutputKind.Output, $"ran {line}\n"));
       return Task.FromResult(GatewayReply.Accept(new TerminalInputReceipt(terminalId, AnsweredQuestion: false)));
+    }
+
+    public override Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request, CancellationToken cancellationToken)
+    {
+      _calls.Enqueue($"complete {terminalId} {request.Input}");
+      return Task.FromResult(GatewayReply.Accept(new TerminalCompletions(
+        0, request.Input.Length, [new TerminalCompletionMatch("Get-ChildItem", "Get-ChildItem", TerminalCompletionKind.Command, "Get-ChildItem [-Path]")], 1, 0, false)));
     }
 
     public override Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken)
@@ -361,6 +398,10 @@ public class TerminalRelayTests
 
     public Task<GatewayReply<TerminalInputReceipt>> InputAsync(Guid terminal, string line) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<TerminalInputReceipt>>(nameof(IDashboardHub.SendTerminalInput), terminal, line, Cancel);
+
+    public Task<GatewayReply<TerminalCompletions>> CompleteAsync(Guid terminal, string input) =>
+      Dashboard.Connection.InvokeAsync<GatewayReply<TerminalCompletions>>(
+        nameof(IDashboardHub.GetTerminalCompletions), terminal, new TerminalCompletionRequest(input, input.Length, Forward: true), Cancel);
 
     public Task<GatewayReply<Guid>> CloseAsync(Guid terminal) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.CloseTerminal), terminal, Cancel);

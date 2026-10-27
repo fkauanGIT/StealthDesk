@@ -163,6 +163,109 @@ public class DeviceTerminalTests : BunitContext
   }
 
   [Fact]
+  public async Task Tab_CompletesTheWordAtTheCaret_AndWalksTheMatchesBothWays()
+  {
+    await _terminal.OpenAsync(Device);
+    _terminal.Input = "dir; Get-C";
+
+    await _terminal.CompleteAsync(forward: true, cursor: 10);
+    Assert.Equal("dir; Get-ChildItem", _terminal.Input);
+    Assert.Equal(18, _terminal.Caret);
+    await _terminal.CompleteAsync(forward: true, cursor: 18);
+    Assert.Equal("dir; Get-Command", _terminal.Input);
+    await _terminal.CompleteAsync(forward: false, cursor: 16);
+    Assert.Equal("dir; Get-ChildItem", _terminal.Input);
+
+    // Every request was for what was typed before the first Tab.
+    Assert.All(_hub.Calls.Where(x => x.StartsWith("complete", StringComparison.Ordinal)), x => Assert.StartsWith("complete dir; Get-C|10|", x));
+  }
+
+  [Fact]
+  public async Task TypingAfterTab_CompletesWhatIsTypedNow()
+  {
+    await _terminal.OpenAsync(Device);
+    _terminal.Input = "Get-C";
+    await _terminal.CompleteAsync(forward: true, cursor: 5);
+
+    _terminal.Input = "Get-Con";
+    await _terminal.CompleteAsync(forward: true, cursor: 7);
+
+    Assert.Equal("Get-Content", _terminal.Input);
+  }
+
+  [Fact]
+  public async Task NoMatch_OrARefusal_SaysSo_AndLeavesTheInput()
+  {
+    await _terminal.OpenAsync(Device);
+    _terminal.Input = "Zzz";
+
+    await _terminal.CompleteAsync(forward: true, cursor: 3);
+    Assert.Equal("No completions.", _terminal.Hint);
+    _hub.CompletionReply = GatewayReply.Refuse<TerminalCompletions>("Completions aren't available while a command runs.");
+    await _terminal.CompleteAsync(forward: true, cursor: 3);
+
+    Assert.Equal("Completions aren't available while a command runs.", _terminal.Hint);
+    Assert.Equal("Zzz", _terminal.Input);
+  }
+
+  [Fact]
+  public async Task ListingCompletions_GetsEveryPage_AndPickingOneReplacesTheWord()
+  {
+    await _terminal.OpenAsync(Device);
+    _hub.Completable = [.. Enumerable.Range(1, 120).Select(x => $"Item-{x:000}")];
+    _terminal.Input = "Get-Item; It";
+
+    await _terminal.ListCompletionsAsync(cursor: 12);
+
+    Assert.Equal(120, _terminal.Completions!.Completions.Matches.Count);
+    Assert.Equal(3, _hub.Calls.Count(x => x.StartsWith("complete", StringComparison.Ordinal)));
+    _terminal.Choose(_terminal.Completions.Completions.Matches[41]);
+    Assert.Equal("Get-Item; Item-042", _terminal.Input);
+    Assert.Null(_terminal.Completions);
+  }
+
+  [Fact]
+  public async Task TooManyCompletions_AreCounted_NotListed()
+  {
+    await _terminal.OpenAsync(Device);
+    _hub.Completable = [.. Enumerable.Range(1, 600).Select(x => $"Item-{x:000}")];
+    _terminal.Input = "It";
+
+    await _terminal.ListCompletionsAsync(cursor: 2);
+
+    Assert.Null(_terminal.Completions);
+    Assert.Equal("600 matches: type more to narrow them.", _terminal.Hint);
+    Assert.Single(_hub.Calls, x => x.StartsWith("complete", StringComparison.Ordinal));
+  }
+
+  [Fact]
+  public async Task Escape_ClosesTheListFirst_ThenClears()
+  {
+    await _terminal.OpenAsync(Device);
+    _terminal.Input = "Get-C";
+    await _terminal.ListCompletionsAsync(cursor: 5);
+
+    Assert.True(_terminal.CloseCompletions());
+    Assert.Equal("Get-C", _terminal.Input);
+    Assert.False(_terminal.CloseCompletions());
+  }
+
+  [Fact]
+  public async Task ClearingTheScreen_EmptiesIt_AndTheSessionGoesOn()
+  {
+    await _terminal.OpenAsync(Device);
+    _terminal.Input = "hostname";
+    await _terminal.SubmitAsync();
+
+    _hub.Send(_hub.NextTerminal, TerminalOutputKind.Cleared, string.Empty);
+    _hub.Send(_hub.NextTerminal, TerminalOutputKind.Output, "PS C:\\> ");
+
+    Assert.Equal("PS C:\\> ", Screen);
+    Assert.Equal(TerminalStatus.Open, _terminal.Status);
+    Assert.Equal(["hostname"], _terminal.History);
+  }
+
+  [Fact]
   public async Task TheSessionEnding_SaysWhy()
   {
     await _terminal.OpenAsync(Device);

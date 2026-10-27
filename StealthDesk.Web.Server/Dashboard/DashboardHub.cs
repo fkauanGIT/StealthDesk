@@ -151,6 +151,23 @@ public sealed class DashboardHub(
   }
 
   [ChecksPermission(PermissionNames.DeviceTerminalUse)]
+  public async Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request)
+  {
+    if (request.Input.Length > IDashboardHub.MaxTerminalInputLength || request.Page < 0)
+    {
+      return GatewayReply.Refuse<TerminalCompletions>("The completion request is out of range.");
+    }
+
+    var (terminal, refused) = await TerminalOfAsync(terminalId);
+    if (terminal is null)
+    {
+      return GatewayReply.Refuse<TerminalCompletions>(refused!);
+    }
+
+    return await agents.CallAsync(terminal.DeviceId, (agent, token) => agent.GetTerminalCompletions(terminalId, request, token), Context.ConnectionAborted);
+  }
+
+  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
   public async Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId)
   {
     var (terminal, refused) = await TerminalOfAsync(terminalId);

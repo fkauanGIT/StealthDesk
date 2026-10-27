@@ -18,6 +18,9 @@ public class RefusingAgent : IAgentCallbacks
   public virtual Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<TerminalInputReceipt>(NoAnswers));
 
+  public virtual Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<TerminalCompletions>(NoAnswers));
+
   public virtual Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
 }

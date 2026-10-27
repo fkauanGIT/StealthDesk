@@ -19,6 +19,9 @@ public enum TerminalStatus
 /// <summary>A run of text of one kind on a line of the terminal.</summary>
 public sealed record TerminalSpan(TerminalOutputKind Kind, string Text);
 
+/// <summary>Every match for what was typed, to pick one from; <see cref="Typed"/> is what they complete.</summary>
+public sealed record CompletionList(string Typed, TerminalCompletions Completions);
+
 /// <summary>A line of the terminal; the last one is still being written.</summary>
 public sealed class TerminalLine
 {
@@ -61,6 +64,11 @@ public sealed class DeviceTerminal : IDisposable
   private int _historyIndex;
   private string _draft = string.Empty;
 
+  // What Tab completes: the input and caret when it was first pressed, and what the last completion left, so Tab
+  // after Tab walks the same matches until something else is typed.
+  private (string Input, int Cursor)? _completing;
+  private string? _completed;
+
   public DeviceTerminal(IDeviceHub hub, NavigationManager navigation)
   {
     _hub = hub;
@@ -88,6 +96,15 @@ public sealed class DeviceTerminal : IDisposable
   public bool Multiline { get; set; }
 
   public bool Sending { get; private set; }
+
+  /// <summary>Something to say about completing, e.g. that there were none; null when there is nothing to say.</summary>
+  public string? Hint { get; private set; }
+
+  /// <summary>Every match, as listed by <see cref="ListCompletionsAsync"/>; null when no list is open.</summary>
+  public CompletionList? Completions { get; private set; }
+
+  /// <summary>Where the caret goes after a completion changed the input; the page puts it there once.</summary>
+  public int? Caret { get; set; }
 
   public IReadOnlyList<TerminalLine> Lines => _lines;
 
@@ -171,6 +188,9 @@ public sealed class DeviceTerminal : IDisposable
       Remember(sent.Value is { AnsweredQuestion: true } ? string.Empty : line);
       Input = string.Empty;
       Notice = null;
+      Hint = null;
+      Completions = null;
+      _completing = null;
     }
     else
     {
@@ -178,6 +198,116 @@ public sealed class DeviceTerminal : IDisposable
     }
 
     Raise();
+  }
+
+  /// <summary>
+  /// Replaces the part of the input before <paramref name="cursor"/> PowerShell completes with the next match (Tab),
+  /// or the one before (Shift+Tab). Pressed again without typing, it goes on through the same matches.
+  /// </summary>
+  public async Task CompleteAsync(bool forward, int cursor)
+  {
+    if (Status != TerminalStatus.Open || TerminalId is not { } terminal)
+    {
+      return;
+    }
+
+    if (_completing is null || Input != _completed)
+    {
+      _completing = (Input, Math.Clamp(cursor, 0, Input.Length));
+    }
+
+    var (typed, at) = _completing.Value;
+    var reply = await _hub.GetTerminalCompletionsAsync(terminal, new TerminalCompletionRequest(typed, at, forward));
+    Hint = null;
+    if (!reply.Accepted)
+    {
+      Hint = reply.Error;
+    }
+    else if (reply.Value!.Matches is [var match])
+    {
+      Use(typed, reply.Value, match);
+      _completed = Input;
+    }
+    else
+    {
+      Hint = "No completions.";
+    }
+
+    Raise();
+  }
+
+  /// <summary>
+  /// Lists every match for the input up to <paramref name="cursor"/>, page by page, to pick one from. Too many to
+  /// read are counted instead.
+  /// </summary>
+  public async Task ListCompletionsAsync(int cursor)
+  {
+    if (Status != TerminalStatus.Open || TerminalId is not { } terminal)
+    {
+      return;
+    }
+
+    var typed = Input;
+    var at = Math.Clamp(cursor, 0, typed.Length);
+    var matches = new List<TerminalCompletionMatch>();
+    TerminalCompletions? last = null;
+    Hint = null;
+    for (var page = 0; last is null || last.HasMorePages; page++)
+    {
+      var reply = await _hub.GetTerminalCompletionsAsync(terminal, new TerminalCompletionRequest(typed, at, Forward: null, page));
+      if (!reply.Accepted)
+      {
+        Hint = reply.Error;
+        Raise();
+        return;
+      }
+
+      last = reply.Value!;
+      matches.AddRange(last.Matches);
+    }
+
+    Completions = null;
+    if (last.TotalCount > TerminalCompletions.MaxListed)
+    {
+      Hint = $"{last.TotalCount} matches: type more to narrow them.";
+    }
+    else if (matches.Count == 0)
+    {
+      Hint = "No completions.";
+    }
+    else
+    {
+      Completions = new CompletionList(typed, last with { Matches = matches, Page = 0, HasMorePages = false });
+    }
+
+    Raise();
+  }
+
+  /// <summary>Puts the match picked from the list in the input, and closes the list.</summary>
+  public void Choose(TerminalCompletionMatch match)
+  {
+    if (Completions is not { } list)
+    {
+      return;
+    }
+
+    Completions = null;
+    Use(list.Typed, list.Completions, match);
+    _completing = null;
+    Raise();
+  }
+
+  /// <summary>Closes the list of matches; false when none was open.</summary>
+  public bool CloseCompletions()
+  {
+    if (Completions is null)
+    {
+      return false;
+    }
+
+    Completions = null;
+    Raise();
+    return true;
   }
 
   /// <summary>The command before the one shown; the first step back keeps what was being typed.</summary>
@@ -216,6 +346,8 @@ public sealed class DeviceTerminal : IDisposable
     var had = Input.Length > 0;
     Input = string.Empty;
     _draft = string.Empty;
+    _completing = null;
+    Hint = null;
     _historyIndex = _history.Count;
     Raise();
     return had;
@@ -244,6 +376,14 @@ public sealed class DeviceTerminal : IDisposable
     _hub.TerminalOutputReceived -= OnOutput;
     _hub.ConnectionLost -= OnConnectionLost;
     _navigation.LocationChanged -= OnLocationChanged;
+  }
+
+  private void Use(string typed, TerminalCompletions completions, TerminalCompletionMatch match)
+  {
+    var start = Math.Clamp(completions.ReplacementIndex, 0, typed.Length);
+    var end = Math.Clamp(start + completions.ReplacementLength, start, typed.Length);
+    Input = typed[..start] + match.CompletionText + typed[end..];
+    Caret = start + match.CompletionText.Length;
   }
 
   private void Remember(string line)
@@ -285,6 +425,12 @@ public sealed class DeviceTerminal : IDisposable
       Status = TerminalStatus.Ended;
       TerminalId = null;
       Notice = output.Text;
+      return;
+    }
+
+    if (output.Kind == TerminalOutputKind.Cleared)
+    {
+      _lines.Clear();
       return;
     }
 
@@ -367,6 +513,10 @@ public sealed class DeviceTerminal : IDisposable
     _history.Clear();
     _early.Clear();
     _historyIndex = 0;
+    _completing = null;
+    _completed = null;
+    Completions = null;
+    Hint = null;
   }
 
   private void Raise() => Changed?.Invoke();

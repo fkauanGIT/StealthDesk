@@ -76,6 +76,127 @@ public class TerminalSessionTests
   private static string Program(string line) => OperatingSystem.IsWindows() ? $"cmd /c \"{line}\"" : $"sh -c '{line}'";
 
   [Fact]
+  public async Task Completing_GetChi_GivesGetChildItem_AndTabWalksTheMatchesBothWays()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    var first = Complete(terminal, "Get-Chi", forward: true);
+    var second = Complete(terminal, "Get-Co", forward: true);
+    var third = Complete(terminal, "Get-Co", forward: true);
+    var back = Complete(terminal, "Get-Co", forward: false);
+
+    Assert.Equal((0, 7, "Get-ChildItem"), (first.ReplacementIndex, first.ReplacementLength, Assert.Single(first.Matches).CompletionText));
+    Assert.Equal(TerminalCompletionKind.Command, first.Matches[0].Kind);
+    Assert.NotEqual(second.Matches[0].CompletionText, third.Matches[0].CompletionText);
+    Assert.Equal(second.Matches[0].CompletionText, back.Matches[0].CompletionText);
+  }
+
+  [Fact]
+  public async Task APath_CompletesFromTheDevicesDisk()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+    var folder = Directory.CreateTempSubdirectory("sd-complete-");
+    File.WriteAllText(Path.Combine(folder.FullName, "unique-report-file.txt"), "x");
+
+    try
+    {
+      var input = $"Get-Content '{folder.FullName}{Path.DirectorySeparatorChar}unique-rep";
+      var completed = Complete(terminal, input, forward: true);
+
+      Assert.Contains("unique-report-file.txt", Assert.Single(completed.Matches).CompletionText);
+      Assert.Equal(TerminalCompletionKind.ProviderItem, completed.Matches[0].Kind);
+    }
+    finally
+    {
+      folder.Delete(recursive: true);
+    }
+  }
+
+  [Fact]
+  public async Task ListingCompletions_GivesEveryPage_AndOnlyThose_AndTooManyAreCounted()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    // Files of a folder made for the test: what completes doesn't depend on what the machine has installed.
+    var folder = Directory.CreateTempSubdirectory("sd-many-");
+    foreach (var i in Enumerable.Range(0, TerminalCompletions.MaxListed + 100))
+    {
+      File.WriteAllText(Path.Combine(folder.FullName, $"{(i < 120 ? "some" : "more")}-{i:000}.txt"), string.Empty);
+    }
+
+    var pages = new List<TerminalCompletions>();
+    TerminalCompletions many;
+    try
+    {
+      var prefix = $"Get-Item '{folder.FullName}{Path.DirectorySeparatorChar}";
+      for (var page = 0; pages.Count == 0 || pages[^1].HasMorePages; page++)
+      {
+        pages.Add(Complete(terminal, prefix + "some-", forward: null, page));
+      }
+
+      many = Complete(terminal, prefix, forward: null);
+    }
+    finally
+    {
+      folder.Delete(recursive: true);
+    }
+
+    var all = pages.SelectMany(x => x.Matches).Select(x => x.CompletionText).ToList();
+
+    Assert.Equal(3, pages.Count);
+    Assert.Equal(120, all.Count);
+    Assert.Equal(pages[0].TotalCount, all.Count);
+    Assert.Equal(all.Count, all.Distinct().Count());
+    Assert.All(pages.SkipLast(1), x => Assert.Equal(TerminalCompletionRequest.PageSize, x.Matches.Count));
+    Assert.Equal(TerminalCompletions.MaxListed + 100, many.TotalCount);
+    Assert.Empty(many.Matches);
+  }
+
+  [Fact]
+  public async Task Completing_WhileACommandRuns_IsRefused()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+
+    terminal.Send("Start-Sleep -Seconds 2");
+    await Task.Delay(300, TestContext.Current.CancellationToken);
+    var refused = terminal.Sessions.Complete(terminal.Terminal, new TerminalCompletionRequest("Get-Chi", 7, Forward: true));
+
+    Assert.Equal("Completions aren't available while a command runs.", refused.Error);
+  }
+
+  [Fact]
+  public async Task Cls_ClearsTheScreen_AndTheNextOutputStartsOnACleanOne()
+  {
+    await using var terminal = new TerminalHarness();
+    await terminal.OpenAsync();
+    await terminal.RunAsync("'before'");
+
+    // Not run as the others: what cls clears includes the line itself, shown just before.
+    var sent = terminal.Received.Count;
+    terminal.Send("cls");
+    await terminal.UntilAsync(() => terminal.Received.Skip(sent).Any(x => x.Kind == TerminalOutputKind.Cleared) && terminal.Screen.EndsWith("> ", StringComparison.Ordinal));
+    var after = await terminal.RunAsync("'after'");
+
+    var cleared = terminal.Received.ToList().FindLastIndex(x => x.Kind == TerminalOutputKind.Cleared);
+    Assert.True(cleared >= 0, "Nothing cleared the screen.");
+    var shownSince = string.Concat(terminal.Received.Skip(cleared + 1).Select(x => x.Text));
+    Assert.DoesNotContain("before", shownSince);
+    Assert.StartsWith("PS ", shownSince);
+    Assert.Equal("after\n", after);
+  }
+
+  private static TerminalCompletions Complete(TerminalHarness terminal, string input, bool? forward, int page = 0)
+  {
+    var completed = terminal.Sessions.Complete(terminal.Terminal, new TerminalCompletionRequest(input, input.Length, forward, page));
+    Assert.True(completed.Succeeded, completed.Error);
+    return completed.Value!;
+  }
+
+  [Fact]
   public async Task EachLine_SaysWhetherItAnsweredAQuestion()
   {
     await using var terminal = new TerminalHarness();

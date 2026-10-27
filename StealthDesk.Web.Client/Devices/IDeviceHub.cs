@@ -22,5 +22,7 @@ public interface IDeviceHub
 
   Task<GatewayReply<TerminalInputReceipt>> SendTerminalInputAsync(Guid terminalId, string line);
 
+  Task<GatewayReply<TerminalCompletions>> GetTerminalCompletionsAsync(Guid terminalId, TerminalCompletionRequest request);
+
   Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId);
 }

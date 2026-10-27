@@ -59,6 +59,58 @@ internal sealed class FakeDeviceHub : IDeviceHub
     return Task.FromResult(InputReply ?? GatewayReply.Accept(new TerminalInputReceipt(terminalId, Answering)));
   }
 
+  /// <summary>What completes, as the device's PowerShell would: the last word up to the caret, by its start.</summary>
+  public List<string> Completable { get; set; } = ["Get-ChildItem", "Get-Command", "Get-Content"];
+
+  /// <summary>What completing answers instead, e.g. a refusal.</summary>
+  public GatewayReply<TerminalCompletions>? CompletionReply { get; set; }
+
+  private (string Input, int Cursor)? _completing;
+  private int _next = -1;
+
+  public Task<GatewayReply<TerminalCompletions>> GetTerminalCompletionsAsync(Guid terminalId, TerminalCompletionRequest request)
+  {
+    Calls.Add($"complete {request.Input}|{request.Cursor}|{request.Forward}|{request.Page}");
+    if (CompletionReply is { } reply)
+    {
+      return Task.FromResult(reply);
+    }
+
+    var start = request.Input.LastIndexOf(' ', Math.Max(0, request.Cursor - 1)) + 1;
+    var word = request.Input[start..request.Cursor];
+    var matches = Completable.Where(x => x.StartsWith(word, StringComparison.OrdinalIgnoreCase))
+      .Select(x => new TerminalCompletionMatch(x, x, TerminalCompletionKind.Command, $"{x} [args]"))
+      .ToList();
+    TerminalCompletions Answer(IReadOnlyList<TerminalCompletionMatch> some, int total, int page, bool more) =>
+      new(start, request.Cursor - start, some, total, page, more);
+
+    if (request.Forward is { } forward)
+    {
+      if (_completing != (request.Input, request.Cursor))
+      {
+        _completing = (request.Input, request.Cursor);
+        _next = -1;
+      }
+
+      if (matches.Count == 0)
+      {
+        return Task.FromResult(GatewayReply.Accept(Answer([], 0, 0, false)));
+      }
+
+      _next = forward ? (_next + 1) % matches.Count : (_next <= 0 ? matches.Count : _next) - 1;
+      return Task.FromResult(GatewayReply.Accept(Answer([matches[_next]], 1, 0, false)));
+    }
+
+    if (matches.Count > TerminalCompletions.MaxListed)
+    {
+      return Task.FromResult(GatewayReply.Accept(Answer([], matches.Count, request.Page, false)));
+    }
+
+    var size = TerminalCompletionRequest.PageSize;
+    return Task.FromResult(GatewayReply.Accept(Answer(
+      [.. matches.Skip(request.Page * size).Take(size)], matches.Count, request.Page, (request.Page + 1) * size < matches.Count)));
+  }
+
   public Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId)
   {
     Calls.Add($"close {terminalId}");

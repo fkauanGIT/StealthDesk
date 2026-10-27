@@ -181,6 +181,7 @@ public class PermissionMatrixTests
       [
         nameof(DashboardHub.CloseTerminal),
         nameof(DashboardHub.GetDeviceActions),
+        nameof(DashboardHub.GetTerminalCompletions),
         nameof(DashboardHub.OpenTerminal),
         nameof(DashboardHub.SendTerminalInput),
         nameof(DashboardHub.SubscribeToDevices),

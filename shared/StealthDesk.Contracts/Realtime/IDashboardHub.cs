@@ -40,6 +40,9 @@ public interface IDashboardHub
   /// <summary>A line typed in a terminal this connection opened; the receipt says whether it answered a question.</summary>
   Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line);
 
+  /// <summary>Completions for what is typed in a terminal this connection opened: Tab, Shift+Tab, or every match.</summary>
+  Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request);
+
   /// <summary>Closes a terminal this connection opened; its last output says it ended.</summary>
   Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId);
 }
