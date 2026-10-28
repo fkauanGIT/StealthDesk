@@ -84,4 +84,15 @@ on a company server, in a container behind HTTPS, and agents install as a Window
 - Guides for deploying, backing up, restoring and upgrading, tested on a new Linux machine, and this documentation
   as a website
 
-Next up: **v0.6**, the remote terminal.
+**v0.6 - Remote terminal** ([#26](https://github.com/fkauanGIT/StealthDesk/issues/26)) is complete: a PowerShell
+terminal on a device, from the browser, for the people allowed to use it.
+
+- A **Terminal** action on a device opens PowerShell 7.6 running in the agent, with the history of commands, multiline
+  input, and completion from the device's own PowerShell
+- Questions commands ask are answered in the terminal, secrets shown as stars and kept out of the history
+- A `device.terminal.use` permission checked on every command; output goes only to the browser that opened the
+  session, which closes when that browser leaves
+- Each visit and terminal call is traced with the user and the device, never with what is typed
+- Tested end to end on Windows: the agent from the container image, through the server, from a browser
+
+Next up: **v0.7**, remote desktop.
