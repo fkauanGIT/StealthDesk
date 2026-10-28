@@ -314,6 +314,34 @@ public class DeviceTerminalTests : BunitContext
   }
 
   [Fact]
+  public async Task AVisit_StartsWithTheFirstSession_AndEndsWhenTheUserLeavesTheDevice()
+  {
+    await _terminal.OpenAsync(Device);
+    _hub.Send(_hub.NextTerminal, TerminalOutputKind.Ended, "Closed after 10 minutes without use.");
+    await _terminal.OpenAsync(Device);
+    Navigation.NavigateTo($"devices/{Device}");
+    var whileOnTheDevice = _hub.Calls.ToList();
+
+    Navigation.NavigateTo("device-groups");
+
+    Assert.Equal(1, whileOnTheDevice.Count(x => x == $"visit {Device}"));
+    Assert.Equal(0, whileOnTheDevice.Count(x => x == "end visit"));
+    Assert.True(whileOnTheDevice.IndexOf($"visit {Device}") < whileOnTheDevice.FindIndex(x => x.StartsWith("open", StringComparison.Ordinal)));
+    Assert.Equal("end visit", _hub.Calls.Last());
+  }
+
+  [Fact]
+  public async Task AfterTheConnectionDropped_TheNextSessionStartsANewVisit()
+  {
+    await _terminal.OpenAsync(Device);
+    _hub.Drop();
+
+    await _terminal.OpenAsync(Device);
+
+    Assert.Equal(2, _hub.Calls.Count(x => x == $"visit {Device}"));
+  }
+
+  [Fact]
   public async Task AnotherDevice_GetsItsOwnSession_AndTheFirstOneIsClosed()
   {
     await _terminal.OpenAsync(Device);

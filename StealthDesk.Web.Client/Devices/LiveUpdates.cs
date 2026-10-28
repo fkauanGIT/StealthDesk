@@ -140,6 +140,25 @@ public sealed class LiveUpdates(
   public Task<GatewayReply<DeviceActions>> GetDeviceActionsAsync(Guid deviceId) =>
     CallAsync<DeviceActions>(nameof(IDashboardHub.GetDeviceActions), deviceId);
 
+  public Task<GatewayReply<Guid>> StartDeviceAccessAsync(Guid deviceId) =>
+    CallAsync<Guid>(nameof(IDashboardHub.StartDeviceAccess), deviceId);
+
+  // Nothing to answer: a visit not ended here ends with the connection.
+  public async Task EndDeviceAccessAsync()
+  {
+    if (_connection is { State: HubConnectionState.Connected } connection)
+    {
+      try
+      {
+        await connection.InvokeAsync(nameof(IDashboardHub.EndDeviceAccess), _stopping.Token);
+      }
+      catch (Exception ex)
+      {
+        logger.LogDebug(ex, "Ending the device visit failed.");
+      }
+    }
+  }
+
   public Task<GatewayReply<Guid>> OpenTerminalAsync(Guid deviceId) =>
     CallAsync<Guid>(nameof(IDashboardHub.OpenTerminal), deviceId);
 

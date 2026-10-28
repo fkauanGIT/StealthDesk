@@ -8,7 +8,7 @@ and the hubs until they change it.
 | Path | Transport | Purpose |
 |------|-----------|---------|
 | `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports, the server's calls to the agent, and terminal output. |
-| `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices, to ask which actions they may use on one, and to open, type in and close a terminal on a device. Each terminal call checks `device.terminal.use` on that device; a terminal's output goes only to the connection that opened it, and closes with it. |
+| `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices, to ask which actions they may use on one, and to open, type in and close a terminal on a device. Each terminal call checks `device.terminal.use` on that device; a terminal's output goes only to the connection that opened it, and closes with it. A visit to a device's remote features (`StartDeviceAccess` / `EndDeviceAccess`) and each terminal call are traced as activities of `StealthDesk.Web.Server.DeviceAccess`, with the user, the device and the outcome, never with what is typed. |
 
 ## Devices, tenants and the server
 

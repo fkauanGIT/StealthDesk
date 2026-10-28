@@ -35,6 +35,18 @@ internal sealed class FakeDeviceHub : IDeviceHub
     return Task.FromResult(Actions);
   }
 
+  public Task<GatewayReply<Guid>> StartDeviceAccessAsync(Guid deviceId)
+  {
+    Calls.Add($"visit {deviceId}");
+    return Task.FromResult(GatewayReply.Accept(deviceId));
+  }
+
+  public Task EndDeviceAccessAsync()
+  {
+    Calls.Add("end visit");
+    return Task.CompletedTask;
+  }
+
   public async Task<GatewayReply<Guid>> OpenTerminalAsync(Guid deviceId)
   {
     Calls.Add($"open {deviceId}");

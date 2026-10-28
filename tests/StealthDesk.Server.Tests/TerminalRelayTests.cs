@@ -6,6 +6,7 @@ using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.Terminal;
 using StealthDesk.Server.Tests.Infrastructure;
+using StealthDesk.Web.Server.Dashboard;
 
 namespace StealthDesk.Server.Tests;
 
@@ -230,6 +231,84 @@ public class TerminalRelayTests
   }
 
   [Fact]
+  public async Task AVisit_IsTraced_WithItsTerminalCalls_TheUserAndTheDevice()
+  {
+    using var traced = new TracedActivities();
+    await using var world = await World.CreateAsync();
+
+    var visit = await world.StartVisitAsync();
+    var terminal = (await world.OpenAsync()).Value;
+    await world.InputAsync(terminal, "hostname");
+    await world.CompleteAsync(terminal, "Get-Chi");
+    await world.CloseAsync(terminal);
+    var unknown = Guid.NewGuid();
+    await world.InputAsync(unknown, "dir");
+    await world.EndVisitAsync();
+
+    Assert.True(visit.Accepted, visit.Error);
+    var activities = traced.Of(world.Device);
+    var root = Assert.Single(activities, x => x.OperationName == DeviceAccessTracing.Visit);
+    Assert.Equal(world.User.Id.ToString(), root.GetTagItem(DeviceAccessTracing.UserIdTag));
+    Assert.Equal("tech@example.com", root.GetTagItem(DeviceAccessTracing.UserNameTag));
+    var calls = activities.Where(x => x.ParentSpanId == root.SpanId).OrderBy(x => x.StartTimeUtc).ToList();
+    Assert.Equal(
+      [DeviceAccessTracing.TerminalOpen, DeviceAccessTracing.TerminalInput, DeviceAccessTracing.TerminalCompletions, DeviceAccessTracing.TerminalClose],
+      calls.Select(x => x.OperationName));
+    Assert.All(calls, x =>
+    {
+      Assert.Equal("accepted", x.GetTagItem(DeviceAccessTracing.OutcomeTag));
+      Assert.Equal(terminal.ToString(), x.GetTagItem(DeviceAccessTracing.TerminalIdTag));
+      Assert.Equal(world.User.Id.ToString(), x.GetTagItem(DeviceAccessTracing.UserIdTag));
+    });
+
+    // A refused call is traced too, with why, though it names no device.
+    var refused = Assert.Single(traced.All, x => Equals(x.GetTagItem(DeviceAccessTracing.TerminalIdTag), unknown.ToString()));
+    Assert.Equal(DeviceAccessTracing.TerminalInput, refused.OperationName);
+    Assert.Equal("refused", refused.GetTagItem(DeviceAccessTracing.OutcomeTag));
+    Assert.Equal("The terminal isn't open.", refused.GetTagItem(DeviceAccessTracing.RefusalTag));
+  }
+
+  [Fact]
+  public async Task WhatIsTyped_IsInNoTrace_NorLog()
+  {
+    const string Secret = "S3cret-7f2a-only-typed";
+    var logs = new CapturedLogs(Microsoft.Extensions.Logging.LogLevel.Trace);
+    using var traced = new TracedActivities();
+    await using var world = await World.CreateAsync(logs: logs, logEverything: true);
+
+    await world.StartVisitAsync();
+    var terminal = (await world.OpenAsync()).Value;
+    await world.InputAsync(terminal, $"$password = '{Secret}'");
+    await world.CompleteAsync(terminal, Secret);
+    await world.CloseAsync(terminal);
+    await world.EndVisitAsync();
+
+    // It did go through: what reached the agent carried it.
+    Assert.Contains(world.Agent.Calls, x => x.Contains(Secret, StringComparison.Ordinal));
+    var recorded = traced.Of(world.Device)
+      .SelectMany(x => x.TagObjects.Select(t => $"{t.Key}={t.Value}")
+        .Concat(x.Events.SelectMany(e => e.Tags.Select(t => $"{t.Key}={t.Value}").Append(e.Name)))
+        .Append(x.DisplayName))
+      .ToList();
+    Assert.NotEmpty(recorded);
+    Assert.DoesNotContain(recorded, x => x.Contains(Secret, StringComparison.Ordinal));
+    Assert.NotEmpty(logs.All);
+    Assert.DoesNotContain(logs.All, x => x.Contains(Secret, StringComparison.Ordinal));
+  }
+
+  [Fact]
+  public async Task AVisitToADeviceTheUserMayNotRead_IsRefused_AndNotTraced()
+  {
+    using var traced = new TracedActivities();
+    await using var world = await World.CreateAsync(canUse: false, ownTenant: false);
+
+    var visit = await world.StartVisitAsync();
+
+    Assert.Equal("Device not found.", visit.Error);
+    Assert.Empty(traced.Of(world.Device));
+  }
+
+  [Fact]
   public async Task ClosingASessionTheAgentNoLongerHas_LetsGoOfIt()
   {
     await using var world = await World.CreateAsync();
@@ -256,6 +335,31 @@ public class TerminalRelayTests
     Assert.Equal($"The input is too long ({IDashboardHub.MaxTerminalInputLength + 1} characters); send at most {IDashboardHub.MaxTerminalInputLength} at a time.", sent.Error);
     Assert.True(fits.Accepted, fits.Error);
     Assert.Equal([$"open {terminal}", $"input {terminal} {new string('b', IDashboardHub.MaxTerminalInputLength)}"], world.Agent.Calls);
+  }
+
+  /// <summary>The device access activities stopped while it listens; other tests' too, so tests pick theirs by device.</summary>
+  private sealed class TracedActivities : IDisposable
+  {
+    private readonly ConcurrentQueue<Activity> _stopped = new();
+    private readonly ActivityListener _listener;
+
+    public TracedActivities()
+    {
+      _listener = new ActivityListener
+      {
+        ShouldListenTo = source => source.Name == DeviceAccessTracing.SourceName,
+        Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        ActivityStopped = _stopped.Enqueue,
+      };
+      ActivitySource.AddActivityListener(_listener);
+    }
+
+    public IReadOnlyList<Activity> All => [.. _stopped];
+
+    public IReadOnlyList<Activity> Of(Guid device) =>
+      [.. _stopped.Where(x => Equals(x.GetTagItem(DeviceAccessTracing.DeviceIdTag), device.ToString()))];
+
+    public void Dispose() => _listener.Dispose();
   }
 
   /// <summary>
@@ -338,7 +442,11 @@ public class TerminalRelayTests
     public TestDashboard Dashboard { get; private set; } = null!;
     public Guid Device { get; private set; }
 
-    public static async Task<World> CreateAsync(bool canUse = true, bool ownTenant = true, string? callTimeout = null, CapturedLogs? logs = null)
+    public UserRecord User => _user;
+
+    /// <param name="logEverything">Every log level on, the framework's too, as someone looking into a problem would.</param>
+    public static async Task<World> CreateAsync(
+      bool canUse = true, bool ownTenant = true, string? callTimeout = null, CapturedLogs? logs = null, bool logEverything = false)
     {
       var server = await ServerHost.OnPostgresAsync();
       if (callTimeout is not null)
@@ -349,6 +457,13 @@ public class TerminalRelayTests
       if (logs is not null)
       {
         server.WithServices(services => services.AddSingleton<Microsoft.Extensions.Logging.ILoggerProvider>(logs));
+      }
+
+      if (logEverything)
+      {
+        server.With("Logging:LogLevel:Default", "Trace")
+          .With("Logging:LogLevel:Microsoft.AspNetCore", "Trace")
+          .With("Logging:LogLevel:Microsoft.AspNetCore.SignalR.Internal.DefaultHubDispatcher", "Trace");
       }
 
       var world = new World { Server = server, Device = Guid.NewGuid(), _group = Guid.NewGuid() };
@@ -398,6 +513,11 @@ public class TerminalRelayTests
 
     public Task<GatewayReply<TerminalInputReceipt>> InputAsync(Guid terminal, string line) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<TerminalInputReceipt>>(nameof(IDashboardHub.SendTerminalInput), terminal, line, Cancel);
+
+    public Task<GatewayReply<Guid>> StartVisitAsync() =>
+      Dashboard.Connection.InvokeAsync<GatewayReply<Guid>>(nameof(IDashboardHub.StartDeviceAccess), Device, Cancel);
+
+    public Task EndVisitAsync() => Dashboard.Connection.InvokeAsync(nameof(IDashboardHub.EndDeviceAccess), Cancel);
 
     public Task<GatewayReply<TerminalCompletions>> CompleteAsync(Guid terminal, string input) =>
       Dashboard.Connection.InvokeAsync<GatewayReply<TerminalCompletions>>(

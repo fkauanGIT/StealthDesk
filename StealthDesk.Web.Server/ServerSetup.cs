@@ -46,6 +46,9 @@ public static class ServerSetup
       .Validate(x => x.AgentCallTimeout > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.AgentCallTimeout)} must be longer than zero.")
       .ValidateOnStart();
     builder.Services.AddSignalR().AddMessagePackProtocol();
+    // SignalR logs every hub call with its arguments below Information: what is typed in a terminal, passwords
+    // included, and what commands print. Added after the configuration's rules, so turning Debug on can't reach it.
+    builder.Logging.AddFilter("Microsoft.AspNetCore.SignalR.Internal.DefaultHubDispatcher", level => level >= LogLevel.Information);
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IMessageSigner, MessageSigner>();

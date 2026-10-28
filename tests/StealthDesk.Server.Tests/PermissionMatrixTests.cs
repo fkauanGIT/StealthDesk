@@ -184,6 +184,7 @@ public class PermissionMatrixTests
         nameof(DashboardHub.GetTerminalCompletions),
         nameof(DashboardHub.OpenTerminal),
         nameof(DashboardHub.SendTerminalInput),
+        nameof(DashboardHub.StartDeviceAccess),
         nameof(DashboardHub.SubscribeToDevices),
       ],
       typeof(DashboardHub).GetMethods().Where(x => x.GetCustomAttribute<ChecksPermissionAttribute>() is not null).Select(x => x.Name).Order());

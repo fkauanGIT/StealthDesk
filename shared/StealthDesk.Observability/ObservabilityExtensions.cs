@@ -17,6 +17,9 @@ public static class ObservabilityExtensions
   /// <summary>Checks that only tell whether the process responds; every other check also counts for readiness.</summary>
   public const string LivenessTag = "liveness";
 
+  /// <summary>StealthDesk's own activities, e.g. who used a device, traced along with the framework's.</summary>
+  public const string ActivitySources = "StealthDesk.*";
+
   /// <summary>
   /// Health checks plus OpenTelemetry logs, metrics and traces. Telemetry is only exported when
   /// <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is configured; otherwise it stays in-process.
@@ -47,6 +50,7 @@ public static class ObservabilityExtensions
         .AddHttpClientInstrumentation()
         .AddRuntimeInstrumentation())
       .WithTracing(tracing => tracing
+        .AddSource(ActivitySources)
         .AddAspNetCoreInstrumentation(options => options.Filter = context => !IsHealthProbe(context.Request.Path))
         .AddHttpClientInstrumentation());
 

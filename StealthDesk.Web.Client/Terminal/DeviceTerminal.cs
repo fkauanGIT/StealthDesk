@@ -64,6 +64,9 @@ public sealed class DeviceTerminal : IDisposable
   private int _historyIndex;
   private string _draft = string.Empty;
 
+  // Whether the server records a visit to this device: started with the first session, ended when the user leaves.
+  private bool _visiting;
+
   // What Tab completes: the input and caret when it was first pressed, and what the last completion left, so Tab
   // after Tab walks the same matches until something else is typed.
   private (string Input, int Cursor)? _completing;
@@ -123,9 +126,13 @@ public sealed class DeviceTerminal : IDisposable
 
     if (DeviceId != deviceId)
     {
-      await CloseAsync();
-      Clear();
+      await LeaveDeviceAsync();
       DeviceId = deviceId;
+    }
+
+    if (!_visiting)
+    {
+      _visiting = (await _hub.StartDeviceAccessAsync(deviceId)).Accepted;
     }
 
     Status = TerminalStatus.Opening;
@@ -464,9 +471,10 @@ public sealed class DeviceTerminal : IDisposable
     }
   }
 
-  // The server closes every terminal of a connection that drops, so this one is over.
+  // The server closes every terminal of a connection that drops, so this one is over, and so is the visit.
   private void OnConnectionLost()
   {
+    _visiting = false;
     if (Status is TerminalStatus.Open or TerminalStatus.Opening)
     {
       Status = TerminalStatus.Ended;
@@ -488,9 +496,20 @@ public sealed class DeviceTerminal : IDisposable
 
   private async Task LeaveAsync()
   {
-    await CloseAsync();
-    Clear();
+    await LeaveDeviceAsync();
     Raise();
+  }
+
+  private async Task LeaveDeviceAsync()
+  {
+    await CloseAsync();
+    if (_visiting)
+    {
+      _visiting = false;
+      await _hub.EndDeviceAccessAsync();
+    }
+
+    Clear();
   }
 
   private bool IsPageOf(Guid device, string location)

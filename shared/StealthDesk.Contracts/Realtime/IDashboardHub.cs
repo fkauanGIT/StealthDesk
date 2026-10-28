@@ -32,6 +32,16 @@ public interface IDashboardHub
   Task<GatewayReply<DeviceActions>> GetDeviceActions(Guid deviceId);
 
   /// <summary>
+  /// Starts recording a visit to the device's remote features: who used it and what for, in the server's traces. Lasts
+  /// until <see cref="EndDeviceAccess"/>, another visit, or the connection drops. A device the user may not read is
+  /// refused as one that doesn't exist.
+  /// </summary>
+  Task<GatewayReply<Guid>> StartDeviceAccess(Guid deviceId);
+
+  /// <summary>Ends the visit this connection started, if any.</summary>
+  Task EndDeviceAccess();
+
+  /// <summary>
   /// Opens a terminal on the device and answers its id. Its output comes through
   /// <see cref="IDashboardCallbacks.ReceiveTerminalOutput"/>, to this connection only, starting before the answer.
   /// </summary>
