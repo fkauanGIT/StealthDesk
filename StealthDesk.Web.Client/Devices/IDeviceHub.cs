@@ -18,6 +18,11 @@ public interface IDeviceHub
 
   Task<GatewayReply<DeviceActions>> GetDeviceActionsAsync(Guid deviceId);
 
+  /// <summary>Starts the server's record of a visit to the device's remote features.</summary>
+  Task<GatewayReply<Guid>> StartDeviceAccessAsync(Guid deviceId);
+
+  Task EndDeviceAccessAsync();
+
   Task<GatewayReply<Guid>> OpenTerminalAsync(Guid deviceId);
 
   Task<GatewayReply<TerminalInputReceipt>> SendTerminalInputAsync(Guid terminalId, string line);

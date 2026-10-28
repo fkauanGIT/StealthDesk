@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
@@ -32,6 +34,9 @@ public sealed class DashboardHub(
   ILogger<DashboardHub> logger)
   : Hub<IDashboardCallbacks>, IDashboardHub
 {
+  // Hub instances live for one call only; the visit outlives it in the connection's items.
+  private const string VisitItem = "device-access";
+
   public static string DeviceGroup(Guid deviceId) => $"device:{deviceId}";
 
   public override async Task OnConnectedAsync()
@@ -45,9 +50,12 @@ public sealed class DashboardHub(
     // Nobody is left to see these sessions: closing them stops what they run instead of leaving it to the idle limit.
     foreach (var terminal in terminals.RemoveAll(Context.ConnectionId))
     {
+      using var call = StartCall(DeviceAccessTracing.TerminalClose, terminal.DeviceId, terminal.TerminalId);
+      call?.SetTag(DeviceAccessTracing.OutcomeTag, "closed: the browser disconnected");
       await CloseOnDeviceAsync(terminal);
     }
 
+    EndVisit();
     await MarkUser(online: false);
     await base.OnDisconnectedAsync(exception);
   }
@@ -98,8 +106,60 @@ public sealed class DashboardHub(
     return GatewayReply.Accept(new DeviceActions(UseTerminal: await MayAsync(device, PermissionNames.DeviceTerminalUse)));
   }
 
+  /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>
+  [ChecksPermission(PermissionNames.DeviceRead)]
+  public async Task<GatewayReply<Guid>> StartDeviceAccess(Guid deviceId)
+  {
+    var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == deviceId, Context.ConnectionAborted);
+    if (device is null || !await MayAsync(device, PermissionNames.DeviceRead))
+    {
+      return GatewayReply.Refuse<Guid>("Device not found.");
+    }
+
+    EndVisit();
+    Context.Items[VisitItem] = DeviceAccessTracing.StartVisit(UserId, Context.User?.Identity?.Name, deviceId);
+    return GatewayReply.Accept(deviceId);
+  }
+
+  [NoPermission("It only ends the record of a visit this connection started.")]
+  public Task EndDeviceAccess()
+  {
+    EndVisit();
+    return Task.CompletedTask;
+  }
+
   [ChecksPermission(PermissionNames.DeviceTerminalUse)]
   public async Task<GatewayReply<Guid>> OpenTerminal(Guid deviceId)
+  {
+    using var call = StartCall(DeviceAccessTracing.TerminalOpen, deviceId, terminalId: null);
+    var opened = DeviceAccessTracing.Record(call, await OpenTerminalCoreAsync(deviceId));
+    call?.SetTag(DeviceAccessTracing.TerminalIdTag, opened.Accepted ? opened.Value.ToString() : null);
+    return opened;
+  }
+
+  // Never traced with what is typed: a line may be a password.
+  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
+  public async Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line)
+  {
+    using var call = StartCall(DeviceAccessTracing.TerminalInput, DeviceOf(terminalId), terminalId);
+    return DeviceAccessTracing.Record(call, await SendTerminalInputCoreAsync(terminalId, line));
+  }
+
+  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
+  public async Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request)
+  {
+    using var call = StartCall(DeviceAccessTracing.TerminalCompletions, DeviceOf(terminalId), terminalId);
+    return DeviceAccessTracing.Record(call, await GetTerminalCompletionsCoreAsync(terminalId, request));
+  }
+
+  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
+  public async Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId)
+  {
+    using var call = StartCall(DeviceAccessTracing.TerminalClose, DeviceOf(terminalId), terminalId);
+    return DeviceAccessTracing.Record(call, await CloseTerminalCoreAsync(terminalId));
+  }
+
+  private async Task<GatewayReply<Guid>> OpenTerminalCoreAsync(Guid deviceId)
   {
     if (await RefuseTerminalAsync(deviceId) is { } refused)
     {
@@ -132,8 +192,7 @@ public sealed class DashboardHub(
     return GatewayReply.Refuse<Guid>(opened.Error ?? "The terminal couldn't open.");
   }
 
-  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
-  public async Task<GatewayReply<TerminalInputReceipt>> SendTerminalInput(Guid terminalId, string line)
+  private async Task<GatewayReply<TerminalInputReceipt>> SendTerminalInputCoreAsync(Guid terminalId, string line)
   {
     if (line.Length > IDashboardHub.MaxTerminalInputLength)
     {
@@ -150,8 +209,7 @@ public sealed class DashboardHub(
     return await agents.CallAsync(terminal.DeviceId, (agent, token) => agent.SendTerminalInput(terminalId, line, token), Context.ConnectionAborted);
   }
 
-  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
-  public async Task<GatewayReply<TerminalCompletions>> GetTerminalCompletions(Guid terminalId, TerminalCompletionRequest request)
+  private async Task<GatewayReply<TerminalCompletions>> GetTerminalCompletionsCoreAsync(Guid terminalId, TerminalCompletionRequest request)
   {
     if (request.Input.Length > IDashboardHub.MaxTerminalInputLength || request.Page < 0)
     {
@@ -167,8 +225,7 @@ public sealed class DashboardHub(
     return await agents.CallAsync(terminal.DeviceId, (agent, token) => agent.GetTerminalCompletions(terminalId, request, token), Context.ConnectionAborted);
   }
 
-  [ChecksPermission(PermissionNames.DeviceTerminalUse)]
-  public async Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId)
+  private async Task<GatewayReply<Guid>> CloseTerminalCoreAsync(Guid terminalId)
   {
     var (terminal, refused) = await TerminalOfAsync(terminalId);
     if (terminal is null)
@@ -185,6 +242,22 @@ public sealed class DashboardHub(
     }
 
     return closed;
+  }
+
+  private string UserId => Context.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+  private Guid? DeviceOf(Guid terminalId) => terminals.Find(terminalId, Context.ConnectionId)?.DeviceId;
+
+  private Activity? StartCall(string name, Guid? deviceId, Guid? terminalId) =>
+    DeviceAccessTracing.StartCall(
+      name, Context.Items.TryGetValue(VisitItem, out var visit) ? visit as Activity : null, UserId, Context.User?.Identity?.Name, deviceId, terminalId);
+
+  private void EndVisit()
+  {
+    if (Context.Items.Remove(VisitItem, out var visit))
+    {
+      (visit as Activity)?.Dispose();
+    }
   }
 
   // Checked on every call: a deny added or a grant removed applies to the next line typed, not the next session.
