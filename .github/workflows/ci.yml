@@ -186,6 +186,21 @@ jobs:
       - name: Build the server image
         run: docker build --file StealthDesk.Web.Server/Dockerfile --tag stealthdesk-server:ci .
 
+      # The agent the image hands out, built on Linux, for the Windows job that runs the terminal with it.
+      - name: Take the agent out of the image
+        run: |
+          container=$(docker create stealthdesk-server:ci)
+          mkdir -p image-agent
+          docker cp "$container:/app/downloads/windows/StealthDesk.Agent.exe" image-agent/StealthDesk.Agent.exe
+          docker rm "$container"
+
+      - name: Upload the image's agent
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-agent
+          path: image-agent/StealthDesk.Agent.exe
+          retention-days: 1
+
       - name: Start the server before its database
         run: |
           docker network create stealthdesk
@@ -318,3 +333,73 @@ jobs:
             exit 1
           fi
           docker compose -f docker-compose.secrets.yml down --volumes
+
+  # The terminal end to end: the agent the image hands out, running PowerShell on Windows, the server, and a browser.
+  # The image itself runs on Linux runners only, where the agent can't, so the server here is built from the source.
+  terminal-end-to-end:
+    name: Terminal end to end
+    runs-on: windows-latest
+    needs: container-image
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.x
+
+      - name: Download the image's agent
+        uses: actions/download-artifact@v8
+        with:
+          name: image-agent
+          path: image-agent
+
+      - name: Build the server and the browser tests
+        run: |
+          dotnet build StealthDesk.Web.Server --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw "The server didn't build." }
+          dotnet build tests/StealthDesk.Web.UITests --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw "The browser tests didn't build." }
+
+      # One step: a process a step starts is ended with that step on Windows runners.
+      - name: Run a terminal on the image's agent, through the server, from a browser
+        run: |
+          $env:ASPNETCORE_ENVIRONMENT = "Development"
+          $server = Start-Process dotnet -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
+            "run", "--project", "StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
+            "--urls", "http://localhost:5099", "--UseInMemoryDatabase", "true"
+          try {
+            $ready = $false
+            for ($attempt = 1; $attempt -le 60 -and -not $ready; $attempt++) {
+              try { Invoke-RestMethod http://localhost:5099/health/ready | Out-Null; $ready = $true } catch { Start-Sleep -Seconds 2 }
+            }
+            if (-not $ready) { throw "The server didn't become ready." }
+
+            $env:STEALTHDESK_UI_SERVER = "http://localhost:5099"
+            $env:STEALTHDESK_UI_AGENT = "$PWD/image-agent/StealthDesk.Agent.exe"
+            dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.TerminalEndToEndTests
+            if ($LASTEXITCODE -ne 0) { throw "The terminal end-to-end tests failed." }
+          }
+          catch {
+            Write-Host "--- server log"
+            Get-Content server.log, server-errors.log -ErrorAction SilentlyContinue
+            throw
+          }
+          finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      # Each test's last screen, to see what went wrong.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: terminal-end-to-end-results
+          path: TestResults/StealthDesk.Web.UITests/
+          retention-days: 7
