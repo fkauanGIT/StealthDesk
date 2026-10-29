@@ -108,10 +108,13 @@ $device = Devices | Where-Object { $_.isOnline } | Select-Object -First 1
 Check "the device appears online" ($null -ne $device) "$($device.name) $($device.id)"
 
 Write-Host "--- Running the command again updates the agent in place"
-$before = (Get-Item $installed).LastWriteTimeUtc
-Start-Sleep -Seconds 2
+# The zip keeps its files' dates, so a replaced file looks the same: a file only the old folder had tells instead.
+$marker = Join-Path $installFolder "left-from-before.txt"
+Set-Content $marker "before"
+$before = (Get-CimInstance Win32_Service -Filter "Name='$service'").ProcessId
 $output = RunCommand $command
-Check "the agent was replaced" ((Get-Item $installed).LastWriteTimeUtc -gt $before)
+Check "the install folder was replaced" (-not (Test-Path $marker))
+Check "the agent was replaced" ((Get-FileHash -Algorithm SHA256 $installed).Hash -eq $agentHash -and (Get-CimInstance Win32_Service -Filter "Name='$service'").ProcessId -ne $before)
 Check "the service is running" ((Get-Service $service).Status -eq "Running")
 Check "it keeps the device's identity" ((Get-Content (Join-Path $dataFolder "agent-settings.json") -Raw | ConvertFrom-Json).Agent.DeviceId -eq $device.id)
 WaitFor "the device to come back online" { (Devices | Where-Object { $_.id -eq $device.id }).isOnline -eq $true }
