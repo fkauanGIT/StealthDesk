@@ -103,7 +103,14 @@ public sealed class DashboardHub(
       return GatewayReply.Refuse<DeviceActions>("Device not found.");
     }
 
-    return GatewayReply.Accept(new DeviceActions(UseTerminal: await MayAsync(device, PermissionNames.DeviceTerminalUse)));
+    return GatewayReply.Accept(new DeviceActions(
+      UseTerminal: await MayAsync(device, PermissionNames.DeviceTerminalUse),
+      SeeDesktop: await MayAsync(device, PermissionNames.DeviceRemoteControlConnect),
+      ControlDesktop: await MayAsync(device, PermissionNames.DeviceRemoteControlInteract),
+      UseSecureScreens: await MayAsync(device, PermissionNames.DeviceRemoteControlElevatedDesktop),
+      SendCtrlAltDel: await MayAsync(device, PermissionNames.DeviceCtrlAltDelSend),
+      ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
+      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite)));
   }
 
   /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>

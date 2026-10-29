@@ -74,6 +74,12 @@ public static class PermissionPresets
     [
       PermissionNames.DeviceRead,
       PermissionNames.DeviceTerminalUse,
+      PermissionNames.DeviceRemoteControlConnect,
+      PermissionNames.DeviceRemoteControlInteract,
+      PermissionNames.DeviceRemoteControlElevatedDesktop,
+      PermissionNames.DeviceCtrlAltDelSend,
+      PermissionNames.DeviceClipboardRead,
+      PermissionNames.DeviceClipboardWrite,
     ],
     [AgentInstaller] =
     [

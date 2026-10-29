@@ -88,6 +88,47 @@ public class DeviceActionsTests
     Assert.False(actions.Value!.UseTerminal);
   }
 
+  // Each remote control permission and the action it offers.
+  private static readonly Dictionary<string, Func<DeviceActions, bool>> RemoteControlActions = new()
+  {
+    [PermissionNames.DeviceRemoteControlConnect] = x => x.SeeDesktop,
+    [PermissionNames.DeviceRemoteControlInteract] = x => x.ControlDesktop,
+    [PermissionNames.DeviceRemoteControlElevatedDesktop] = x => x.UseSecureScreens,
+    [PermissionNames.DeviceCtrlAltDelSend] = x => x.SendCtrlAltDel,
+    [PermissionNames.DeviceClipboardRead] = x => x.ReadClipboard,
+    [PermissionNames.DeviceClipboardWrite] = x => x.WriteClipboard,
+  };
+
+  public static TheoryData<string> RemoteControlPermissions => [.. RemoteControlActions.Keys];
+
+  [Theory]
+  [MemberData(nameof(RemoteControlPermissions))]
+  public async Task ARemoteControlPermission_OnTheDevice_OffersItsActionAndNoOther(string permission)
+  {
+    await using var world = await World.CreateAsync();
+    await world.AssignAsync(permission, PermissionScopeKind.Device);
+
+    var actions = await world.ActionsAsync();
+
+    Assert.True(actions.Accepted, actions.Error);
+    Assert.All(RemoteControlActions, x => Assert.Equal(x.Key == permission, x.Value(actions.Value!)));
+    Assert.False(actions.Value!.UseTerminal);
+  }
+
+  [Theory]
+  [MemberData(nameof(RemoteControlPermissions))]
+  public async Task ARemoteControlPermission_DeniedOnTheDevice_IsNotOffered_EvenAllowedForTheTenant(string permission)
+  {
+    await using var world = await World.CreateAsync();
+    await world.AssignAsync(permission, PermissionScopeKind.Tenant);
+    await world.AssignAsync(permission, PermissionScopeKind.Device, PermissionEffect.Deny);
+
+    var actions = await world.ActionsAsync();
+
+    Assert.True(actions.Accepted, actions.Error);
+    Assert.False(RemoteControlActions[permission](actions.Value!));
+  }
+
   [Fact]
   public async Task ReadingAlone_OffersNoTerminal()
   {
@@ -97,6 +138,7 @@ public class DeviceActionsTests
 
     Assert.True(actions.Accepted, actions.Error);
     Assert.False(actions.Value!.UseTerminal);
+    Assert.All(RemoteControlActions.Values, x => Assert.False(x(actions.Value!)));
   }
 
   [Fact]
