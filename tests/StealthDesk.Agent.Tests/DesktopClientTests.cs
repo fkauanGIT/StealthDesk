@@ -44,6 +44,7 @@ public sealed class DesktopClientTests
   [Fact]
   public void TheAgentsArguments_ReadBack_AsTheyWereGiven()
   {
+    Assert.SkipUnless(OperatingSystem.IsWindows(), "Splits the command line as Windows does.");
     var start = new DesktopClientStart("second-instance", @"C:\Program Data\StealthDesk\second-instance\");
     var arguments = DesktopClientCommandLine.Arguments(start);
 
@@ -58,6 +59,7 @@ public sealed class DesktopClientTests
   [Fact]
   public async Task OpenedByHand_TheProgramSaysWhy_AndCloses()
   {
+    Assert.SkipUnless(OperatingSystem.IsWindows(), "The desktop client is a Windows program.");
     var executable = Path.Combine(AppContext.BaseDirectory, $"{Brand.DesktopClientName}.exe");
     var start = new ProcessStartInfo(executable) { RedirectStandardError = true, UseShellExecute = false };
     using var process = Process.Start(start)!;
@@ -65,7 +67,7 @@ public sealed class DesktopClientTests
     var said = await process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
     await process.WaitForExitAsync(TestContext.Current.CancellationToken);
 
-    Assert.Equal(1, process.ExitCode);
+    Assert.True(process.ExitCode == 1, $"Exit code {process.ExitCode}: {said}");
     Assert.Contains("can't be opened by hand", said, StringComparison.Ordinal);
   }
 
