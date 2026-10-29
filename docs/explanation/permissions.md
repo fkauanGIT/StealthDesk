@@ -19,6 +19,14 @@ Wherever it comes from, a deny always wins: a user allowed to read every device 
 doesn't see that device, even through a group that allows it. Presets such as Tenant Administrator and Self Service
 group the usual permissions.
 
+## The terminal
+
+`device.terminal.use` lets someone open a [terminal](../guides/terminal.md) on a device and run commands there, as the
+agent's account: **LocalSystem** for an agent installed as a service, so as much as an administrator of the machine
+can. It is separate from reading the device (`device.read`), is part of the **Device Superuser** preset, and is checked
+again on every command, so a deny takes effect on the next line typed. Give it only to people trusted with the
+devices' administrator passwords, on the devices or device groups they look after rather than the whole tenant.
+
 ## Where they are checked
 
 Every API route and dashboard hub method checks its permission, and the device list, each device and live updates

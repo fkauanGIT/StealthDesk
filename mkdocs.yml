@@ -65,6 +65,7 @@ nav:
       - Behind a reverse proxy: guides/reverse-proxy.md
       - Encrypting the data protection keys: guides/encrypting-keys.md
       - Installing agents: guides/installing-agents.md
+      - Using the terminal: guides/terminal.md
       - Backing up and restoring: guides/backup-and-restore.md
       - Upgrading and rolling back: guides/upgrading.md
       - Accounts and sign-in: guides/accounts.md
