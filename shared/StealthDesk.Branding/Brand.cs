@@ -16,6 +16,12 @@ public static class Brand
 
   public static string AgentName => $"{Key}.Agent";
 
+  /// <summary>The program the agent starts in each Windows session to see and use its desktop.</summary>
+  public static string DesktopClientName => $"{Key}.DesktopClient";
+
+  /// <summary>Folder next to the agent that holds the desktop client.</summary>
+  public const string DesktopClientFolderName = "DesktopClient";
+
   /// <summary>Assembly of the web server. Fixed: it follows the project, not the brand.</summary>
   public const string ServerAssemblyName = "StealthDesk.Web.Server";
 }

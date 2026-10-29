@@ -159,6 +159,14 @@ internal static class AgentCommandLine
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
     builder.AddStealthDeskAgent(startup);
     builder.Services.AddWindowsInventory();
+    using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+    {
+      if (identity.IsSystem)
+      {
+        builder.Services.AddWindowsDesktopClients();
+      }
+    }
+
     builder.Services.AddWindowsService(options => options.ServiceName = Installation(startup.InstanceName).ServiceName);
     return builder.Build();
   }
