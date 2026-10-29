@@ -21,13 +21,15 @@ COPY shared/ shared/
 RUN dotnet publish StealthDesk.Web.Server/StealthDesk.Web.Server.csproj \
   --configuration Release --no-restore --output /app -p:UseAppHost=false
 
-# The Windows agent the server hands out: one executable carrying its own runtime. Built in parallel with the server.
+# The Windows agent the server hands out: a zip of the agent and its desktop client, each one executable carrying its
+# own runtime. Built in parallel with the server.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS agent
 WORKDIR /src
 COPY .editorconfig Directory.Build.props Directory.Build.targets Directory.Packages.props ./
 COPY StealthDesk.Agent/StealthDesk.Agent.csproj StealthDesk.Agent/
 COPY StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj StealthDesk.Agent.Core/
 COPY StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj StealthDesk.Agent.Windows/
+COPY StealthDesk.DesktopClient/StealthDesk.DesktopClient.csproj StealthDesk.DesktopClient/
 COPY shared/StealthDesk.Branding/StealthDesk.Branding.csproj shared/StealthDesk.Branding/
 COPY shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj shared/StealthDesk.Contracts/
 COPY shared/StealthDesk.Core/StealthDesk.Core.csproj shared/StealthDesk.Core/
@@ -39,8 +41,15 @@ RUN dotnet restore StealthDesk.Agent/StealthDesk.Agent.csproj --runtime win-x64
 COPY StealthDesk.Agent/ StealthDesk.Agent/
 COPY StealthDesk.Agent.Core/ StealthDesk.Agent.Core/
 COPY StealthDesk.Agent.Windows/ StealthDesk.Agent.Windows/
+COPY StealthDesk.DesktopClient/ StealthDesk.DesktopClient/
 COPY shared/ shared/
-RUN dotnet publish StealthDesk.Agent/StealthDesk.Agent.csproj -p:PublishProfile=Windows --output /agent
+RUN dotnet publish StealthDesk.Agent/StealthDesk.Agent.csproj -p:PublishProfile=Windows --output /publish/agent \
+  && dotnet publish StealthDesk.DesktopClient/StealthDesk.DesktopClient.csproj -p:PublishProfile=Windows --output /publish/desktop-client
+# The two executables and nothing else that publishing leaves next to them.
+RUN mkdir -p /bundle/DesktopClient /agent \
+  && cp /publish/agent/StealthDesk.Agent.exe /bundle/ \
+  && cp /publish/desktop-client/StealthDesk.DesktopClient.exe /bundle/DesktopClient/ \
+  && pwsh -NoProfile -Command "Compress-Archive -Path /bundle/* -DestinationPath /agent/StealthDesk.Agent.zip"
 
 # Run on the ASP.NET runtime alone.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
@@ -63,7 +72,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 # Served at /downloads/agent/windows; install commands name its SHA-256.
-COPY --from=agent /agent/StealthDesk.Agent.exe downloads/windows/
+COPY --from=agent /agent/StealthDesk.Agent.zip downloads/windows/
 # The terms the image is shared under travel with it.
 COPY LICENSE ./
 

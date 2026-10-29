@@ -1,7 +1,7 @@
 # Releasing a version
 
 Each release publishes the server image on Docker Hub, tagged with its version (`0.5.0`), its minor version (`0.5`)
-and `latest`, and a GitHub release with the Windows agent (`StealthDesk.Agent.exe`) and its SHA-256. A pre-release
+and `latest`, and a GitHub release with the Windows agent (`StealthDesk.Agent.zip`, with its desktop client) and its SHA-256. A pre-release
 such as `0.5.0-rc.1` gets only its own tag, and `latest` stays where it was.
 
 ## What the Release workflow does

@@ -140,9 +140,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "The server didn't build." }
           dotnet build StealthDesk.Agent --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The agent didn't build." }
-          # The single file the server hands out, as the container image builds it.
+          # The zip the server hands out, as the container image builds it: the two single-file programs alone.
           dotnet publish StealthDesk.Agent -p:PublishProfile=Windows --output publish/agent
           if ($LASTEXITCODE -ne 0) { throw "The single-file agent didn't publish." }
+          dotnet publish StealthDesk.DesktopClient -p:PublishProfile=Windows --output publish/desktop-client
+          if ($LASTEXITCODE -ne 0) { throw "The single-file desktop client didn't publish." }
+          New-Item -ItemType Directory -Force publish/bundle/DesktopClient | Out-Null
+          Copy-Item publish/agent/StealthDesk.Agent.exe publish/bundle/
+          Copy-Item publish/desktop-client/StealthDesk.DesktopClient.exe publish/bundle/DesktopClient/
+          Compress-Archive -Path publish/bundle/* -DestinationPath publish/StealthDesk.Agent.zip
 
       # One step: a process a step starts is ended with that step on Windows runners.
       - name: Install the agent from the web command and as a service, against a running server
@@ -158,7 +164,7 @@ jobs:
             }
             if (-not $ready) { throw "The server didn't become ready." }
 
-            ./.github/scripts/agent-download-test.ps1 -Agent publish/agent/StealthDesk.Agent.exe -Downloads publish/downloads -Server http://localhost:5099
+            ./.github/scripts/agent-download-test.ps1 -Bundle publish/StealthDesk.Agent.zip -Downloads publish/downloads -Server http://localhost:5099
             ./.github/scripts/agent-service-test.ps1 -Agent StealthDesk.Agent/bin/Release/net10.0/StealthDesk.Agent.exe -Server http://localhost:5099
           }
           catch {
@@ -190,15 +196,17 @@ jobs:
       - name: Take the agent out of the image
         run: |
           container=$(docker create stealthdesk-server:ci)
-          mkdir -p image-agent
-          docker cp "$container:/app/downloads/windows/StealthDesk.Agent.exe" image-agent/StealthDesk.Agent.exe
+          docker cp "$container:/app/downloads/windows/StealthDesk.Agent.zip" StealthDesk.Agent.zip
           docker rm "$container"
+          unzip StealthDesk.Agent.zip -d image-agent
+          test -f image-agent/StealthDesk.Agent.exe
+          test -f image-agent/DesktopClient/StealthDesk.DesktopClient.exe
 
       - name: Upload the image's agent
         uses: actions/upload-artifact@v7
         with:
           name: image-agent
-          path: image-agent/StealthDesk.Agent.exe
+          path: image-agent/
           retention-days: 1
 
       - name: Start the server before its database

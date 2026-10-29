@@ -1,8 +1,10 @@
+using StealthDesk.Branding;
+
 namespace StealthDesk.Agent.Windows.Service;
 
 /// <summary>
 /// The files an install copies. A regular build is a folder of files next to the executable; a single-file build is
-/// the executable alone, often downloaded into a folder full of other things (like the temp folder) that aren't ours.
+/// the executable and the desktop client's folder next to it, maybe in a folder full of other things that aren't ours.
 /// </summary>
 public static class AgentFiles
 {
@@ -12,9 +14,16 @@ public static class AgentFiles
     var folder = Path.GetDirectoryName(Path.GetFullPath(executable))!;
     var mainAssembly = Path.Combine(folder, Path.GetFileNameWithoutExtension(executable) + ".dll");
 
-    return File.Exists(mainAssembly)
-      ? Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Select(x => Path.GetRelativePath(folder, x)).ToList()
-      : [Path.GetFileName(executable)];
+    if (File.Exists(mainAssembly))
+    {
+      return Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Select(x => Path.GetRelativePath(folder, x)).ToList();
+    }
+
+    var desktopClient = Path.Combine(folder, Brand.DesktopClientFolderName);
+    var desktopClientFiles = Directory.Exists(desktopClient)
+      ? Directory.EnumerateFiles(desktopClient, "*", SearchOption.AllDirectories).Select(x => Path.GetRelativePath(folder, x))
+      : [];
+    return [Path.GetFileName(executable), .. desktopClientFiles];
   }
 
   /// <summary>Copies what makes up the agent at <paramref name="executable"/> into <paramref name="destination"/>.</summary>

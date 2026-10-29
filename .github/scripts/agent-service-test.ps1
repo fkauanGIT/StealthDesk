@@ -36,6 +36,12 @@ function WaitFor([string] $what, [scriptblock] $condition, [int] $seconds = 60) 
 
 function ServiceProcess { (Get-CimInstance Win32_Service -Filter "Name='$service'").ProcessId }
 
+$desktopClient = Join-Path $installFolder "DesktopClient\StealthDesk.DesktopClient.exe"
+# The desktop clients the installed agent runs, wherever they are.
+function DesktopClients { @(Get-CimInstance Win32_Process -Filter "Name='StealthDesk.DesktopClient.exe'" | Where-Object { $_.ExecutablePath -eq $desktopClient }) }
+Add-Type -Namespace ServiceTest -Name Sessions -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint WTSGetActiveConsoleSessionId();'
+$consoleSession = [ServiceTest.Sessions]::WTSGetActiveConsoleSessionId()
+
 $admin = @{ email = "admin@example.com"; password = "Service-Test-1" } | ConvertTo-Json
 # Registering fails when another test signed the administrator up first.
 try { Invoke-RestMethod "$Server/api/auth/register" -Method Post -Body $admin -ContentType application/json | Out-Null } catch { }
@@ -118,6 +124,26 @@ finally {
   Remove-Item $result -ErrorAction SilentlyContinue
 }
 
+Write-Host "--- A desktop client in the console session, as SYSTEM"
+Check "the desktop client is installed next to the agent" (Test-Path $desktopClient)
+WaitFor "a desktop client to start in the console session" { @(DesktopClients | Where-Object { $_.SessionId -eq $consoleSession }).Count -eq 1 } 30
+$client = DesktopClients | Where-Object { $_.SessionId -eq $consoleSession }
+Check "it runs in the console session" ($client.SessionId -eq $consoleSession -and $consoleSession -ne 0) "session $consoleSession, process $($client.ProcessId)"
+Check "it runs as SYSTEM" ((Invoke-CimMethod -InputObject $client -MethodName GetOwnerSid).Sid -eq "S-1-5-18")
+WaitFor "its log to be written" { Get-ChildItem (Join-Path $dataFolder "logs") -Filter "desktop-client-session$consoleSession*.log" -ErrorAction SilentlyContinue } 15
+Check "it started for this agent instance, not refusing" ((Get-Content (Get-ChildItem (Join-Path $dataFolder "logs") -Filter "desktop-client-session$consoleSession*.log")[0].FullName -Raw) -match "agent instance default in session $consoleSession")
+
+Stop-Process -Id $client.ProcessId -Force
+WaitFor "the agent to start it again" { @(DesktopClients | Where-Object { $_.SessionId -eq $consoleSession -and $_.ProcessId -ne $client.ProcessId }).Count -eq 1 } 30
+Check "a killed desktop client is started again" $true "process $($client.ProcessId), then $((DesktopClients).ProcessId)"
+Check "there is still only one in the session" (@(DesktopClients | Where-Object { $_.SessionId -eq $consoleSession }).Count -eq 1)
+
+# Opened by an administrator, who isn't SYSTEM: it says why and closes.
+$byHand = Start-Process $desktopClient -ArgumentList "--instance", "default", "--data-folder", $dataFolder -PassThru -Wait -RedirectStandardError "$env:TEMP\desktop-client-by-hand.txt"
+$said = Get-Content "$env:TEMP\desktop-client-by-hand.txt" -Raw
+Remove-Item "$env:TEMP\desktop-client-by-hand.txt"
+Check "opened by hand, it refuses" ($byHand.ExitCode -eq 1 -and $said -match "can't be opened by hand") "exit code $($byHand.ExitCode): $said"
+
 Write-Host "--- Killing the process"
 $before = ServiceProcess
 Stop-Process -Id $before -Force
@@ -131,6 +157,8 @@ $stopped = Get-Date
 Stop-Service $service
 WaitFor "the device to go offline" { -not (Online) } 10
 Check "the server shows the device offline right away" $true "$([int]((Get-Date) - $stopped).TotalMilliseconds) ms after stopping"
+WaitFor "its desktop clients to stop with it" { (DesktopClients).Count -eq 0 } 15
+Check "no desktop client outlives the service" ((DesktopClients).Count -eq 0)
 Start-Service $service
 WaitFor "the device to come back online" { Online }
 Check "it comes back when started" (Online)

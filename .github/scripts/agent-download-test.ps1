@@ -3,29 +3,32 @@
   Runs the install command the Add device page copies, the way an administrator would, against a running server.
 
 .DESCRIPTION
-  Needs an administrator, a server started with AgentDownloads:Folder pointing to -Downloads, and the agent published
-  as a single file (-p:PublishProfile=Windows). Checks that a tampered download never runs, that the command installs
-  the agent, and that running it again updates it in place. Uninstalls at the end.
+  Needs an administrator, a server started with AgentDownloads:Folder pointing to -Downloads, and the agent's zip as
+  the container image builds it: the single-file agent and DesktopClient\ with the single-file desktop client. Checks
+  that a tampered download never runs, that the command installs the agent and its desktop client, and that running it
+  again updates it in place. Uninstalls at the end.
 
 .EXAMPLE
-  ./agent-download-test.ps1 -Agent publish/StealthDesk.Agent.exe -Downloads C:\server-downloads -Server http://localhost:5099
+  ./agent-download-test.ps1 -Bundle publish/StealthDesk.Agent.zip -Downloads C:\server-downloads -Server http://localhost:5099
 #>
 param(
-  [Parameter(Mandatory)] [string] $Agent,
+  [Parameter(Mandatory)] [string] $Bundle,
   [Parameter(Mandatory)] [string] $Downloads,
   [Parameter(Mandatory)] [string] $Server
 )
 
 $ErrorActionPreference = "Stop"
 # .NET methods resolve relative paths against the process's folder, not PowerShell's: make them absolute.
-$Agent = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Agent)
+$Bundle = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Bundle)
 $Downloads = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Downloads)
 $service = "StealthDesk.Agent"
 $installFolder = Join-Path $env:ProgramFiles "StealthDesk\default"
 $dataFolder = Join-Path $env:ProgramData "StealthDesk\default"
 $installed = Join-Path $installFolder "StealthDesk.Agent.exe"
-$served = Join-Path $Downloads "windows\StealthDesk.Agent.exe"
-$temporary = Join-Path $env:TEMP "StealthDesk.Agent.exe"
+$installedClient = Join-Path $installFolder "DesktopClient\StealthDesk.DesktopClient.exe"
+$served = Join-Path $Downloads "windows\StealthDesk.Agent.zip"
+$temporary = Join-Path $env:TEMP "StealthDesk.Agent.zip"
+$unpacked = Join-Path $env:TEMP "StealthDesk.Agent"
 $appsKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\StealthDesk.Agent"
 
 function Check([string] $what, [bool] $passed, [string] $detail = "") {
@@ -67,8 +70,16 @@ Check "the machine starts without the agent" (-not (Get-Service $service -ErrorA
 Check "the server has no build yet" ($null -eq (Options).windowsAgent)
 
 New-Item -ItemType Directory -Force (Split-Path $served) | Out-Null
-Copy-Item $Agent $served
+Copy-Item $Bundle $served
 $build = (Get-FileHash -Algorithm SHA256 $served).Hash
+# What the zip holds, to compare with what gets installed.
+$expected = Join-Path $env:TEMP "expected-agent-bundle"
+Remove-Item -Recurse -Force $expected -ErrorAction SilentlyContinue
+Expand-Archive $Bundle $expected
+$agentHash = (Get-FileHash -Algorithm SHA256 (Join-Path $expected "StealthDesk.Agent.exe")).Hash
+$clientHash = (Get-FileHash -Algorithm SHA256 (Join-Path $expected "DesktopClient\StealthDesk.DesktopClient.exe")).Hash
+Check "the zip holds the agent and the desktop client, and nothing else" (@(Get-ChildItem $expected -Recurse -File).Count -eq 2) ((Get-ChildItem $expected -Recurse -File).Name -join ", ")
+Remove-Item -Recurse -Force $expected
 Check "the server names the build's hash" ((Options).windowsAgent.sha256 -eq $build) $build
 $key = (Invoke-RestMethod "$Server/api/v1/installer-keys" -Method Post -ContentType application/json -WebSession $session `
   -Body (@{ type = 0; name = "Copied command"; allowedUses = 1 } | ConvertTo-Json)).fullKey
@@ -82,15 +93,16 @@ $bytes[$bytes.Length - 1] = $bytes[$bytes.Length - 1] -bxor 0xFF
 $output = RunCommand $command
 Check "the command says the download doesn't match" ($output -match "does not match its SHA-256 hash")
 Check "nothing was installed" (-not (Get-Service $service -ErrorAction SilentlyContinue) -and -not (Test-Path $installFolder) -and -not (Test-Path $dataFolder))
-Check "the tampered download was deleted" (-not (Test-Path $temporary))
-Copy-Item $Agent $served -Force
+Check "the tampered download was deleted, never unpacked" (-not (Test-Path $temporary) -and -not (Test-Path $unpacked))
+Copy-Item $Bundle $served -Force
 
 Write-Host "--- The copied command installs the agent"
 $output = RunCommand $command
 Check "the service is running" ((Get-Service $service).Status -eq "Running")
-Check "the install folder holds the agent alone" (@(Get-ChildItem $installFolder -Recurse -File).Count -eq 1) ((Get-ChildItem $installFolder -Recurse -File).Name -join ", ")
-Check "the installed agent is the build the server named" ((Get-FileHash -Algorithm SHA256 $installed).Hash -eq $build)
-Check "the download was deleted" (-not (Test-Path $temporary))
+Check "the install folder holds the agent and its desktop client alone" (@(Get-ChildItem $installFolder -Recurse -File).Count -eq 2) ((Get-ChildItem $installFolder -Recurse -File).Name -join ", ")
+Check "the installed agent is the one in the zip the server named" ((Get-FileHash -Algorithm SHA256 $installed).Hash -eq $agentHash)
+Check "the installed desktop client is the one in the zip" ((Get-FileHash -Algorithm SHA256 $installedClient).Hash -eq $clientHash)
+Check "the download and what it unpacked were deleted" (-not (Test-Path $temporary) -and -not (Test-Path $unpacked))
 WaitFor "the device to come online" { @(Devices | Where-Object { $_.isOnline }).Count -eq 1 }
 $device = Devices | Where-Object { $_.isOnline } | Select-Object -First 1
 Check "the device appears online" ($null -ne $device) "$($device.name) $($device.id)"
