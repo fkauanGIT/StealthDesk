@@ -60,7 +60,11 @@ public sealed class DesktopClientTests
   public async Task OpenedByHand_TheProgramSaysWhy_AndCloses()
   {
     Assert.SkipUnless(OperatingSystem.IsWindows(), "The desktop client is a Windows program.");
-    var executable = Path.Combine(AppContext.BaseDirectory, $"{Brand.DesktopClientName}.exe");
+    // Its own build, with everything it needs: the copy next to these tests may lack what only it uses.
+    var testBuild = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
+    var repository = testBuild.Parent!.Parent!.Parent!.Parent!.Parent!.FullName;
+    var executable = Path.Combine(
+      repository, "StealthDesk.DesktopClient", "bin", testBuild.Parent.Name, testBuild.Name, $"{Brand.DesktopClientName}.exe");
     var start = new ProcessStartInfo(executable) { RedirectStandardError = true, UseShellExecute = false };
     using var process = Process.Start(start)!;
 
