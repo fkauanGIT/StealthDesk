@@ -22,6 +22,7 @@ using StealthDesk.Web.Server.Invites;
 using StealthDesk.Web.Server.UserGroups;
 using StealthDesk.Web.Server.Permissions;
 using StealthDesk.Web.Server.PersonalAccessTokens;
+using StealthDesk.Web.Server.Relay;
 using StealthDesk.Web.Server.ReverseProxy;
 using StealthDesk.Web.Server.Users;
 
@@ -45,6 +46,14 @@ public static class ServerSetup
       .Validate(x => x.ClockTolerance is null || x.ClockTolerance > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.ClockTolerance)} must be longer than zero, or empty to turn the check off.")
       .Validate(x => x.AgentCallTimeout > TimeSpan.Zero, $"{GatewayOptions.Section}:{nameof(GatewayOptions.AgentCallTimeout)} must be longer than zero.")
       .ValidateOnStart();
+    builder.Services.AddOptions<RelayOptions>()
+      .Bind(builder.Configuration.GetSection(RelayOptions.Section))
+      .Validate(x => x.TicketLifetime > TimeSpan.Zero, $"{RelayOptions.Section}:{nameof(RelayOptions.TicketLifetime)} must be longer than zero.")
+      .Validate(x => x.PartnerTimeout > TimeSpan.Zero, $"{RelayOptions.Section}:{nameof(RelayOptions.PartnerTimeout)} must be longer than zero.")
+      .Validate(x => x.MaxMessageBytes > 0, $"{RelayOptions.Section}:{nameof(RelayOptions.MaxMessageBytes)} must be more than zero.")
+      .ValidateOnStart();
+    builder.Services.AddSingleton<RelaySessions>();
+    builder.Services.AddSingleton<IRelaySessions>(provider => provider.GetRequiredService<RelaySessions>());
     builder.Services.AddSignalR().AddMessagePackProtocol();
     // SignalR logs every hub call with its arguments below Information: what is typed in a terminal, passwords
     // included, and what commands print. Added after the configuration's rules, so turning Debug on can't reach it.
@@ -120,6 +129,7 @@ public static class ServerSetup
     app.MapGet(Routes.ServerVersion, () => typeof(ServerSetup).Assembly.GetName().Version?.ToString() ?? "unknown").AllowAnonymous();
     app.MapHub<AgentGatewayHub>(Routes.AgentGateway);
     app.MapHub<DashboardHub>(Routes.Dashboard);
+    app.MapRelay();
 
     // Any other path is a page of the web app, but an unknown API or hub path is an error, not a page.
     app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();

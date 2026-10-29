@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
 using System.Text.Json;
 using StealthDesk.Contracts;
 using StealthDesk.Contracts.Accounts;
 using StealthDesk.Contracts.InstallerKeys;
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.Relay;
 using StealthDesk.Contracts.Users;
 using StealthDesk.Web.UITests.Infrastructure;
 
@@ -45,6 +47,23 @@ public class DeploymentTests
     await app.SignInAsync(AdminEmail, Password);
     await Expect(app.Heading("Devices")).ToBeVisibleAsync();
     await app.ScreenshotAsync("signed-in-again");
+  }
+
+  [Fact]
+  public async Task ADeployment_LetsAWebSocketThroughToTheRelay()
+  {
+    SkipUnlessPhase(null);
+    using var socket = new ClientWebSocket();
+    socket.Options.CollectHttpResponseDetails = true;
+    // A test deployment's certificate is its own, as for the browser.
+    socket.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+
+    var relay = RelayConnection.For(UiServer.Existing().BaseAddress, Guid.NewGuid(), RelayRole.Device, "no-such-session");
+    await Assert.ThrowsAsync<WebSocketException>(() => socket.ConnectAsync(relay, Cancel));
+
+    // The relay's own answer for a session it doesn't know: the upgrade reached it. Without the upgrade headers it
+    // would be 400, and a path the server doesn't map would be the web app's page.
+    Assert.Equal(HttpStatusCode.NotFound, socket.HttpStatusCode);
   }
 
   [Fact]
