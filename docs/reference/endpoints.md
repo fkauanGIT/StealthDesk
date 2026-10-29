@@ -9,6 +9,7 @@ and the hubs until they change it.
 |------|-----------|---------|
 | `/hubs/agent` | WebSockets | SignalR gateway agents stay connected to. Carries their signed device reports, the server's calls to the agent, and terminal output. |
 | `/hubs/dashboard` | WebSockets | SignalR hub signed-in browsers connect to for live updates of their tenant's devices, to ask which actions they may use on one, and to open, type in and close a terminal on a device. Each terminal call checks `device.terminal.use` on that device; a terminal's output goes only to the connection that opened it, and closes with it. A visit to a device's remote features (`StartDeviceAccess` / `EndDeviceAccess`) and each terminal call are traced as activities of `StealthDesk.Web.Server.DeviceAccess`, with the user, the device and the outcome, never with what is typed. |
+| `/relay` | WebSockets | Where the two ends of a remote control session meet: the viewer's browser and the device's desktop client. Each joins once, with the session's id, its role (`Viewer` or `Device`) and its own token, which the server hands out when it starts the session; the viewer's end must also be the signed-in user the session was issued to. An end is let in once the other arrives, or answered 408 after `Relay:PartnerTimeout`; whatever one sends reaches the other, and when either leaves, the other is closed with why. |
 
 ## Devices, tenants and the server
 

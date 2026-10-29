@@ -76,14 +76,15 @@ every 15 seconds, within Nginx's default `proxy_read_timeout` of 60.
 
 ## WebSockets and the agents' routes
 
-The proxy must pass WebSocket upgrades (the `Upgrade` and `Connection` headers) to `/hubs/agent` and
-`/hubs/dashboard`. Agents use nothing but `/hubs/agent`, and prove who they are with signed reports and installer
-keys. When the proxy puts its own sign-in in front of the server (Cloudflare Access, for instance), leave these paths
+The proxy must pass WebSocket upgrades (the `Upgrade` and `Connection` headers) to `/hubs/agent`,
+`/hubs/dashboard` and `/relay`. Agents use nothing but `/hubs/agent`, and prove who they are with signed reports and
+installer keys; a device's end of a remote control session joins `/relay` with the session's one-time token. When the proxy puts its own sign-in in front of the server (Cloudflare Access, for instance), leave these paths
 open; browsers need the rest:
 
 | Path | Who uses it |
 |---|---|
 | `/hubs/agent` | Every agent, all the time. |
+| `/relay` | A device's end of a remote control session. |
 | `/downloads/agent/windows` | The install command, on a machine being installed: it has no account. |
 
 ## Check it

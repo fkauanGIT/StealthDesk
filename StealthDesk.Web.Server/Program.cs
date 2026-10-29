@@ -16,6 +16,9 @@ if (app.Environment.IsDevelopment())
   app.UseWebAssemblyDebugging();
 }
 
+// The relay's WebSockets; SignalR's hubs bring their own. Pinged as often as the hubs, so a proxy doesn't cut a
+// session whose screen is still.
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<MustChangePasswordMiddleware>();
