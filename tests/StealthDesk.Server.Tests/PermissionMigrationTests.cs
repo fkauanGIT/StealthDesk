@@ -15,6 +15,17 @@ public class PermissionMigrationTests
 {
   private const string BeforePermissions = "20261003020144_AddUsers";
   private const string BeforeTerminal = "20261016110021_AddDeviceGroups";
+  private const string BeforeRemoteControl = "20261026132734_AddDeviceTerminalPermission";
+
+  private static readonly string[] RemoteControl =
+  [
+    PermissionNames.DeviceRemoteControlConnect,
+    PermissionNames.DeviceRemoteControlInteract,
+    PermissionNames.DeviceRemoteControlElevatedDesktop,
+    PermissionNames.DeviceCtrlAltDelSend,
+    PermissionNames.DeviceClipboardRead,
+    PermissionNames.DeviceClipboardWrite,
+  ];
   private const string ServerMarker = "stealthdesk:server_admin";
   private const string TenantMarker = "stealthdesk:tenant_admin";
 
@@ -105,6 +116,55 @@ public class PermissionMigrationTests
 
     Assert.Empty(await TerminalRowsAsync(server));
     Assert.Equal(7, await server.WithDbAsync(db => db.PermissionAssignments.CountAsync(x => x.Permission == PermissionNames.DeviceRead && x.OwningTenantId == tenant)));
+  }
+
+  [Fact]
+  public async Task DeviceReadTheSystemGave_BringsRemoteControl_AndUndoingTakesItAway()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var tenant = await TestTenants.CreateAsync(server, "Tenant");
+    var creator = await TestAccounts.CreateUserAsync(server, "creator@example.com", tenant);
+    var operatorUser = await TestAccounts.CreateUserAsync(server, "operator@example.com", tenant);
+    var holder = await TestAccounts.CreateUserAsync(server, "holder@example.com", tenant);
+    var group = Guid.NewGuid();
+    await MigrateAsync(server, BeforeRemoteControl);
+
+    // As the version before left them: device.read given by the system, by a person, and one who already holds
+    // seeing the desktop; and a user group.
+    await server.WithDbAsync(db =>
+    {
+      db.PermissionAssignments.AddRange(
+        Assignment(PermissionPrincipalKind.User, creator.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, operatorUser.Id, PermissionNames.DeviceRead, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceRemoteControlConnect, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.UserGroup, group, PermissionNames.DeviceRead, tenant));
+      return db.SaveChangesAsync();
+    });
+
+    await MigrateAsync(server, null);
+    var granted = await server.WithDbAsync(db => db.PermissionAssignments.AsNoTracking().Where(x => RemoteControl.Contains(x.Permission)).ToListAsync());
+
+    foreach (var permission in RemoteControl)
+    {
+      Assert.Equal(
+        new[] { creator.Id, group, holder.Id }.Order(),
+        granted.Where(x => x.Permission == permission).Select(x => x.PrincipalId).Order());
+    }
+
+    Assert.All(granted.Where(x => x.CreatedByKind == PermissionAssignmentRecord.System), x =>
+    {
+      Assert.Equal(PermissionEffect.Allow, x.Effect);
+      Assert.Equal(PermissionScopeKind.Tenant, x.ScopeKind);
+      Assert.Equal(tenant, x.ScopeId);
+      Assert.True(x.IsEnabled);
+    });
+    Assert.Equal("User", Assert.Single(granted, x => x.PrincipalId == holder.Id && x.Permission == PermissionNames.DeviceRemoteControlConnect).CreatedByKind);
+
+    await MigrateAsync(server, BeforeRemoteControl);
+
+    Assert.False(await server.WithDbAsync(db => db.PermissionAssignments.AnyAsync(x => RemoteControl.Contains(x.Permission))));
+    Assert.Equal(4, await server.WithDbAsync(db => db.PermissionAssignments.CountAsync(x => x.Permission == PermissionNames.DeviceRead && x.OwningTenantId == tenant)));
   }
 
   private static PermissionAssignmentRecord Assignment(

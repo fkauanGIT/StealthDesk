@@ -80,6 +80,12 @@ public static class PermissionCatalog
 
     new(PermissionNames.DeviceRead, Categories.Devices, "Read devices", "View devices, their details and their live status.", Devices),
     new(PermissionNames.DeviceTerminalUse, Categories.Devices, "Use the terminal", "Open a terminal on a device and run commands on it as the agent's account, LocalSystem on Windows.", Devices),
+    new(PermissionNames.DeviceRemoteControlConnect, Categories.Devices, "See the desktop", "Start remote control on a device and see the desktop of a session logged on to it.", Devices),
+    new(PermissionNames.DeviceRemoteControlInteract, Categories.Devices, "Control the desktop", "Use a device's mouse and keyboard during remote control.", Devices),
+    new(PermissionNames.DeviceRemoteControlElevatedDesktop, Categories.Devices, "Use secure screens", "See and use UAC prompts and the lock screen during remote control.", Devices),
+    new(PermissionNames.DeviceCtrlAltDelSend, Categories.Devices, "Send Ctrl+Alt+Del", "Send Ctrl+Alt+Del to a device during remote control.", Devices),
+    new(PermissionNames.DeviceClipboardRead, Categories.Devices, "Read the clipboard", "Get text from a device's clipboard during remote control.", Devices),
+    new(PermissionNames.DeviceClipboardWrite, Categories.Devices, "Write the clipboard", "Put text on a device's clipboard during remote control.", Devices),
 
     new(PermissionNames.PersonalAccessTokenSelfRead, Categories.PersonalAccessTokens, "Read own tokens", "View your own personal access tokens.", TenantOnly),
     new(PermissionNames.PersonalAccessTokenSelfWrite, Categories.PersonalAccessTokens, "Manage own tokens", "Create and revoke your own personal access tokens.", TenantOnly),
