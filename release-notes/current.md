@@ -15,6 +15,9 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   `Relay:TicketLifetime`, `Relay:PartnerTimeout` and `Relay:MaxMessageBytes`
 - A desktop client the agent's service keeps running in every Windows session with a screen, the sign-in screen
   included, as LocalSystem inside that session: what will see and use the desktop
+- The agent and its desktop clients talk over a named pipe only LocalSystem and logged-on users may open; the agent
+  keeps a connection only from the desktop client installed next to it, as Windows reports the process, signed like
+  the agent when the agent is signed
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;

@@ -83,7 +83,7 @@ internal static class AgentCommandLine
       }
 
       var startup = new AgentStartup(parse.GetValue(instance), parse.GetValue(server), InstallerKey: parse.GetValue(installerKey), DeviceId: parse.GetValue(deviceId));
-      using var host = BuildAgent(args, startup);
+      using var host = BuildAgent(args, startup, serveDesktopClients: true);
       await host.RunAsync(cancellationToken);
       return 0;
     });
@@ -153,14 +153,17 @@ internal static class AgentCommandLine
   }
 
   [System.Runtime.Versioning.SupportedOSPlatform("windows6.1")]
-  private static IHost BuildAgent(string[] args, AgentStartup startup)
+  /// <param name="serveDesktopClients">Off while installing, which only waits for the server's first answer.</param>
+  private static IHost BuildAgent(string[] args, AgentStartup startup, bool serveDesktopClients)
   {
     // As a service the working folder is System32: settings files are found next to the executable instead.
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
     builder.AddStealthDeskAgent(startup);
     builder.Services.AddWindowsInventory();
-    using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+    if (serveDesktopClients)
     {
+      builder.Services.AddWindowsDesktopClientPipe();
+      using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
       if (identity.IsSystem)
       {
         builder.Services.AddWindowsDesktopClients();
@@ -179,7 +182,7 @@ internal static class AgentCommandLine
       throw new PlatformNotSupportedException("The agent currently runs on Windows only.");
     }
 
-    using var host = BuildAgent(args, startup);
+    using var host = BuildAgent(args, startup, serveDesktopClients: false);
     await host.StartAsync(cancellationToken);
     try
     {

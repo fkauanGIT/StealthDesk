@@ -4,6 +4,7 @@
     <Project Path="shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj" />
     <Project Path="shared/StealthDesk.Core/StealthDesk.Core.csproj" />
     <Project Path="shared/StealthDesk.Hosting/StealthDesk.Hosting.csproj" />
+    <Project Path="shared/StealthDesk.Ipc/StealthDesk.Ipc.csproj" />
     <Project Path="shared/StealthDesk.Observability/StealthDesk.Observability.csproj" />
     <Project Path="shared/StealthDesk.Realtime/StealthDesk.Realtime.csproj" />
   </Folder>

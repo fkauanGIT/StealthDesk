@@ -5,8 +5,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Branding;
 using StealthDesk.Contracts.Agents;
+using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.DesktopClient;
 using StealthDesk.Hosting;
+using StealthDesk.Ipc;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
@@ -31,11 +33,20 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings {
 // One file per session: each session has its own client.
 builder.AddDailyFileLog(Path.Combine(start!.DataFolder, "logs", $"desktop-client-session{sessionId}.log"), keepDays: 7);
 builder.Services.AddHostedService<LifetimeLogging>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
+builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(
+  provider,
+  Pipes.NameFor(start.Instance, DesktopClientBuild.IsDebug),
+  new DesktopClientHello(sessionId, typeof(AgentConnection).Assembly.GetName().Version?.ToString(3) ?? "0.0.0")));
+builder.Services.AddHostedService(provider => provider.GetRequiredService<AgentConnection>());
 using var host = builder.Build();
 host.Services.GetRequiredService<ILogger<Program>>()
   .LogInformation("Desktop client of agent instance {Instance} in session {SessionId}.", start.Instance, sessionId);
+// Taken before running: RunAsync disposes the host's services when it returns.
+var agent = host.Services.GetRequiredService<AgentConnection>();
 await host.RunAsync();
-return 0;
+return agent.GaveUp ? 1 : 0;
 
 // Whoever opened it by hand sees why it closed; with its output read by another program, that program gets it instead.
 // Session 0 has no desktop to show a message on.
