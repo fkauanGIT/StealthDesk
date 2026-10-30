@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="StreamJsonRpc" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\StealthDesk.Branding\StealthDesk.Branding.csproj" />
+    <ProjectReference Include="..\StealthDesk.Contracts\StealthDesk.Contracts.csproj" />
+  </ItemGroup>
+</Project>

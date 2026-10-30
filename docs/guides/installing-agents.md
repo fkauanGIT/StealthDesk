@@ -70,6 +70,16 @@ is started by the agent and closes. Each one logs to `logs\desktop-client-sessio
 
 The agent starts desktop clients only as the service: run from a console, it never does.
 
+Each desktop client talks to its agent through a named pipe, `StealthDesk-<instance>`, that the agent serves. As the
+service, the pipe lets in only LocalSystem and users logged on at a desktop, and denies anonymous connections; those
+users may connect but not serve the pipe themselves, so no program of theirs can pose as the agent. No
+password is shared: when a process connects, the agent asks Windows which process it is, and keeps the connection only
+if it runs the desktop client installed next to the agent and, once the agent is code-signed, is signed with the same
+certificate. A program refused 5 times within a minute is turned away without being checked until the minute passes.
+A client whose agent goes away tries again every 5 seconds and closes after a minute without reaching it; the agent,
+once back, starts new ones. A debug build serves `StealthDesk-debug-<instance>` instead and also takes a desktop client
+run from the source tree, so the two can be run by hand.
+
 ## Antivirus software
 
 The agent isn't signed yet, so antivirus software that watches for remote access tools may quarantine it when it

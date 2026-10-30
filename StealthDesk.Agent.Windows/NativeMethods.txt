@@ -10,3 +10,5 @@ OpenProcessToken
 DuplicateTokenEx
 CreateProcessAsUser
 CloseHandle
+GetNamedPipeClientProcessId
+QueryFullProcessImageName
