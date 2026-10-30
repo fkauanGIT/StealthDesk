@@ -8,7 +8,6 @@ namespace StealthDesk.Agent.Tests;
 public sealed class DesktopClientAuthenticatorTests
 {
   private const string Installed = @"C:\Program Files\StealthDesk\DesktopClient\StealthDesk.DesktopClient.exe";
-  private const string DebugFolder = @"C:\src\StealthDesk\StealthDesk.DesktopClient\bin\Debug";
 
   private readonly FakeSigners _signers = new();
   private readonly FakeTimeProvider _clock = new();
@@ -80,15 +79,23 @@ public sealed class DesktopClientAuthenticatorTests
   [Fact]
   public void ADebugBuild_AlsoTakesDotnetAndTheClientBuiltInTheSourceTree_WithoutComparingSignatures()
   {
-    _signers.Mismatches[Installed] = "not signed";
-    var debug = Create(isDebugBuild: true);
+    // Paths of the system the test runs on: the folder rules split paths as that system does.
+    var root = Path.Combine(Path.GetTempPath(), "stealthdesk-debug-rules");
+    var installed = Path.Combine(root, "agent", "DesktopClient", "StealthDesk.DesktopClient.exe");
+    var debugFolder = Path.Combine(root, "src", "StealthDesk.DesktopClient", "bin", "Debug");
+    _signers.Mismatches[installed] = "not signed";
+    var debug = new DesktopClientAuthenticator(
+      new DesktopClientPipeRules(installed, IsDebugBuild: true, debugFolder),
+      _signers,
+      _clock,
+      NullLogger<DesktopClientAuthenticator>.Instance);
 
-    Assert.Null(debug.Refusal(new PipeClient(10, Installed)));
-    Assert.Null(debug.Refusal(new PipeClient(10, @"C:\Program Files\dotnet\dotnet.exe")));
-    Assert.Null(debug.Refusal(new PipeClient(10, $@"{DebugFolder}\net10.0\StealthDesk.DesktopClient.exe")));
-    Assert.NotNull(debug.Refusal(new PipeClient(10, $@"{DebugFolder}\net10.0\Other.exe")));
-    Assert.NotNull(debug.Refusal(new PipeClient(10, $@"{DebugFolder}-copy\StealthDesk.DesktopClient.exe")));
-    Assert.NotNull(debug.Refusal(new PipeClient(10, @"C:\Users\bob\StealthDesk.DesktopClient.exe")));
+    Assert.Null(debug.Refusal(new PipeClient(10, installed)));
+    Assert.Null(debug.Refusal(new PipeClient(10, Path.Combine(root, "dotnet", "dotnet.exe"))));
+    Assert.Null(debug.Refusal(new PipeClient(10, Path.Combine(debugFolder, "net10.0", "StealthDesk.DesktopClient.exe"))));
+    Assert.NotNull(debug.Refusal(new PipeClient(10, Path.Combine(debugFolder, "net10.0", "Other.exe"))));
+    Assert.NotNull(debug.Refusal(new PipeClient(10, Path.Combine($"{debugFolder}-copy", "StealthDesk.DesktopClient.exe"))));
+    Assert.NotNull(debug.Refusal(new PipeClient(10, Path.Combine(root, "bob", "StealthDesk.DesktopClient.exe"))));
     Assert.Equal(0, _signers.Checks);
   }
 
@@ -98,8 +105,8 @@ public sealed class DesktopClientAuthenticatorTests
     Assert.Equal("Process 10 has no executable path.", Create().Refusal(new PipeClient(10, "")));
   }
 
-  private DesktopClientAuthenticator Create(bool isDebugBuild = false) =>
-    new(new DesktopClientPipeRules(Installed, isDebugBuild, DebugFolder), _signers, _clock, NullLogger<DesktopClientAuthenticator>.Instance);
+  private DesktopClientAuthenticator Create() =>
+    new(new DesktopClientPipeRules(Installed, IsDebugBuild: false), _signers, _clock, NullLogger<DesktopClientAuthenticator>.Instance);
 
   private sealed class FakeSigners : IExecutableSigners
   {
