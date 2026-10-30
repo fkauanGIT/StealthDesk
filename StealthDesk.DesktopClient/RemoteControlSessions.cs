@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.RemoteControl;
+using StealthDesk.RemoteControl;
 
 namespace StealthDesk.DesktopClient;
 
@@ -67,6 +68,7 @@ internal sealed class RemoteControlSession(DesktopRemoteControlStart request)
 internal sealed class RemoteControlSessions(
   RelayConnector connect,
   IUserNotice notice,
+  TimeProvider clock,
   IHostApplicationLifetime lifetime,
   ILogger<RemoteControlSessions> logger)
 {
@@ -121,7 +123,9 @@ internal sealed class RemoteControlSessions(
           notice.Show($"{session.ViewerName} started remote control of this computer.");
         }
 
-        await ReceiveUntilClosedAsync(socket, lifetime.ApplicationStopping);
+        var stream = new RelayStream(socket, clock, logger);
+        var ended = await stream.RunAsync((message, _) => HandleAsync(session, message), lifetime.ApplicationStopping);
+        logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
       }
     }
     // Never the address in the log: it carries the session's token.
@@ -149,40 +153,10 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  // Nothing comes from the viewer yet but the end of the session.
-  private static async Task ReceiveUntilClosedAsync(WebSocket socket, CancellationToken stopping)
+  // Nothing the viewer sends is acted on yet.
+  private Task HandleAsync(RemoteControlSession session, StreamEnvelope message)
   {
-    var buffer = new byte[4 * 1024];
-    try
-    {
-      while (true)
-      {
-        var received = await socket.ReceiveAsync(buffer.AsMemory(), stopping);
-        if (received.MessageType == WebSocketMessageType.Close)
-        {
-          // The relay hangs up right after its close message: the session ended normally either way.
-          await TryCloseAsync(socket, WebSocketCloseStatus.NormalClosure, "The session ended.");
-          return;
-        }
-      }
-    }
-    catch (OperationCanceledException) when (stopping.IsCancellationRequested)
-    {
-      // The client is closing: the viewer is told the device left.
-      await TryCloseAsync(socket, WebSocketCloseStatus.EndpointUnavailable, "The desktop client closed.");
-    }
-  }
-
-  private static async Task TryCloseAsync(WebSocket socket, WebSocketCloseStatus status, string reason)
-  {
-    using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-    try
-    {
-      await socket.CloseOutputAsync(status, reason, limit.Token);
-    }
-    catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)
-    {
-      // Gone already.
-    }
+    logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
+    return Task.CompletedTask;
   }
 }

@@ -120,7 +120,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     notify);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, _notices, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

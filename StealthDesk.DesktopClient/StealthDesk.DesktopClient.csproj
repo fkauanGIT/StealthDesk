@@ -21,6 +21,7 @@
     <ProjectReference Include="..\shared\StealthDesk.Contracts\StealthDesk.Contracts.csproj" />
     <ProjectReference Include="..\shared\StealthDesk.Hosting\StealthDesk.Hosting.csproj" />
     <ProjectReference Include="..\shared\StealthDesk.Ipc\StealthDesk.Ipc.csproj" />
+    <ProjectReference Include="..\shared\StealthDesk.RemoteControl\StealthDesk.RemoteControl.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="StealthDesk.Agent.Tests" />

@@ -314,6 +314,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
         return new TaskCompletionSource<System.Net.WebSockets.WebSocket>().Task.WaitAsync(token);
       },
       new SilentNotice(),
+      TimeProvider.System,
       _clientLifetime,
       NullLogger<RemoteControlSessions>.Instance);
     var (_, clientSide) = await ConnectAsync(new DesktopClientEndpoint(sessions, _clientLifetime, NullLogger<DesktopClientEndpoint>.Instance));
