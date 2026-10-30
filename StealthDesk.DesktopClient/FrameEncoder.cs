@@ -12,7 +12,9 @@ namespace StealthDesk.DesktopClient;
 [SupportedOSPlatform("windows6.1")]
 internal static class FrameEncoder
 {
+  // Looked up once: looking a codec up by format on every save isn't safe while regions are encoded in parallel.
   private static readonly ImageCodecInfo Jpeg = ImageCodecInfo.GetImageEncoders().First(x => x.FormatID == ImageFormat.Jpeg.Guid);
+  private static readonly ImageCodecInfo Png = ImageCodecInfo.GetImageEncoders().First(x => x.FormatID == ImageFormat.Png.Guid);
 
   /// <summary>Each region encoded on its own, in parallel.</summary>
   /// <param name="quality">1 to 100; JPEG only.</param>
@@ -43,7 +45,7 @@ internal static class FrameEncoder
       using var output = new MemoryStream();
       if (encoding == ImageEncoding.Png)
       {
-        bitmap.Save(output, ImageFormat.Png);
+        bitmap.Save(output, Png, null);
       }
       else
       {
