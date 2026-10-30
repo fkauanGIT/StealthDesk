@@ -75,8 +75,10 @@ public static class RelayEndpoint
     var partnerTimeout = options.Value.PartnerTimeout;
     try
     {
-      // Before accepting: an end left alone gets a plain answer instead of an open socket nobody writes to.
-      await session.Arrived(other).WaitAsync(partnerTimeout, lifetime.ApplicationStopping);
+      // Before accepting: an end left alone gets a plain answer instead of an open socket nobody writes to. A session
+      // ended meanwhile, by the server, stops the wait too.
+      using var waiting = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping, session.Ended.Token);
+      await session.Arrived(other).WaitAsync(partnerTimeout, waiting.Token);
     }
     catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
     {

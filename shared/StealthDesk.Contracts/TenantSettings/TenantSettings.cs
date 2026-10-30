@@ -9,7 +9,10 @@ public static class TenantSettingNames
   /// <summary>The instance those commands name; when unset, one made from the server's address.</summary>
   public const string InstanceName = "instance-name";
 
-  public static IReadOnlyList<string> All { get; } = [AppendInstanceName, InstanceName];
+  /// <summary><c>true</c> or <c>false</c>: the user at a device is told when a remote control session of it starts and ends.</summary>
+  public const string NotifyUserOnRemoteControl = "notify-user-on-remote-control";
+
+  public static IReadOnlyList<string> All { get; } = [AppendInstanceName, InstanceName, NotifyUserOnRemoteControl];
 
   public const int ValueMax = 100;
 }

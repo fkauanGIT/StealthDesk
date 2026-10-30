@@ -12,12 +12,18 @@ namespace StealthDesk.DesktopClient;
 
 /// <summary>What the desktop client answers to its agent.</summary>
 [SupportedOSPlatform("windows6.1")]
-internal sealed class DesktopClientEndpoint(IHostApplicationLifetime lifetime, ILogger<DesktopClientEndpoint> logger) : IDesktopClientEndpoint
+internal sealed class DesktopClientEndpoint(
+  RemoteControlSessions remoteControl,
+  IHostApplicationLifetime lifetime,
+  ILogger<DesktopClientEndpoint> logger) : IDesktopClientEndpoint
 {
   public Task<DesktopSessionInfo> GetSessionInfo(CancellationToken cancellationToken)
   {
     var sessionId = CurrentSession.Id;
-    return Task.FromResult(new DesktopSessionInfo(sessionId, CurrentSession.UserName((uint)sessionId)));
+    return Task.FromResult(new DesktopSessionInfo(
+      sessionId,
+      CurrentSession.UserName((uint)sessionId),
+      IsConsole: PInvoke.WTSGetActiveConsoleSessionId() == (uint)sessionId));
   }
 
   public Task Shutdown(string reason, CancellationToken cancellationToken)
@@ -26,6 +32,12 @@ internal sealed class DesktopClientEndpoint(IHostApplicationLifetime lifetime, I
     lifetime.StopApplication();
     return Task.CompletedTask;
   }
+
+  // The refusal reaches the agent as the call's error.
+  public Task StartRemoteControl(DesktopRemoteControlStart request, CancellationToken cancellationToken) =>
+    remoteControl.Start(request) is { } refusal
+      ? Task.FromException(new InvalidOperationException(refusal))
+      : Task.CompletedTask;
 }
 
 [SupportedOSPlatform("windows6.1")]

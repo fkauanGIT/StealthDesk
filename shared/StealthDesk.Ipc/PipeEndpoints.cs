@@ -22,4 +22,10 @@ public partial interface IDesktopClientEndpoint
 
   /// <summary>The client closes; <paramref name="reason"/> goes to its log.</summary>
   Task Shutdown(string reason, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// The client joins the relay session as the device's end, in the background: it returns once the request is taken,
+  /// and throws with why when it isn't.
+  /// </summary>
+  Task StartRemoteControl(DesktopRemoteControlStart request, CancellationToken cancellationToken);
 }

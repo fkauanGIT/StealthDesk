@@ -23,6 +23,7 @@ using StealthDesk.Web.Server.UserGroups;
 using StealthDesk.Web.Server.Permissions;
 using StealthDesk.Web.Server.PersonalAccessTokens;
 using StealthDesk.Web.Server.Relay;
+using StealthDesk.Web.Server.RemoteControl;
 using StealthDesk.Web.Server.ReverseProxy;
 using StealthDesk.Web.Server.Users;
 
@@ -65,6 +66,7 @@ public static class ServerSetup
     builder.Services.AddScoped<IDeviceAccess, DeviceAccess>();
     builder.Services.AddScoped<IAgentCalls, AgentCalls>();
     builder.Services.AddSingleton<ITerminalRelay, TerminalRelay>();
+    builder.Services.AddSingleton<IRemoteControlSessions, RemoteControlSessions>();
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<IPasswordHasher<PersonalAccessTokenRecord>, PasswordHasher<PersonalAccessTokenRecord>>();
     builder.Services.AddScoped<PersonalAccessTokenService>();

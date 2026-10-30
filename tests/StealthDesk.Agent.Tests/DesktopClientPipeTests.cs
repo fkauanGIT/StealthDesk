@@ -6,9 +6,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using StealthDesk.Agent.Core.DesktopClients;
+using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Tests.Fakes;
 using StealthDesk.Agent.Windows.DesktopClients;
 using StealthDesk.Contracts.DesktopClients;
+using StealthDesk.Contracts.Relay;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.DesktopClient;
 using StealthDesk.Ipc;
 
@@ -25,7 +28,11 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
 
   private readonly string _pipeName = $"StealthDesk-test-{Guid.NewGuid():N}";
   private readonly List<IDisposable> _disposables = [];
+  private static readonly Uri Server = new("https://desk.example.com/");
+
   private readonly DesktopClientConnections _connections = new(NullLogger<DesktopClientConnections>.Instance);
+  private readonly TempAgentFolder _agentFolder = new();
+  private readonly TestLifetime _clientLifetime = new();
 
   public DesktopClientPipeTests()
   {
@@ -42,7 +49,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
     var answer = await agentSide.Pipe.Ask((client, token) => client.GetSessionInfo(token), cancellationToken: Token);
 
     Assert.True(answer.Answered, answer.Refusal);
-    Assert.Equal(new DesktopSessionInfo(7, "bob"), answer.Value);
+    Assert.Equal(new DesktopSessionInfo(7, "bob", IsConsole: true), answer.Value);
   }
 
   [Fact]
@@ -296,6 +303,59 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
     Assert.NotEqual(Pipes.NameFor("default", false), Pipes.NameFor("second", false));
   }
 
+  [Fact]
+  public async Task TheAgent_HandsARemoteControlSession_ToTheClientOfItsSession_WithTheRelayUnderItsOwnServer()
+  {
+    var joined = new TaskCompletionSource<Uri>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var sessions = new RemoteControlSessions(
+      (address, token) =>
+      {
+        joined.TrySetResult(address);
+        return new TaskCompletionSource<System.Net.WebSockets.WebSocket>().Task.WaitAsync(token);
+      },
+      new SilentNotice(),
+      _clientLifetime,
+      NullLogger<RemoteControlSessions>.Instance);
+    var (_, clientSide) = await ConnectAsync(new DesktopClientEndpoint(sessions, _clientLifetime, NullLogger<DesktopClientEndpoint>.Instance));
+    await clientSide.Remote.ClientReady(Hello, Token);
+    var request = Request(desktopSession: Hello.SessionId);
+
+    var started = await RemoteControl().StartAsync(request, Token);
+
+    Assert.True(started.Succeeded, started.Error);
+    Assert.Equal(request.RelaySessionId, started.Value);
+    Assert.Equal(
+      RelayConnection.For(Server, request.RelaySessionId, RelayRole.Device, "device-token"),
+      await joined.Task.WaitAsync(TimeSpan.FromSeconds(5), Token));
+    var session = Assert.Single(sessions.Running);
+    Assert.Equal(request.RelaySessionId, session.Id);
+    Assert.Equal(request.Permissions, session.Permissions);
+  }
+
+  [Fact]
+  public async Task NoClientInThatSession_OrOneThatRefuses_IsAnswered_WithWhy()
+  {
+    var refusing = new TestClientEndpoint { Refuse = "The desktop client is closing." };
+    var (_, clientSide) = await ConnectAsync(refusing);
+    await clientSide.Remote.ClientReady(Hello, Token);
+
+    var elsewhere = await RemoteControl().StartAsync(Request(desktopSession: 9), Token);
+    var refused = await RemoteControl().StartAsync(Request(desktopSession: Hello.SessionId), Token);
+
+    Assert.Equal("No desktop client is running in session 9.", elsewhere.Error);
+    Assert.Equal("The desktop client of session 7 didn't start the session: The desktop client is closing.", refused.Error);
+  }
+
+  [Fact]
+  public async Task TheSessionsShown_AreThoseTheClientsReport()
+  {
+    await ConnectAsync(new TestClientEndpoint());
+
+    var sessions = await RemoteControl().SessionsAsync(Token);
+
+    Assert.Equal([new RemoteDesktopSession(7, "bob", IsConsole: true)], sessions);
+  }
+
   public ValueTask DisposeAsync()
   {
     foreach (var connection in _connections.All)
@@ -303,9 +363,23 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
       connection.Pipe.Dispose();
     }
 
+    _agentFolder.Dispose();
     _disposables.ForEach(x => x.Dispose());
     return ValueTask.CompletedTask;
   }
+
+  private static RemoteControlRequest Request(int desktopSession) => new(
+    Guid.NewGuid(),
+    "device-token",
+    desktopSession,
+    "tech@example.com",
+    new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false),
+    NotifyUser: false);
+
+  private DesktopClientRemoteControl RemoteControl() => new(
+    _connections,
+    _agentFolder.OpenStore(new AgentSettings { ServerUrl = Server }),
+    NullLogger<DesktopClientRemoteControl>.Instance);
 
   /// <summary>The agent taking this test process as its client, and the client's end.</summary>
   private async Task<(DesktopClientConnection AgentSide, PipeConnection<IAgentEndpoint> ClientSide)> ConnectAsync(IDesktopClientEndpoint endpoint)
@@ -375,13 +449,33 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
         }
       }
 
-      return new DesktopSessionInfo(7, "bob");
+      return new DesktopSessionInfo(7, "bob", IsConsole: true);
     }
 
     public Task Shutdown(string reason, CancellationToken cancellationToken)
     {
       Shutdowns.Add(reason);
       return Task.CompletedTask;
+    }
+
+    public List<DesktopRemoteControlStart> RemoteControlStarts { get; } = [];
+
+    public Task StartRemoteControl(DesktopRemoteControlStart request, CancellationToken cancellationToken)
+    {
+      if (Refuse is not null)
+      {
+        throw new InvalidOperationException(Refuse);
+      }
+
+      RemoteControlStarts.Add(request);
+      return Task.CompletedTask;
+    }
+  }
+
+  private sealed class SilentNotice : IUserNotice
+  {
+    public void Show(string message)
+    {
     }
   }
 

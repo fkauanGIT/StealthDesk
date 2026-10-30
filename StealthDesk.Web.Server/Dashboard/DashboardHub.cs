@@ -7,10 +7,14 @@ using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 using StealthDesk.Web.Server.Devices;
 using StealthDesk.Web.Server.Gateway;
 using StealthDesk.Web.Server.Permissions;
+using StealthDesk.Web.Server.Relay;
+using StealthDesk.Web.Server.RemoteControl;
+using StealthDesk.Web.Server.TenantSettings;
 using StealthDesk.Web.Server.Terminal;
 
 namespace StealthDesk.Web.Server.Dashboard;
@@ -18,8 +22,8 @@ namespace StealthDesk.Web.Server.Dashboard;
 /// <summary>
 /// The realtime endpoint browsers stay connected to. Kept apart from the agent gateway: agents prove who they are
 /// with a key, while dashboards are tied to a signed-in user, who counts as online while connected. A dashboard
-/// hears only about the devices it subscribed to and may read, and gets the output only of terminals it opened, which
-/// close when it disconnects.
+/// hears only about the devices it subscribed to and may read, and gets the output only of terminals it opened; those
+/// terminals and the remote control sessions it started end when it disconnects.
 /// </summary>
 [Authorize]
 [NoPermission("Connecting only marks the user online; each method checks its own permission.")]
@@ -29,6 +33,9 @@ public sealed class DashboardHub(
   IAuthorizationService authorization,
   IAgentCalls agents,
   ITerminalRelay terminals,
+  IRelaySessions relay,
+  IRemoteControlSessions remoteControl,
+  TenantSettingService tenantSettings,
   StealthDeskDb db,
   TimeProvider clock,
   ILogger<DashboardHub> logger)
@@ -55,6 +62,7 @@ public sealed class DashboardHub(
       await CloseOnDeviceAsync(terminal);
     }
 
+    remoteControl.EndForConnection(Context.ConnectionId, "The browser disconnected.");
     EndVisit();
     await MarkUser(online: false);
     await base.OnDisconnectedAsync(exception);
@@ -164,6 +172,89 @@ public sealed class DashboardHub(
   {
     using var call = StartCall(DeviceAccessTracing.TerminalClose, DeviceOf(terminalId), terminalId);
     return DeviceAccessTracing.Record(call, await CloseTerminalCoreAsync(terminalId));
+  }
+
+  [ChecksPermission(PermissionNames.DeviceRemoteControlConnect)]
+  public async Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessions(Guid deviceId)
+  {
+    var (device, refused) = await RemoteControlDeviceAsync(deviceId);
+    if (device is null)
+    {
+      return GatewayReply.Refuse<IReadOnlyList<RemoteDesktopSession>>(refused!);
+    }
+
+    return await agents.CallAsync(device.Id, (agent, token) => agent.GetDesktopSessions(token), Context.ConnectionAborted);
+  }
+
+  [ChecksPermission(PermissionNames.DeviceRemoteControlConnect)]
+  public async Task<GatewayReply<RemoteControlTicket>> StartRemoteControl(Guid deviceId, int desktopSessionId)
+  {
+    using var call = StartCall(DeviceAccessTracing.RemoteControlStart, deviceId, terminalId: null);
+    call?.SetTag(DeviceAccessTracing.DesktopSessionIdTag, desktopSessionId);
+    var started = DeviceAccessTracing.Record(call, await StartRemoteControlCoreAsync(deviceId, desktopSessionId));
+    call?.SetTag(DeviceAccessTracing.RemoteControlSessionIdTag, started.Accepted ? started.Value!.RelaySessionId.ToString() : null);
+    return started;
+  }
+
+  private async Task<GatewayReply<RemoteControlTicket>> StartRemoteControlCoreAsync(Guid deviceId, int desktopSessionId)
+  {
+    var (device, refused) = await RemoteControlDeviceAsync(deviceId);
+    if (device is null)
+    {
+      return GatewayReply.Refuse<RemoteControlTicket>(refused!);
+    }
+
+    // Decided now, for the whole session: the desktop client holds the viewer to them.
+    var permissions = new ViewerPermissions(
+      Interact: await MayAsync(device, PermissionNames.DeviceRemoteControlInteract),
+      UseSecureScreens: await MayAsync(device, PermissionNames.DeviceRemoteControlElevatedDesktop),
+      SendCtrlAltDel: await MayAsync(device, PermissionNames.DeviceCtrlAltDelSend),
+      ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
+      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite));
+    var notifyUser = await tenantSettings.NotifyUserOnRemoteControlAsync(device.TenantId, Context.ConnectionAborted);
+    var viewerName = Context.User?.Identity?.Name ?? "A technician";
+
+    var tickets = relay.Issue(Guid.Parse(UserId));
+    var request = new RemoteControlRequest(tickets.SessionId, tickets.DeviceToken, desktopSessionId, viewerName, permissions, notifyUser);
+    GatewayReply<Guid> started;
+    try
+    {
+      started = await agents.CallAsync(device.Id, (agent, token) => agent.StartRemoteControl(request, token), Context.ConnectionAborted);
+    }
+    catch (OperationCanceledException)
+    {
+      started = GatewayReply.Refuse<Guid>("The connection closed.");
+    }
+
+    if (!started.Accepted)
+    {
+      // The device may have taken it after the server stopped waiting: its end finds the session gone.
+      relay.End(tickets.SessionId);
+      return GatewayReply.Refuse<RemoteControlTicket>(started.Error ?? "The remote control session couldn't start.");
+    }
+
+    remoteControl.Add(new RemoteControlLink(tickets.SessionId, device.Id, Context.ConnectionId, UserId, Context.User?.Identity?.Name));
+    if (Context.ConnectionAborted.IsCancellationRequested)
+    {
+      // Gone while the device answered: its disconnect ended this connection's sessions before this one was added.
+      remoteControl.EndForConnection(Context.ConnectionId, "The browser disconnected.");
+    }
+
+    return GatewayReply.Accept(new RemoteControlTicket(tickets.SessionId, tickets.ViewerToken));
+  }
+
+  // Checked on every call; a device the user may not read is refused as one that doesn't exist.
+  private async Task<(DeviceRecord? Device, string? Refused)> RemoteControlDeviceAsync(Guid deviceId)
+  {
+    var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == deviceId, Context.ConnectionAborted);
+    if (device is not null && await MayAsync(device, PermissionNames.DeviceRemoteControlConnect))
+    {
+      return (device, null);
+    }
+
+    return (null, device is not null && await MayAsync(device, PermissionNames.DeviceRead)
+      ? "You may not see this device's desktop."
+      : "Device not found.");
   }
 
   private async Task<GatewayReply<Guid>> OpenTerminalCoreAsync(Guid deviceId)

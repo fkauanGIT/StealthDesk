@@ -166,6 +166,12 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+    public Task<GatewayReply<IReadOnlyList<StealthDesk.Contracts.RemoteControl.RemoteDesktopSession>>> GetDesktopSessions(CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<IReadOnlyList<StealthDesk.Contracts.RemoteControl.RemoteDesktopSession>>(NoAnswers));
+
+    public Task<GatewayReply<Guid>> StartRemoteControl(StealthDesk.Contracts.RemoteControl.RemoteControlRequest request, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
   }
 }
 

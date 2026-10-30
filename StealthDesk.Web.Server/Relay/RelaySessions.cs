@@ -18,6 +18,15 @@ public interface IRelaySessions
 {
   /// <summary>A new session whose viewer end must be <paramref name="viewerUserId"/>, signed in.</summary>
   RelayTickets Issue(Guid viewerUserId);
+
+  /// <summary>
+  /// Cancelled once the session ends, however it ends: an end left, it was ended, or nobody joined it in time. Already
+  /// cancelled for a session that is gone.
+  /// </summary>
+  CancellationToken Ended(Guid sessionId);
+
+  /// <summary>Ends the session, closing whichever ends joined it; nothing for one that is gone.</summary>
+  void End(Guid sessionId);
 }
 
 public sealed class RelaySessions(TimeProvider clock, IOptions<RelayOptions> options) : IRelaySessions
@@ -30,7 +39,21 @@ public sealed class RelaySessions(TimeProvider clock, IOptions<RelayOptions> opt
     ForgetUnused();
     var session = new RelaySession(Guid.NewGuid(), viewerUserId, Token(), Token(), clock.GetUtcNow());
     _sessions[session.Id] = session;
+    // So whoever waits for the session's end hears of tickets nobody used, without waiting for the next session issued.
+    session.Expiry = clock.CreateTimer(_ => ForgetUnused(), null, options.Value.TicketLifetime + TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan);
     return new RelayTickets(session.Id, session.ViewerToken, session.DeviceToken);
+  }
+
+  public CancellationToken Ended(Guid sessionId) =>
+    _sessions.TryGetValue(sessionId, out var session) ? session.Ended.Token : new CancellationToken(canceled: true);
+
+  public void End(Guid sessionId)
+  {
+    if (_sessions.TryGetValue(sessionId, out var session))
+    {
+      Forget(session);
+      session.Finish();
+    }
   }
 
   /// <summary>The session, unless it doesn't exist or nobody joined it in time.</summary>
@@ -44,6 +67,7 @@ public sealed class RelaySessions(TimeProvider clock, IOptions<RelayOptions> opt
     if (IsUnused(session))
     {
       Forget(session);
+      session.Finish();
       return null;
     }
 
@@ -60,6 +84,7 @@ public sealed class RelaySessions(TimeProvider clock, IOptions<RelayOptions> opt
     foreach (var session in _sessions.Values.Where(IsUnused))
     {
       Forget(session);
+      session.Finish();
     }
   }
 
@@ -86,6 +111,9 @@ internal sealed class RelaySession(Guid id, Guid viewerUserId, string viewerToke
   public string DeviceToken { get; } = deviceToken;
 
   public DateTimeOffset IssuedAt { get; } = issuedAt;
+
+  /// <summary>Gives up the session when nobody joins it in time.</summary>
+  public ITimer? Expiry { get; set; }
 
   public bool AnyoneJoined => Volatile.Read(ref _viewerJoined) == 1 || Volatile.Read(ref _deviceJoined) == 1;
 
@@ -116,6 +144,16 @@ internal sealed class RelaySession(Guid id, Guid viewerUserId, string viewerToke
 
   /// <summary>True the first time only: whoever ends the session closes both ends.</summary>
   public bool TryEnd() => Interlocked.Exchange(ref _ended, 1) == 0;
+
+  /// <summary>Ends the session from outside its ends: each end that joined sees it end and closes.</summary>
+  public void Finish()
+  {
+    Expiry?.Dispose();
+    if (TryEnd())
+    {
+      Ended.Cancel();
+    }
+  }
 }
 
 /// <summary>A connected end; what is sent to it goes one at a time, as a WebSocket requires.</summary>
