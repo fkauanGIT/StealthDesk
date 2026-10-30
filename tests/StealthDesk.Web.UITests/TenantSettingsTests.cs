@@ -19,7 +19,8 @@ public class TenantSettingsTests
     await app.Page.GetByRole(AriaRole.Group, new() { Name = "Name an instance in install commands" })
       .GetByRole(AriaRole.Button, new() { Name = "On", Exact = true }).ClickAsync();
     await app.FillAsync("Instance name", "office");
-    await app.ClickAsync("Save");
+    // The remote control card has a Save of its own.
+    await app.Page.Locator("form:not([data-remote-control])").GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
     await Expect(app.Page.GetByText("Settings saved.")).ToBeVisibleAsync();
     await app.ScreenshotAsync("saved");
 
