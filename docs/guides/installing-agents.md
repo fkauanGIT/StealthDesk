@@ -80,6 +80,19 @@ A client whose agent goes away tries again every 5 seconds and closes after a mi
 once back, starts new ones. A debug build serves `StealthDesk-debug-<instance>` instead and also takes a desktop client
 run from the source tree, so the two can be run by hand.
 
+### During a remote control session
+
+The desktop client joins the session on the server's relay and streams its screen to the viewer: the list of
+displays first, then the whole screen of the one shown (the primary display, until the viewer picks another), then
+only what changed, as JPEG (or PNG) images of the rectangles that changed. It captures with DXGI desktop duplication
+from Windows 8, which hands over each new frame from the graphics card with what changed in it, and with GDI wherever
+that can't work; the metrics the viewer gets say which. It never captures faster than the connection carries: each
+image waits for the viewer to acknowledge enough of the ones before.
+
+The quality is set by the viewer, or follows the bandwidth used (80 up to 5 Mbps, 20 from 15 Mbps); images sent at a
+lower quality are sent again at the best once there is room. The viewer may also cap the bandwidth, and ask for the
+pointer to be drawn into the screen; its shape is sent whenever it changes either way.
+
 ## Antivirus software
 
 The agent isn't signed yet, so antivirus software that watches for remote access tools may quarantine it when it

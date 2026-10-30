@@ -22,6 +22,10 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   the device, a browser lists its sessions and asks for one, and the desktop client there joins the relay, holding the
   viewer to what their permissions allowed when the session started. The session ends when either end leaves, the
   browser disconnects or the device goes offline, and its start and end are in the device's access trace
+- During a session the desktop client streams the screen through the relay: the displays, then the whole screen, then
+  only what changed, as JPEG regions, captured with DXGI desktop duplication from Windows 8 and GDI wherever that
+  can't work, never faster than the connection carries. Quality by hand or following the bandwidth, an optional
+  bandwidth cap, switching displays, the pointer's shape, and the pointer drawn in when asked; metrics every second
 - The person at the device is told in a message on its screen when a session starts and ends, unless the tenant
   turns that off in its settings (**Remote control**); the server's default is `TenantDefaults:NotifyUserOnRemoteControl`
 

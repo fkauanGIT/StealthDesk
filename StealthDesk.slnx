@@ -7,6 +7,7 @@
     <Project Path="shared/StealthDesk.Ipc/StealthDesk.Ipc.csproj" />
     <Project Path="shared/StealthDesk.Observability/StealthDesk.Observability.csproj" />
     <Project Path="shared/StealthDesk.Realtime/StealthDesk.Realtime.csproj" />
+    <Project Path="shared/StealthDesk.RemoteControl/StealthDesk.RemoteControl.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/StealthDesk.Agent.Tests/StealthDesk.Agent.Tests.csproj" />

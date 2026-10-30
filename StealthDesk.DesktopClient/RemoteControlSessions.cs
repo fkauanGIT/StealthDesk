@@ -4,6 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.RemoteControl;
+using StealthDesk.RemoteControl;
+using MessagePack;
 
 namespace StealthDesk.DesktopClient;
 
@@ -62,11 +64,14 @@ internal sealed class RemoteControlSession(DesktopRemoteControlStart request)
 /// <summary>
 /// The remote control sessions of this desktop client. Each joins its relay session as the device's end, in the
 /// background, and lasts until the viewer leaves, the relay ends it, or the client closes. The user is told when one
-/// starts and ends unless the tenant turned that off.
+/// starts and ends unless the tenant turned that off. While it runs, the screen is streamed to the viewer.
 /// </summary>
 internal sealed class RemoteControlSessions(
   RelayConnector connect,
+  Func<IScreenCapture> captures,
+  RegionEncoder encode,
   IUserNotice notice,
+  TimeProvider clock,
   IHostApplicationLifetime lifetime,
   ILogger<RemoteControlSessions> logger)
 {
@@ -121,7 +126,15 @@ internal sealed class RemoteControlSessions(
           notice.Show($"{session.ViewerName} started remote control of this computer.");
         }
 
-        await ReceiveUntilClosedAsync(socket, lifetime.ApplicationStopping);
+        var stream = new RelayStream(socket, clock, logger);
+        using var capture = captures();
+        var streamer = new ScreenStreamer(capture, encode, stream, clock, logger);
+        using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
+        var sending = streamer.RunAsync(streaming.Token);
+        var ended = await stream.RunAsync((message, _) => HandleAsync(session, streamer, message), lifetime.ApplicationStopping);
+        await streaming.CancelAsync();
+        await sending;
+        logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
       }
     }
     // Never the address in the log: it carries the session's token.
@@ -149,40 +162,36 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  // Nothing comes from the viewer yet but the end of the session.
-  private static async Task ReceiveUntilClosedAsync(WebSocket socket, CancellationToken stopping)
+  private Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, StreamEnvelope message)
   {
-    var buffer = new byte[4 * 1024];
     try
     {
-      while (true)
+      switch (message.Type)
       {
-        var received = await socket.ReceiveAsync(buffer.AsMemory(), stopping);
-        if (received.MessageType == WebSocketMessageType.Close)
-        {
-          // The relay hangs up right after its close message: the session ended normally either way.
-          await TryCloseAsync(socket, WebSocketCloseStatus.NormalClosure, "The session ended.");
-          return;
-        }
+        case StreamMessageType.ChangeDisplay:
+          var change = MessagePackSerializer.Deserialize<ChangeDisplay>(message.Payload);
+          if (!streamer.ShowDisplay(change.Id))
+          {
+            logger.LogDebug("Session {SessionId} was asked for display {Display}, which isn't there.", session.Id, change.Id);
+          }
+
+          break;
+        case StreamMessageType.RequestFullFrame:
+          streamer.RequestFullFrame();
+          break;
+        case StreamMessageType.CaptureSettings:
+          streamer.Apply(MessagePackSerializer.Deserialize<CaptureSettings>(message.Payload));
+          break;
+        default:
+          logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
+          break;
       }
     }
-    catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+    catch (MessagePackSerializationException ex)
     {
-      // The client is closing: the viewer is told the device left.
-      await TryCloseAsync(socket, WebSocketCloseStatus.EndpointUnavailable, "The desktop client closed.");
+      logger.LogDebug(ex, "Session {SessionId} couldn't read a {Type} message.", session.Id, message.Type);
     }
-  }
 
-  private static async Task TryCloseAsync(WebSocket socket, WebSocketCloseStatus status, string reason)
-  {
-    using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-    try
-    {
-      await socket.CloseOutputAsync(status, reason, limit.Token);
-    }
-    catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)
-    {
-      // Gone already.
-    }
+    return Task.CompletedTask;
   }
 }
