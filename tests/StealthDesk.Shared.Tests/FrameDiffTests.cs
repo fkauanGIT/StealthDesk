@@ -96,6 +96,25 @@ public class FrameDiffTests
       cut);
   }
 
+  [Theory]
+  [InlineData(0, 3, 2, new uint[] { 1, 2, 3, 4, 5, 6 })]
+  [InlineData(1, 2, 3, new uint[] { 4, 1, 5, 2, 6, 3 })]
+  [InlineData(2, 3, 2, new uint[] { 6, 5, 4, 3, 2, 1 })]
+  [InlineData(3, 2, 3, new uint[] { 3, 6, 2, 5, 1, 4 })]
+  [InlineData(5, 2, 3, new uint[] { 4, 1, 5, 2, 6, 3 })]
+  public void AFrame_TurnsClockwise_ByQuarters(int quarterTurns, int width, int height, uint[] expected)
+  {
+    // 1 2 3
+    // 4 5 6
+    uint[] pixels = [1, 2, 3, 4, 5, 6];
+    var frame = new Frame(3, 2, System.Runtime.InteropServices.MemoryMarshal.AsBytes(pixels.AsSpan()).ToArray());
+
+    var turned = frame.Rotated(quarterTurns, new byte[pixels.Length * Frame.BytesPerPixel]);
+
+    Assert.Equal((width, height), (turned.Width, turned.Height));
+    Assert.Equal(expected, System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(turned.Pixels.AsSpan()).ToArray());
+  }
+
   private static Frame Filled(int width, int height, uint color)
   {
     var frame = new Frame(width, height, new byte[width * height * Frame.BytesPerPixel]);

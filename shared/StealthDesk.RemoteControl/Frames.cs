@@ -39,6 +39,35 @@ public sealed class Frame
 
   /// <summary>One row of pixels, each as a single 32-bit value.</summary>
   public ReadOnlySpan<uint> Row(int y) => MemoryMarshal.Cast<byte, uint>(Pixels.AsSpan(y * Stride, Stride));
+
+  /// <summary>
+  /// This frame turned clockwise by <paramref name="quarterTurns"/> quarters, into <paramref name="into"/>: as a
+  /// rotated display shows what its card draws upright.
+  /// </summary>
+  public Frame Rotated(int quarterTurns, byte[] into)
+  {
+    var turns = ((quarterTurns % 4) + 4) % 4;
+    var (width, height) = turns % 2 == 0 ? (Width, Height) : (Height, Width);
+    var rotated = new Frame(width, height, into);
+    var source = MemoryMarshal.Cast<byte, uint>(Pixels.AsSpan());
+    var target = MemoryMarshal.Cast<byte, uint>(into.AsSpan());
+    for (var y = 0; y < Height; y++)
+    {
+      for (var x = 0; x < Width; x++)
+      {
+        var (toX, toY) = turns switch
+        {
+          0 => (x, y),
+          1 => (Height - 1 - y, x),
+          2 => (Width - 1 - x, Height - 1 - y),
+          _ => (y, Width - 1 - x),
+        };
+        target[(toY * width) + toX] = source[(y * Width) + x];
+      }
+    }
+
+    return rotated;
+  }
 }
 
 /// <summary>

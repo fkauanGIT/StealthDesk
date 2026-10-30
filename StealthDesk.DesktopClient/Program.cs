@@ -43,7 +43,11 @@ builder.Services.AddHostedService<LifetimeLogging>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IUserNotice, SessionMessageBox>();
 builder.Services.AddSingleton<RelayConnector>(RelaySocket.ConnectAsync);
-builder.Services.AddSingleton<Func<IScreenCapture>>(() => OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new GdiScreenCapture() : throw new PlatformNotSupportedException());
+// DXGI where Windows has it, from Windows 8, with GDI for whatever it can't capture.
+builder.Services.AddSingleton<Func<IScreenCapture>>(provider => () =>
+  OperatingSystem.IsWindowsVersionAtLeast(8) ? new WindowsScreenCapture(provider.GetRequiredService<ILogger<WindowsScreenCapture>>())
+  : OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new GdiScreenCapture()
+  : throw new PlatformNotSupportedException());
 builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
