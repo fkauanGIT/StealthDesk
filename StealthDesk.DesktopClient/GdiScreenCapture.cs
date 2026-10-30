@@ -32,7 +32,9 @@ internal sealed unsafe class GdiScreenCapture : IScreenCapture
     return displays;
   }
 
-  public CaptureResult Capture(DisplayInfo display, bool fullFrame)
+  public CursorKind Cursor() => WindowsCursor.Current();
+
+  public CaptureResult Capture(DisplayInfo display, bool fullFrame, bool drawCursor)
   {
     var width = display.Width;
     var height = display.Height;
@@ -68,6 +70,11 @@ internal sealed unsafe class GdiScreenCapture : IScreenCapture
         if (!PInvoke.BitBlt(memory, 0, 0, width, height, screen, display.Left, display.Top, ROP_CODE.SRCCOPY | ROP_CODE.CAPTUREBLT))
         {
           return CaptureResult.Failed(Mode, $"Copying the screen failed (Windows error {Marshal.GetLastPInvokeError()}).");
+        }
+
+        if (drawCursor)
+        {
+          WindowsCursor.Draw(memory, display);
         }
       }
       finally

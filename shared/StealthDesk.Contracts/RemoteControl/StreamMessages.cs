@@ -25,6 +25,9 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.CaptureMetrics"/>, from the desktop client, every second.</summary>
   CaptureMetrics = 7,
+
+  /// <summary><see cref="RemoteControl.CursorShape"/>, from the desktop client, whenever the pointer changes shape.</summary>
+  CursorShape = 8,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>
@@ -33,6 +36,7 @@ public enum StreamMessageType
 /// <param name="AutoQualityMinimum">The quality at <see cref="AutoQualityUpperMbps"/> or more.</param>
 /// <param name="AutoQualityMaximum">The quality at <see cref="AutoQualityLowerMbps"/> or less; in between, in proportion.</param>
 /// <param name="MaxMbps">At most this much is sent; none for no limit.</param>
+/// <param name="ShowCursor">Draw the pointer into the frames, where it is on the device.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record CaptureSettings(
   bool AutoQuality = false,
@@ -42,7 +46,8 @@ public sealed record CaptureSettings(
   double AutoQualityLowerMbps = 5,
   double AutoQualityUpperMbps = 15,
   double? MaxMbps = null,
-  ImageEncoding Encoding = ImageEncoding.Jpeg)
+  ImageEncoding Encoding = ImageEncoding.Jpeg,
+  bool ShowCursor = false)
 {
   /// <summary>The same settings, each in its range and the bounds in order.</summary>
   public CaptureSettings Normalized()
@@ -116,3 +121,21 @@ public sealed record StreamEnvelope(StreamMessageType Type, byte[] Payload, long
 /// <param name="ReceivedBytes">The size of the message received, as it came on the WebSocket.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record StreamAck(int ReceivedBytes, long SentAt);
+
+/// <summary>The shapes of the pointer the viewer can show; any other is <see cref="Unknown"/>.</summary>
+public enum CursorKind
+{
+  Unknown = 0,
+  Arrow = 1,
+  IBeam = 2,
+  Wait = 3,
+  SizeNwse = 4,
+  SizeNesw = 5,
+  SizeWe = 6,
+  SizeNs = 7,
+  Hand = 8,
+}
+
+/// <summary>The pointer's shape on the device, for the viewer to show over the screen.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record CursorShape(CursorKind Kind);

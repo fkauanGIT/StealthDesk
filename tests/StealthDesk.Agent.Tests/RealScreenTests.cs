@@ -86,7 +86,7 @@ public sealed class RealScreenTests : IDisposable
     var deadline = DateTime.UtcNow.AddSeconds(3);
     while (DateTime.UtcNow < deadline && captured is not { Mode: WindowsScreenCapture.Mode, Frame: not null })
     {
-      captured = capture.Capture(primary, fullFrame: false);
+      captured = capture.Capture(primary, fullFrame: false, drawCursor: false);
     }
 
     Assert.SkipUnless(captured is { Mode: WindowsScreenCapture.Mode }, $"DXGI can't duplicate this session's display: {string.Join(" | ", logged.Messages)}");
@@ -95,10 +95,48 @@ public sealed class RealScreenTests : IDisposable
     Assert.Null(captured.Error);
 
     // Most likely nothing changed since: a whole frame must come anyway.
-    var whole = capture.Capture(primary, fullFrame: true);
+    var whole = capture.Capture(primary, fullFrame: true, drawCursor: false);
     Assert.NotNull(whole.Frame);
     Assert.Equal((primary.Width, primary.Height), (whole.Frame.Width, whole.Frame.Height));
   }
+
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public void ThePointer_IsDrawnWhereItIs_OnlyWhenAsked(bool dxgi)
+  {
+    var primary = GdiScreenCapture.ListDisplays().Single(x => x.IsPrimary);
+    var position = WindowsCursor.Position();
+    Assert.SkipUnless(
+      position is { } p && p.X >= primary.Left + 32 && p.Y >= primary.Top + 32 && p.X < primary.Left + primary.Width - 32 && p.Y < primary.Top + primary.Height - 32,
+      "The pointer isn't showing well inside the primary display.");
+    using IScreenCapture capture = dxgi && OperatingSystem.IsWindowsVersionAtLeast(8) ? new WindowsScreenCapture(NullLogger.Instance) : new GdiScreenCapture();
+    var (x, y) = (position!.Value.X - primary.Left, position.Value.Y - primary.Top);
+
+    var plain = Around(First(capture, primary, drawCursor: false), x, y);
+    var drawn = Around(First(capture, primary, drawCursor: true), x, y);
+
+    Assert.NotEqual(plain, drawn);
+  }
+
+  // The first whole frame, however the capture gets it.
+  private static Frame First(IScreenCapture capture, DisplayInfo display, bool drawCursor)
+  {
+    var deadline = DateTime.UtcNow.AddSeconds(3);
+    while (DateTime.UtcNow < deadline)
+    {
+      if (capture.Capture(display, fullFrame: true, drawCursor).Frame is { } frame)
+      {
+        return (Frame)new Frame(frame.Width, frame.Height, (byte[])frame.Pixels.Clone());
+      }
+    }
+
+    throw new TimeoutException("No frame was captured.");
+  }
+
+  // The 32 x 32 pixels down and right of the pointer's tip, where it is drawn.
+  private static uint[] Around(Frame frame, int x, int y) =>
+    [.. Enumerable.Range(y, 32).SelectMany(row => frame.Row(row).Slice(x, 32).ToArray())];
 
   public void Dispose()
   {

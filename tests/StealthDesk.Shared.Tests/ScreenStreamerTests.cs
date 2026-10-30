@@ -203,6 +203,34 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
     Assert.True(metrics.MbpsOut > 0);
   }
 
+  [Fact]
+  public async Task ThePointersShape_IsSentAtTheStart_AndEachTimeItChanges_Only()
+  {
+    await StartAsync();
+    await NextFrameAsync();
+
+    _screen.CursorKind = CursorKind.IBeam;
+    Assert.True(await Until(() => Shapes().Count == 2));
+    await Task.Delay(200, Token);
+
+    Assert.Equal([CursorKind.Arrow, CursorKind.IBeam], Shapes());
+  }
+
+  [Fact]
+  public async Task ThePointer_IsDrawnIntoTheFrames_OnlyWhenTheViewerAsks()
+  {
+    await StartAsync();
+    await NextFrameAsync();
+    Assert.False(_screen.DrewCursor);
+
+    _streamer.Apply(new CaptureSettings(ShowCursor: true));
+
+    Assert.True(await Until(() => _screen.DrewCursor));
+  }
+
+  private IReadOnlyList<CursorKind> Shapes() =>
+    [.. _received.Where(x => x.Type == StreamMessageType.CursorShape).Select(x => Read<CursorShape>(x).Kind)];
+
   private (ImageEncoding Encoding, int Quality) Last() => _encoded.Last() is var last ? (last.Encoding, last.Quality) : default;
 
   public async ValueTask DisposeAsync()
@@ -326,8 +354,17 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
       }
     }
 
-    public CaptureResult Capture(DisplayInfo display, bool fullFrame)
+    /// <summary>The pointer's shape the screen reports.</summary>
+    public CursorKind CursorKind { get; set; } = CursorKind.Arrow;
+
+    /// <summary>Whether the last capture was asked to draw the pointer.</summary>
+    public bool DrewCursor { get; private set; }
+
+    public CursorKind Cursor() => CursorKind;
+
+    public CaptureResult Capture(DisplayInfo display, bool fullFrame, bool drawCursor)
     {
+      DrewCursor = drawCursor;
       Interlocked.Increment(ref _captures);
       if (Interlocked.Decrement(ref _failures) >= 0)
       {

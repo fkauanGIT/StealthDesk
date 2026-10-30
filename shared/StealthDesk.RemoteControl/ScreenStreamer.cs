@@ -24,7 +24,11 @@ public interface IScreenCapture : IDisposable
   IReadOnlyList<DisplayInfo> Displays();
 
   /// <param name="fullFrame">The whole screen is needed: a capture that only reports changes must capture anyway.</param>
-  CaptureResult Capture(DisplayInfo display, bool fullFrame);
+  /// <param name="drawCursor">Draw the pointer into the frame, where it is.</param>
+  CaptureResult Capture(DisplayInfo display, bool fullFrame, bool drawCursor);
+
+  /// <summary>The pointer's shape now.</summary>
+  CursorKind Cursor();
 }
 
 /// <summary>Regions of a frame as images.</summary>
@@ -57,6 +61,7 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
   private Region? _reduced;
   private int _quality;
   private string _mode = string.Empty;
+  private CursorKind? _cursor;
 
   /// <summary>How often the displays are listed again, to tell the viewer when they change.</summary>
   public TimeSpan DisplayCheckInterval { get; init; } = TimeSpan.FromSeconds(2);
@@ -140,6 +145,12 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
           await stream.SendAsync(StreamMessageType.DisplayList, list, cancellationToken);
         }
 
+        if (capture.Cursor() is var cursor && cursor != _cursor)
+        {
+          await stream.SendAsync(StreamMessageType.CursorShape, new CursorShape(cursor), cancellationToken);
+          _cursor = cursor;
+        }
+
         var (shown, fullFrame) = TakeShown();
         if (shown is null)
         {
@@ -153,7 +164,7 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
           : (Region?)null;
 
         // A recovery needs the frame whether or not anything changed.
-        var captured = capture.Capture(shown, fullFrame || recovery is not null);
+        var captured = capture.Capture(shown, fullFrame || recovery is not null, settings.ShowCursor);
         _mode = captured.Mode;
         if (captured.Error is not null)
         {

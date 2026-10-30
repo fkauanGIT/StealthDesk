@@ -30,13 +30,15 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
 
   public IReadOnlyList<DisplayInfo> Displays() => _gdi.Displays();
 
-  public CaptureResult Capture(DisplayInfo display, bool fullFrame)
+  public CursorKind Cursor() => WindowsCursor.Current();
+
+  public CaptureResult Capture(DisplayInfo display, bool fullFrame, bool drawCursor)
   {
     if (OutputFor(display) is { } output)
     {
       try
       {
-        var captured = output.Capture(fullFrame);
+        var captured = output.Capture(display, fullFrame, drawCursor);
         if (captured is not null)
         {
           return captured;
@@ -57,7 +59,7 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
     }
 
     // Nothing new from DXGI, but the whole screen is needed: GDI copies it as it is.
-    return _gdi.Capture(display, fullFrame);
+    return _gdi.Capture(display, fullFrame, drawCursor);
   }
 
   public void Dispose() => Release();
@@ -110,6 +112,7 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
     private readonly DXGI_MODE_ROTATION _rotation;
     private readonly byte[]?[] _buffers = new byte[2][];
     private ID3D11Texture2D? _staging;
+    private Frame? _clean;
     private int _next;
 
     private DuplicatedOutput(string displayId, ID3D11Device device, ID3D11DeviceContext context, IDXGIOutputDuplication duplication, DXGI_MODE_ROTATION rotation)
@@ -171,7 +174,11 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
     }
 
     /// <summary>The next frame, or none when nothing changed since the last one.</summary>
-    public CaptureResult? Capture(bool fullFrame)
+    /// <param name="drawCursor">
+    /// Draw the pointer into it. The card doesn't: it is drawn over a clean copy of the screen, and when only the
+    /// pointer moved, over the last one. The frames are compared then, as the pointer moves between them.
+    /// </param>
+    public CaptureResult? Capture(DisplayInfo display, bool fullFrame, bool drawCursor)
     {
       DXGI_OUTDUPL_FRAME_INFO info;
       IDXGIResource resource;
@@ -186,9 +193,14 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
 
       try
       {
-        // Only the pointer moved: the screen is the same.
         if (info.AccumulatedFrames == 0)
         {
+          // Only the pointer moved: the screen is the same, but where the pointer is drawn isn't.
+          if (drawCursor && info.LastMouseUpdateTime != 0 && _clean is { } clean)
+          {
+            return WithCursor(clean, display);
+          }
+
           return fullFrame ? null : CaptureResult.NoChange(Mode);
         }
 
@@ -198,19 +210,29 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
         var staging = StagingFor(description);
         _context.CopyResource(staging, texture);
         var frame = Copy(staging, (int)description.Width, (int)description.Height);
-        if (_rotation is DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE90 or DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE180 or DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE270)
+        var rotated = _rotation is DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE90 or DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE180 or DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE270;
+        if (rotated)
         {
-          // What changed is in the card's upright frame: the turned frames are compared instead.
           var turns = _rotation switch
           {
             DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE90 => 1,
             DXGI_MODE_ROTATION.DXGI_MODE_ROTATION_ROTATE180 => 2,
             _ => 3,
           };
-          return new CaptureResult(frame.Rotated(turns, new byte[frame.Pixels.Length]), null, Mode);
+          frame = frame.Rotated(turns, new byte[frame.Pixels.Length]);
         }
 
-        return new CaptureResult(frame, fullFrame ? null : Changes(info.TotalMetadataBufferSize), Mode);
+        if (drawCursor)
+        {
+          _clean = new Frame(frame.Width, frame.Height, (byte[])frame.Pixels.Clone());
+          WindowsCursor.Draw(frame, display);
+          return new CaptureResult(frame, null, Mode);
+        }
+
+        _clean = null;
+
+        // What changed is in the card's upright frame: turned frames are compared instead.
+        return new CaptureResult(frame, fullFrame || rotated ? null : Changes(info.TotalMetadataBufferSize), Mode);
       }
       finally
       {
@@ -298,10 +320,19 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
       return staging;
     }
 
-    // Two buffers taken in turn, as GDI does: a frame stays as it was until the capture after next.
-    private Frame Copy(ID3D11Texture2D staging, int width, int height)
+    // The clean screen with the pointer drawn on it.
+    private CaptureResult WithCursor(Frame clean, DisplayInfo display)
     {
-      var size = width * height * Frame.BytesPerPixel;
+      var buffer = NextBuffer(clean.Pixels.Length);
+      clean.Pixels.CopyTo(buffer, 0);
+      var frame = new Frame(clean.Width, clean.Height, buffer);
+      WindowsCursor.Draw(frame, display);
+      return new CaptureResult(frame, null, Mode);
+    }
+
+    // Two buffers taken in turn, as GDI does: a frame stays as it was until the capture after next.
+    private byte[] NextBuffer(int size)
+    {
       var buffer = _buffers[_next];
       if (buffer?.Length != size)
       {
@@ -310,6 +341,12 @@ internal sealed class WindowsScreenCapture(ILogger logger) : IScreenCapture
       }
 
       _next = 1 - _next;
+      return buffer;
+    }
+
+    private Frame Copy(ID3D11Texture2D staging, int width, int height)
+    {
+      var buffer = NextBuffer(width * height * Frame.BytesPerPixel);
       D3D11_MAPPED_SUBRESOURCE mapped;
       _context.Map(staging, 0, D3D11_MAP.D3D11_MAP_READ, 0, &mapped);
       try

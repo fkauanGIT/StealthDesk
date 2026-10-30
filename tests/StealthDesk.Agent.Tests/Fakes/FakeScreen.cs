@@ -11,7 +11,9 @@ internal sealed class FakeScreen : IScreenCapture
 
   public IReadOnlyList<DisplayInfo> Displays() => [Primary, Second];
 
-  public CaptureResult Capture(DisplayInfo display, bool fullFrame) =>
+  public CursorKind Cursor() => CursorKind.Arrow;
+
+  public CaptureResult Capture(DisplayInfo display, bool fullFrame, bool drawCursor) =>
     new(new Frame(display.Width, display.Height, new byte[display.Width * display.Height * Frame.BytesPerPixel]), null, "Fake");
 
   public void Dispose()

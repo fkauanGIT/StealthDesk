@@ -25,3 +25,7 @@ D3D11CreateDevice
 D3D11_SDK_VERSION
 ID3D11Texture2D
 DXGI_ERROR_WAIT_TIMEOUT
+GetCursorInfo
+LoadCursor
+GetIconInfo
+DrawIconEx
