@@ -34,6 +34,9 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings {
 builder.AddDailyFileLog(Path.Combine(start!.DataFolder, "logs", $"desktop-client-session{sessionId}.log"), keepDays: 7);
 builder.Services.AddHostedService<LifetimeLogging>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IUserNotice, SessionMessageBox>();
+builder.Services.AddSingleton<RelayConnector>(RelaySocket.ConnectAsync);
+builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(
   provider,

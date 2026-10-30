@@ -1,3 +1,5 @@
 MessageBox
 WTSQuerySessionInformation
 WTSFreeMemory
+WTSSendMessage
+WTSGetActiveConsoleSessionId

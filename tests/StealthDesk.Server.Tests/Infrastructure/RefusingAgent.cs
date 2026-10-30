@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Server.Tests.Infrastructure;
@@ -22,5 +23,11 @@ public class RefusingAgent : IAgentCallbacks
     Task.FromResult(GatewayReply.Refuse<TerminalCompletions>(NoAnswers));
 
   public virtual Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+  public virtual Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessions(CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<IReadOnlyList<RemoteDesktopSession>>(NoAnswers));
+
+  public virtual Task<GatewayReply<Guid>> StartRemoteControl(RemoteControlRequest request, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
 }

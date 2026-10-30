@@ -12,6 +12,8 @@ public sealed class TenantDefaultsOptions
 
   /// <summary>None makes one from the server's address.</summary>
   public string? InstanceName { get; set; }
+
+  public bool NotifyUserOnRemoteControl { get; set; } = true;
 }
 
 /// <summary>A value checked and written the one way it's stored, or why it can't be.</summary>
@@ -35,8 +37,8 @@ public static class TenantSettingRules
 
     return name switch
     {
-      TenantSettingNames.AppendInstanceName => bool.TryParse(trimmed, out var append)
-        ? new(append ? "true" : "false", null)
+      TenantSettingNames.AppendInstanceName or TenantSettingNames.NotifyUserOnRemoteControl => bool.TryParse(trimmed, out var on)
+        ? new(on ? "true" : "false", null)
         : new(null, $"{name} must be true or false."),
       TenantSettingNames.InstanceName => InstanceNames.Validate(trimmed) is { } error
         ? new(null, error)
@@ -49,6 +51,7 @@ public static class TenantSettingRules
   {
     TenantSettingNames.AppendInstanceName => defaults.AppendInstanceName ? "true" : "false",
     TenantSettingNames.InstanceName => string.IsNullOrWhiteSpace(defaults.InstanceName) ? null : defaults.InstanceName.Trim(),
+    TenantSettingNames.NotifyUserOnRemoteControl => defaults.NotifyUserOnRemoteControl ? "true" : "false",
     _ => null,
   };
 }

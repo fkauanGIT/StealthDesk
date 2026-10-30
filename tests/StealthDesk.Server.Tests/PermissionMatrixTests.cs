@@ -176,15 +176,18 @@ public class PermissionMatrixTests
 
     Assert.Empty(refused);
     Assert.Equal([world.Device], allowed);
-    // The others have their own tests: GetDeviceActions in DeviceActionsTests, the terminal in TerminalRelayTests.
+    // The others have their own tests: GetDeviceActions in DeviceActionsTests, the terminal in TerminalRelayTests,
+    // remote control in RemoteControlSessionTests.
     Assert.Equal(
       [
         nameof(DashboardHub.CloseTerminal),
+        nameof(DashboardHub.GetDesktopSessions),
         nameof(DashboardHub.GetDeviceActions),
         nameof(DashboardHub.GetTerminalCompletions),
         nameof(DashboardHub.OpenTerminal),
         nameof(DashboardHub.SendTerminalInput),
         nameof(DashboardHub.StartDeviceAccess),
+        nameof(DashboardHub.StartRemoteControl),
         nameof(DashboardHub.SubscribeToDevices),
       ],
       typeof(DashboardHub).GetMethods().Where(x => x.GetCustomAttribute<ChecksPermissionAttribute>() is not null).Select(x => x.Name).Order());

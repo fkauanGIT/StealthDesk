@@ -4,6 +4,7 @@ using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.Terminal;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Devices;
+using StealthDesk.Web.Server.RemoteControl;
 using StealthDesk.Web.Server.Terminal;
 
 namespace StealthDesk.Web.Server.Gateway;
@@ -16,6 +17,7 @@ public sealed class AgentGatewayHub(
   IDeviceRegistry registry,
   IDeviceNotifier notifier,
   ITerminalRelay terminals,
+  IRemoteControlSessions remoteControl,
   TimeProvider clock,
   ILogger<AgentGatewayHub> logger) : Hub<IAgentCallbacks>, IAgentGateway
 {
@@ -74,6 +76,8 @@ public sealed class AgentGatewayHub(
         var device = await registry.MarkOfflineAsync(deviceId, Context.ConnectionId, clock.GetUtcNow());
         if (device is not null)
         {
+          // Its sessions could outlive it on the relay, out of the server's reach: the relay closes both ends instead.
+          remoteControl.EndForDevice(deviceId, "The device went offline.");
           await notifier.DeviceChangedAsync(device);
         }
       }

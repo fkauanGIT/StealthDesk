@@ -1,3 +1,4 @@
+| `TenantDefaults:NotifyUserOnRemoteControl` | `true` | The user at a device is told, in a message on its screen, when a remote control session of it starts and ends. |
 # Server settings
 
 Every setting the server reads, by key.

@@ -4,9 +4,9 @@ using StealthDesk.Contracts.Messaging;
 namespace StealthDesk.Web.Server.Dashboard;
 
 /// <summary>
-/// Who used a device and what they did with it, as traces: an activity per visit to a device's remote features, and a
-/// child for each terminal call. Commands and answers typed in a terminal are never recorded, only that a line was sent
-/// and whether it was taken.
+/// Who used a device and what they did with it, as traces: an activity per visit to a device's remote features, a
+/// child for each terminal call and remote control start, and one when a remote control session ends. Commands and
+/// answers typed in a terminal are never recorded, only that a line was sent and whether it was taken.
 /// </summary>
 public static class DeviceAccessTracing
 {
@@ -17,11 +17,22 @@ public static class DeviceAccessTracing
   public const string TerminalInput = "terminal.input";
   public const string TerminalCompletions = "terminal.completions";
   public const string TerminalClose = "terminal.close";
+  public const string RemoteControlStart = "remote-control.start";
+
+  /// <summary>Not a call: recorded when a remote control session ends, however it ends.</summary>
+  public const string RemoteControlEnd = "remote-control.end";
 
   public const string UserIdTag = "stealthdesk.user.id";
   public const string UserNameTag = "stealthdesk.user.name";
   public const string DeviceIdTag = "stealthdesk.device.id";
   public const string TerminalIdTag = "stealthdesk.terminal.id";
+  public const string RemoteControlSessionIdTag = "stealthdesk.remote-control.session.id";
+
+  /// <summary>The Windows session a remote control session was asked for.</summary>
+  public const string DesktopSessionIdTag = "stealthdesk.desktop-session.id";
+
+  /// <summary>Why a remote control session ended.</summary>
+  public const string EndReasonTag = "stealthdesk.end-reason";
 
   /// <summary><c>accepted</c> or <c>refused</c>.</summary>
   public const string OutcomeTag = "stealthdesk.outcome";

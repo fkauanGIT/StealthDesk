@@ -337,31 +337,6 @@ public class TerminalRelayTests
     Assert.Equal([$"open {terminal}", $"input {terminal} {new string('b', IDashboardHub.MaxTerminalInputLength)}"], world.Agent.Calls);
   }
 
-  /// <summary>The device access activities stopped while it listens; other tests' too, so tests pick theirs by device.</summary>
-  private sealed class TracedActivities : IDisposable
-  {
-    private readonly ConcurrentQueue<Activity> _stopped = new();
-    private readonly ActivityListener _listener;
-
-    public TracedActivities()
-    {
-      _listener = new ActivityListener
-      {
-        ShouldListenTo = source => source.Name == DeviceAccessTracing.SourceName,
-        Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-        ActivityStopped = _stopped.Enqueue,
-      };
-      ActivitySource.AddActivityListener(_listener);
-    }
-
-    public IReadOnlyList<Activity> All => [.. _stopped];
-
-    public IReadOnlyList<Activity> Of(Guid device) =>
-      [.. _stopped.Where(x => Equals(x.GetTagItem(DeviceAccessTracing.DeviceIdTag), device.ToString()))];
-
-    public void Dispose() => _listener.Dispose();
-  }
-
   /// <summary>
   /// An agent with a pretend terminal: it records every call that reaches it, sends a prompt when a session opens,
   /// echoes each line as output, and ends the session when told to close it.

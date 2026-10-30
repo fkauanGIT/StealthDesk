@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StealthDesk.Agent.Core.Connection;
+using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Heartbeat;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Core.Terminal;
@@ -78,6 +79,9 @@ public static class AgentHostSetup
     services.AddSingleton<ITerminalOutputSink, GatewayTerminalSink>();
     services.AddSingleton<TerminalSessions>();
     services.AddSingleton<ITerminalSessions>(provider => provider.GetRequiredService<TerminalSessions>());
+    // Empty unless the platform serves the desktop clients' pipe: remote control then finds no session to show.
+    services.AddSingleton<DesktopClientConnections>();
+    services.AddSingleton<DesktopClientRemoteControl>();
 
     services.AddSingleton(new Backoff(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(15)));
     services.AddSingleton<HeartbeatService>();

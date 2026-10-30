@@ -33,6 +33,21 @@ public class TenantSettingApiTests
   }
 
   [Fact]
+  public async Task TheRemoteControlNotice_IsOnByDefault_AndTakesTrueOrFalse()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var (admin, tenant) = await RegisterAsync(server, "admin@example.com");
+
+    var before = Setting(await ListAsync(admin, tenant), TenantSettingNames.NotifyUserOnRemoteControl);
+    var set = await admin.PutAsJsonAsync(One(TenantSettingNames.NotifyUserOnRemoteControl, tenant), new SetTenantSettingRequest(" FALSE "), Cancel);
+
+    Assert.Equal("true", before.DefaultValue);
+    Assert.Null(before.Value);
+    Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+    Assert.Equal("false", (await set.Content.ReadFromJsonAsync<TenantSetting>(Cancel))!.Value);
+  }
+
+  [Fact]
   public async Task ATenantsValue_OverridesTheDefault_OnlyForThatTenant()
   {
     using var server = (await ServerHost.OnPostgresAsync()).With("Accounts:EnablePublicRegistration", "true");
@@ -54,6 +69,7 @@ public class TenantSettingApiTests
 
   [Theory]
   [InlineData(TenantSettingNames.AppendInstanceName, "maybe")]
+  [InlineData(TenantSettingNames.NotifyUserOnRemoteControl, "yes")]
   [InlineData(TenantSettingNames.InstanceName, "default")]
   [InlineData(TenantSettingNames.InstanceName, "has spaces")]
   [InlineData(TenantSettingNames.InstanceName, "-starts-with-a-dash")]

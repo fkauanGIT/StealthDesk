@@ -59,6 +59,36 @@ else
         </form>
         }
     </SdCard>
+
+    <SdCard Title="Remote control">
+        <p class="sd-muted">
+            The person at a device can be told, in a message on their screen, when someone starts and ends a remote
+            control session of it.
+        </p>
+        @if (!canWrite)
+        {
+            <p data-notify-preview><strong>@NotifyPreview</strong></p>
+            <p class="sd-muted">Only someone who manages the tenant's settings can change this.</p>
+        }
+        else
+        {
+        <form class="sd-deploy-form" data-remote-control @onsubmit="SaveNotifyAsync" @onsubmit:preventDefault>
+            <SdSegmented TValue="string" Label="Tell the user at the device" Options="NotifyOptions" @bind-Value="notify" />
+            <p class="sd-field-hint" data-notify-preview>@NotifyPreview</p>
+            @if (notifyError is not null)
+            {
+                <SdAlert>@notifyError</SdAlert>
+            }
+            @if (notifySaved)
+            {
+                <SdAlert Tone="Tone.Info">Settings saved.</SdAlert>
+            }
+            <div class="sd-actions">
+                <SdButton Type="submit" Disabled="notifyBusy">@(notifyBusy ? "Saving..." : "Save")</SdButton>
+            </div>
+        </form>
+        }
+    </SdCard>
 }
 
 @code {
@@ -72,12 +102,28 @@ else
     private bool saved;
     private string? error;
     private string? saveError;
+    private string notify = string.Empty;
+    private bool notifyBusy;
+    private bool notifySaved;
+    private string? notifyError;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
 
     [Inject]
     private IAuthorizationService Authorization { get; set; } = default!;
+
+    private IReadOnlyList<(string, string)> NotifyOptions =>
+    [
+        (string.Empty, $"Server default ({OnOff(Default(TenantSettingNames.NotifyUserOnRemoteControl))})"),
+        ("true", "On"),
+        ("false", "Off"),
+    ];
+
+    private string NotifyPreview =>
+        (notify.Length > 0 ? notify : Default(TenantSettingNames.NotifyUserOnRemoteControl)) == "true"
+            ? "The user at the device is told when a session starts and ends."
+            : "The user at the device isn't told about sessions.";
 
     private IReadOnlyList<(string, string)> AppendOptions =>
     [
@@ -153,11 +199,34 @@ else
         saved = true;
     }
 
+    private async Task SaveNotifyAsync()
+    {
+        notifyError = null;
+        notifySaved = false;
+        notifyBusy = true;
+        var result = await Api.SaveAsync(new Dictionary<string, string?> { [TenantSettingNames.NotifyUserOnRemoteControl] = notify });
+        notifyBusy = false;
+        if (Expired(result.SessionExpired))
+        {
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            notifyError = result.Error;
+            return;
+        }
+
+        Show(result.Value?.Items);
+        notifySaved = true;
+    }
+
     private void Show(IReadOnlyList<TenantSetting>? items)
     {
         settings = items;
         append = Own(TenantSettingNames.AppendInstanceName) ?? string.Empty;
         name = Own(TenantSettingNames.InstanceName);
+        notify = Own(TenantSettingNames.NotifyUserOnRemoteControl) ?? string.Empty;
     }
 
     private string? Own(string setting) => settings?.FirstOrDefault(x => x.Name == setting)?.Value;

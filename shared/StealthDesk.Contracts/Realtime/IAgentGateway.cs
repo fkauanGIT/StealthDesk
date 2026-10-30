@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Contracts.Realtime;
@@ -40,4 +41,13 @@ public interface IAgentCallbacks
 
   /// <summary>Ends the session, stopping what it runs; its last output says so. Refused for one that isn't running.</summary>
   Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId, CancellationToken cancellationToken);
+
+  /// <summary>The Windows sessions with a desktop client connected to this agent, which a remote control session can show.</summary>
+  Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessions(CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Has the desktop client of the request's Windows session join the relay session. Answered with the relay session's
+  /// id once the client took the request, before it joins: the other end joins only after the answer.
+  /// </summary>
+  Task<GatewayReply<Guid>> StartRemoteControl(RemoteControlRequest request, CancellationToken cancellationToken);
 }

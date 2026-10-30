@@ -18,6 +18,12 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
 - The agent and its desktop clients talk over a named pipe only LocalSystem and logged-on users may open; the agent
   keeps a connection only from the desktop client installed next to it, as Windows reports the process, signed like
   the agent when the agent is signed
+- The server starts a remote control session of a device's Windows session: with `device.remote-control.connect` on
+  the device, a browser lists its sessions and asks for one, and the desktop client there joins the relay, holding the
+  viewer to what their permissions allowed when the session started. The session ends when either end leaves, the
+  browser disconnects or the device goes offline, and its start and end are in the device's access trace
+- The person at the device is told in a message on its screen when a session starts and ends, unless the tenant
+  turns that off in its settings (**Remote control**); the server's default is `TenantDefaults:NotifyUserOnRemoteControl`
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;

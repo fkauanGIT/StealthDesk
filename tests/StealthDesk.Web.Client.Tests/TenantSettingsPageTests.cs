@@ -27,12 +27,14 @@ public class TenantSettingsPageTests : AccountTestContext
     Permissions = [PermissionNames.TenantSettingsRead, .. permissions],
   };
 
-  private static TenantSettingList Settings(string? append = null, string? name = null, string? defaultAppend = "false", string? defaultName = null) => new()
+  private static TenantSettingList Settings(
+    string? append = null, string? name = null, string? defaultAppend = "false", string? defaultName = null, string? notify = null, string? defaultNotify = "true") => new()
   {
     Items =
     [
       new TenantSetting(TenantSettingNames.AppendInstanceName, append, defaultAppend),
       new TenantSetting(TenantSettingNames.InstanceName, name, defaultName),
+      new TenantSetting(TenantSettingNames.NotifyUserOnRemoteControl, notify, defaultNotify),
     ],
   };
 
@@ -48,7 +50,7 @@ public class TenantSettingsPageTests : AccountTestContext
     Assert.Equal("Made from the server's address: localhost", Input(page, "Instance name").GetAttribute("placeholder"));
     Assert.Equal("Install commands won't name an instance.", page.Find("[data-preview]").TextContent);
 
-    page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "On").Click();
+    page.Find("form").QuerySelectorAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "On").Click();
     Fill(page, "Instance name", "office");
     Assert.Equal("Install commands will add --instance office.", page.Find("[data-preview]").TextContent);
     Api.RespondWith(Settings(append: "true", name: "office"));
@@ -69,7 +71,7 @@ public class TenantSettingsPageTests : AccountTestContext
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form")));
     Assert.Equal("Server default: lab", Input(page, "Instance name").GetAttribute("placeholder"));
 
-    page.FindAll(".sd-segmented button").Single(x => x.TextContent.Trim().StartsWith("Server default", StringComparison.Ordinal)).Click();
+    page.Find("form").QuerySelectorAll(".sd-segmented button").Single(x => x.TextContent.Trim().StartsWith("Server default", StringComparison.Ordinal)).Click();
     Fill(page, "Instance name", string.Empty);
     Assert.Equal("Install commands will add --instance lab.", page.Find("[data-preview]").TextContent);
     Api.RespondWith(Settings(defaultAppend: "true", defaultName: "lab"));
@@ -111,6 +113,40 @@ public class TenantSettingsPageTests : AccountTestContext
     page.WaitForAssertion(() => Assert.Equal("Install commands will add --instance office.", page.Find("[data-preview]").TextContent));
     Assert.Empty(page.FindAll("form"));
     Assert.Contains("Only someone who manages the tenant's settings", page.Markup);
+  }
+
+  [Fact]
+  public void TheRemoteControlNotice_ShowsTheDefault_AndIsSavedOnItsOwn()
+  {
+    Api.RespondWith(Me(PermissionNames.TenantSettingsWrite));
+    Api.RespondWith(Settings());
+    var page = RenderPage();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("form[data-remote-control]")));
+    var card = () => page.Find("form[data-remote-control]");
+
+    Assert.Contains("Server default (on)", card().QuerySelector(".sd-segmented")!.TextContent);
+    Assert.Equal("The user at the device is told when a session starts and ends.", page.Find("[data-notify-preview]").TextContent);
+
+    card().QuerySelectorAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Off").Click();
+    Assert.Equal("The user at the device isn't told about sessions.", page.Find("[data-notify-preview]").TextContent);
+    Api.RespondWith(Settings(notify: "false"));
+    card().Submit();
+
+    page.WaitForAssertion(() => Assert.Contains("Settings saved.", page.Markup));
+    Assert.Equal($"PUT {Routes.TenantSettings}", Api.Requests[2]);
+    Assert.Equal($"{{\"values\":{{\"{TenantSettingNames.NotifyUserOnRemoteControl}\":\"false\"}}}}", Api.Bodies[2]);
+  }
+
+  [Fact]
+  public void WithoutWrite_TheRemoteControlNotice_IsOnlyShown()
+  {
+    Api.RespondWith(Me());
+    Api.RespondWith(Settings(notify: "false"));
+
+    var page = RenderPage();
+
+    page.WaitForAssertion(() => Assert.Equal("The user at the device isn't told about sessions.", page.Find("[data-notify-preview]").TextContent));
+    Assert.Empty(page.FindAll("form"));
   }
 
   private IRenderedComponent<CascadingAuthenticationState> RenderPage() =>

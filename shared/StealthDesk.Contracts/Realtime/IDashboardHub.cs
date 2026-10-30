@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Contracts.Realtime;
@@ -55,4 +56,17 @@ public interface IDashboardHub
 
   /// <summary>Closes a terminal this connection opened; its last output says it ended.</summary>
   Task<GatewayReply<Guid>> CloseTerminal(Guid terminalId);
+
+  /// <summary>
+  /// The Windows sessions of the device a remote control session can show, as its agent knows them now. Needs the
+  /// permission to see the device's desktop.
+  /// </summary>
+  Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessions(Guid deviceId);
+
+  /// <summary>
+  /// Starts a remote control session of that Windows session: the desktop client there is told to join the relay, and
+  /// the answer is what this browser joins it with. The session ends when either end leaves the relay, this connection
+  /// drops, or the device goes offline.
+  /// </summary>
+  Task<GatewayReply<RemoteControlTicket>> StartRemoteControl(Guid deviceId, int desktopSessionId);
 }

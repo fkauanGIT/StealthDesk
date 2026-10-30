@@ -62,7 +62,6 @@ public static class WindowsPlatformSetup
       AgentBuild.IsDebug,
       AgentBuild.IsDebug ? DesktopClientFiles.DebugFolder() : null));
     services.AddSingleton<DesktopClientAuthenticator>();
-    services.AddSingleton<DesktopClientConnections>();
     services.AddHostedService<DesktopClientPipeHost>();
     return services;
   }
