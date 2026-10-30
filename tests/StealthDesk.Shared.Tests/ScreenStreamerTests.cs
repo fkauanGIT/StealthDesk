@@ -134,6 +134,77 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
     Assert.True(_screen.Captures <= captures + 1, $"{_screen.Captures - captures} captures while the connection was full.");
   }
 
+  [Fact]
+  public async Task TheViewersSettings_ChooseTheEncodingAndQuality_FromThenOn()
+  {
+    await StartAsync();
+    await NextFrameAsync();
+    Assert.Equal((ImageEncoding.Jpeg, 75), Last());
+
+    _streamer.Apply(new CaptureSettings(Quality: 33, Encoding: ImageEncoding.Png));
+    _screen.Paint(Primary, new Region(5, 5, 5, 5));
+    await NextFrameAsync();
+
+    Assert.Equal((ImageEncoding.Png, 33), Last());
+  }
+
+  [Fact]
+  public async Task AboveTheMaximumBandwidth_NothingIsCaptured_UntilItIsRaised()
+  {
+    // A first frame of 200 KB is more than 0.1 Mbps over the meter's few seconds.
+    await StartAsync(imageBytes: 200 * 1024, settings: new CaptureSettings(MaxMbps: 0.1));
+    await NextFrameAsync();
+    await Task.Delay(100, Token);
+    var captures = _screen.Captures;
+
+    _screen.Paint(Primary, new Region(0, 0, 10, 10));
+    await Task.Delay(300, Token);
+    Assert.Equal(captures, _screen.Captures);
+
+    _streamer.Apply(new CaptureSettings(MaxMbps: null));
+    Assert.Equal([new Region(0, 0, 10, 10)], await NextFrameAsync());
+  }
+
+  [Fact]
+  public async Task WhatWentOutAtALowerQuality_IsSentAgainAtTheBest_OnceTheBandwidthAllows()
+  {
+    // Every frame weighs 100 KB: the first is sent while nothing was, at the best quality; the next, with that
+    // frame on the meter, at the lowest.
+    await StartAsync(imageBytes: 100 * 1024, settings: new CaptureSettings(AutoQuality: true, AutoQualityLowerMbps: 0.1, AutoQualityUpperMbps: 0.2));
+    await NextFrameAsync();
+    Assert.Equal(80, Last().Quality);
+    _screen.Paint(Primary, new Region(300, 100, 20, 20));
+    await NextFrameAsync();
+    Assert.Equal(20, Last().Quality);
+
+    // Once the meter forgets those frames, the region goes again at the best quality, though nothing changed.
+    Assert.True(await Until(() => _encoded.Any(x => x.Quality == 80 && x.Regions.Contains(new Region(300, 100, 20, 20))), seconds: 8), "It was never sent again.");
+  }
+
+  [Fact]
+  public async Task EverySecond_TheViewerIsToldHowTheStreamGoes()
+  {
+    await StartAsync();
+    await NextFrameAsync();
+
+    // The screen keeps changing: frames per second count the last second's frames.
+    var x = 0;
+    Assert.True(
+      await Until(() =>
+      {
+        _screen.Paint(Primary, new Region(x++ % 700, 10, 2, 2));
+        return _received.Any(m => m.Type == StreamMessageType.CaptureMetrics);
+      }),
+      "No metrics came.");
+    var metrics = Read<CaptureMetrics>(_received.First(x => x.Type == StreamMessageType.CaptureMetrics));
+    Assert.Equal("Painted", metrics.Mode);
+    Assert.Equal(75, metrics.Quality);
+    Assert.True(metrics.Fps >= 1, $"Fps was {metrics.Fps}.");
+    Assert.True(metrics.MbpsOut > 0);
+  }
+
+  private (ImageEncoding Encoding, int Quality) Last() => _encoded.Last() is var last ? (last.Encoding, last.Quality) : default;
+
   public async ValueTask DisposeAsync()
   {
     await _stop.CancelAsync();
@@ -141,7 +212,7 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
     _pair?.Dispose();
   }
 
-  private async Task StartAsync(TimeSpan? displayCheck = null, bool viewerReads = true, int imageBytes = 0)
+  private async Task StartAsync(TimeSpan? displayCheck = null, bool viewerReads = true, int imageBytes = 0, CaptureSettings? settings = null)
   {
     _pair = await WebSocketPair.ConnectAsync(Token);
     var device = WebSocketPair.Stream(_pair.Client);
@@ -152,15 +223,26 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
       _ = _viewer.RunAsync((message, _) => { _received.Enqueue(message); return Task.CompletedTask; }, _stop.Token);
     }
 
-    _streamer = new ScreenStreamer(_screen, (frame, regions, encoding, quality) => Encode(regions, imageBytes), device, TimeProvider.System, NullLogger.Instance)
+    _streamer = new ScreenStreamer(_screen, (frame, regions, encoding, quality) => Encode(regions, encoding, quality, imageBytes), device, TimeProvider.System, NullLogger.Instance)
     {
       DisplayCheckInterval = displayCheck ?? TimeSpan.FromMinutes(1),
     };
+    if (settings is not null)
+    {
+      _streamer.Apply(settings);
+    }
+
     _streaming = _streamer.RunAsync(_stop.Token);
   }
 
-  private static ScreenRegions Encode(IReadOnlyList<Region> regions, int imageBytes) =>
-    new([.. regions.Select(x => new ScreenRegion(x.X, x.Y, x.Width, x.Height, new byte[imageBytes], ImageEncoding.Jpeg))]);
+  // What each frame was encoded with, in order.
+  private readonly ConcurrentQueue<(ImageEncoding Encoding, int Quality, Region[] Regions)> _encoded = new();
+
+  private ScreenRegions Encode(IReadOnlyList<Region> regions, ImageEncoding encoding, int quality, int imageBytes)
+  {
+    _encoded.Enqueue((encoding, quality, [.. regions]));
+    return new([.. regions.Select(x => new ScreenRegion(x.X, x.Y, x.Width, x.Height, new byte[imageBytes], encoding))]);
+  }
 
   private int Frames() => _received.Count(x => x.Type == StreamMessageType.ScreenRegions);
 
@@ -178,9 +260,9 @@ public sealed class ScreenStreamerTests : IAsyncDisposable
 
   private static T Read<T>(StreamEnvelope message) => MessagePackSerializer.Deserialize<T>(message.Payload);
 
-  private static async Task<bool> Until(Func<bool> condition)
+  private static async Task<bool> Until(Func<bool> condition, int seconds = 5)
   {
-    var deadline = DateTime.UtcNow.AddSeconds(5);
+    var deadline = DateTime.UtcNow.AddSeconds(seconds);
     while (DateTime.UtcNow < deadline)
     {
       if (condition())

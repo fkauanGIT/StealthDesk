@@ -35,23 +35,51 @@ public delegate ScreenRegions RegionEncoder(Frame frame, IReadOnlyList<Region> r
 /// The stream holds a send while too much is unacknowledged, so each capture is as recent as the connection allows. The
 /// whole screen goes first, after the display shown changes, and when the viewer asks for it.
 /// </summary>
+/// <remarks>
+/// The quality is set by hand or follows the bandwidth used. What went out at a lower quality is sent again at the
+/// best once the bandwidth allows, with what changed meanwhile. With a maximum bandwidth set, nothing is captured
+/// while more is being sent. How it goes is sent to the viewer every second.
+/// </remarks>
 public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode, RelayStream stream, TimeProvider clock, ILogger logger)
 {
   private static readonly TimeSpan NoChangeDelay = TimeSpan.FromMilliseconds(10);
   private static readonly TimeSpan FailureDelay = TimeSpan.FromMilliseconds(100);
+  private static readonly TimeSpan BandwidthCheckDelay = TimeSpan.FromMilliseconds(50);
+  private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(1);
 
   private readonly Lock _gate = new();
+  private readonly Queue<DateTimeOffset> _framesSent = new();
   private DisplayInfo? _shown;
   private IReadOnlyList<DisplayInfo> _displays = [];
   private bool _fullFrame = true;
   private bool _displaysChanged;
+  private CaptureSettings _settings = new();
+  private Region? _reduced;
+  private int _quality;
+  private string _mode = string.Empty;
 
   /// <summary>How often the displays are listed again, to tell the viewer when they change.</summary>
   public TimeSpan DisplayCheckInterval { get; init; } = TimeSpan.FromSeconds(2);
 
-  public ImageEncoding Encoding { get; set; } = ImageEncoding.Jpeg;
+  public CaptureSettings Settings
+  {
+    get
+    {
+      lock (_gate)
+      {
+        return _settings;
+      }
+    }
+  }
 
-  public int Quality { get; set; } = 80;
+  /// <summary>Takes the viewer's settings, each brought into its range, for what is sent from now on.</summary>
+  public void Apply(CaptureSettings settings)
+  {
+    lock (_gate)
+    {
+      _settings = settings.Normalized();
+    }
+  }
 
   public void RequestFullFrame()
   {
@@ -82,10 +110,25 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
   {
     Frame? previous = null;
     var nextDisplayCheck = clock.GetUtcNow();
+    var nextMetrics = clock.GetUtcNow() + MetricsInterval;
     while (!cancellationToken.IsCancellationRequested)
     {
       try
       {
+        if (clock.GetUtcNow() >= nextMetrics)
+        {
+          nextMetrics = clock.GetUtcNow() + MetricsInterval;
+          await stream.SendAsync(StreamMessageType.CaptureMetrics, Metrics(), cancellationToken);
+        }
+
+        var settings = Settings;
+        var mbps = stream.MbpsOut;
+        if (settings.MaxMbps is { } max && mbps > max)
+        {
+          await Task.Delay(BandwidthCheckDelay, clock, cancellationToken);
+          continue;
+        }
+
         if (clock.GetUtcNow() >= nextDisplayCheck)
         {
           ReloadDisplays();
@@ -104,10 +147,18 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
           continue;
         }
 
-        var captured = capture.Capture(shown, fullFrame);
+        var quality = QualityPolicy.For(settings, mbps);
+        var recovery = _reduced is { } reduced && quality >= settings.AutoQualityMaximum && QualityPolicy.MayRecover(settings, mbps)
+          ? reduced
+          : (Region?)null;
+
+        // A recovery needs the frame whether or not anything changed.
+        var captured = capture.Capture(shown, fullFrame || recovery is not null);
+        _mode = captured.Mode;
         if (captured.Error is not null)
         {
           logger.LogDebug("Capturing {Display} failed ({Mode}): {Error}", shown.Id, captured.Mode, captured.Error);
+
           // The whole screen next time: what failed may have been half drawn.
           RequestFullFrame();
           await Task.Delay(FailureDelay, clock, cancellationToken);
@@ -125,19 +176,25 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
           continue;
         }
 
-        IReadOnlyList<Region> regions = fullFrame
+        List<Region> regions = fullFrame
           ? [frame.Bounds]
           : captured.Changed is { } changed
-            ? FrameDiff.AlongSections(frame.Width, frame.Height, changed)
-            : FrameDiff.Changes(frame, previous);
+            ? [.. FrameDiff.AlongSections(frame.Width, frame.Height, changed)]
+            : [.. FrameDiff.Changes(frame, previous)];
         previous = frame;
+        if (recovery is { } recovered && !fullFrame)
+        {
+          regions.AddRange(FrameDiff.AlongSections(frame.Width, frame.Height, [recovered]));
+        }
+
         if (regions.Count == 0)
         {
           await Task.Delay(NoChangeDelay, clock, cancellationToken);
           continue;
         }
 
-        await stream.SendAsync(StreamMessageType.ScreenRegions, encode(frame, regions, Encoding, Quality), cancellationToken);
+        await stream.SendAsync(StreamMessageType.ScreenRegions, encode(frame, regions, settings.Encoding, quality), cancellationToken);
+        Sent(settings, quality, regions, coversReduced: recovery is not null || fullFrame);
       }
       catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
       {
@@ -155,6 +212,53 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
         await Task.Delay(FailureDelay, clock, cancellationToken).ContinueWith(_ => { }, TaskScheduler.Default);
       }
     }
+  }
+
+  private void Sent(CaptureSettings settings, int quality, IReadOnlyList<Region> regions, bool coversReduced)
+  {
+    _quality = quality;
+    lock (_framesSent)
+    {
+      _framesSent.Enqueue(clock.GetUtcNow());
+    }
+
+    if (coversReduced)
+    {
+      _reduced = null;
+    }
+
+    if (settings.AutoQuality && quality < settings.AutoQualityMaximum)
+    {
+      // Where the viewer has less than the best quality, to send again once there is room.
+      foreach (var region in regions)
+      {
+        _reduced = _reduced is { } reduced ? Union(reduced, region) : region;
+      }
+    }
+  }
+
+  private CaptureMetrics Metrics()
+  {
+    double fps;
+    lock (_framesSent)
+    {
+      var since = clock.GetUtcNow() - TimeSpan.FromSeconds(1);
+      while (_framesSent.TryPeek(out var sent) && sent < since)
+      {
+        _framesSent.Dequeue();
+      }
+
+      fps = _framesSent.Count;
+    }
+
+    return new CaptureMetrics(fps, stream.MbpsOut, _quality, _mode, stream.Latency.TotalMilliseconds);
+  }
+
+  private static Region Union(Region a, Region b)
+  {
+    var x = Math.Min(a.X, b.X);
+    var y = Math.Min(a.Y, b.Y);
+    return new Region(x, y, Math.Max(a.Right, b.Right) - x, Math.Max(a.Bottom, b.Bottom) - y);
   }
 
   private void ReloadDisplays()

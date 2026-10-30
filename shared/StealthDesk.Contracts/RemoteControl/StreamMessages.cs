@@ -19,7 +19,56 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.RequestFullFrame"/>, from the viewer: send the whole screen next.</summary>
   RequestFullFrame = 5,
+
+  /// <summary><see cref="RemoteControl.CaptureSettings"/>, from the viewer: how to encode what is sent from now on.</summary>
+  CaptureSettings = 6,
+
+  /// <summary><see cref="RemoteControl.CaptureMetrics"/>, from the desktop client, every second.</summary>
+  CaptureMetrics = 7,
 }
+
+/// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>
+/// <param name="AutoQuality">Choose the quality from the bandwidth used, instead of <see cref="Quality"/>.</param>
+/// <param name="Quality">The JPEG quality, 1 to 100, when it isn't chosen automatically.</param>
+/// <param name="AutoQualityMinimum">The quality at <see cref="AutoQualityUpperMbps"/> or more.</param>
+/// <param name="AutoQualityMaximum">The quality at <see cref="AutoQualityLowerMbps"/> or less; in between, in proportion.</param>
+/// <param name="MaxMbps">At most this much is sent; none for no limit.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record CaptureSettings(
+  bool AutoQuality = false,
+  int Quality = 75,
+  int AutoQualityMinimum = 20,
+  int AutoQualityMaximum = 80,
+  double AutoQualityLowerMbps = 5,
+  double AutoQualityUpperMbps = 15,
+  double? MaxMbps = null,
+  ImageEncoding Encoding = ImageEncoding.Jpeg)
+{
+  /// <summary>The same settings, each in its range and the bounds in order.</summary>
+  public CaptureSettings Normalized()
+  {
+    var minimum = Math.Clamp(AutoQualityMinimum, 1, 99);
+    var lower = Math.Max(0.1, AutoQualityLowerMbps);
+    return this with
+    {
+      Quality = Math.Clamp(Quality, 1, 100),
+      AutoQualityMinimum = minimum,
+      AutoQualityMaximum = Math.Clamp(AutoQualityMaximum, minimum + 1, 100),
+      AutoQualityLowerMbps = lower,
+      AutoQualityUpperMbps = Math.Max(lower + 0.1, AutoQualityUpperMbps),
+      MaxMbps = MaxMbps is { } max ? Math.Max(0.1, max) : null,
+    };
+  }
+}
+
+/// <summary>How the stream is doing, for the viewer to show.</summary>
+/// <param name="Fps">Frames sent in the last second.</param>
+/// <param name="MbpsOut">What the desktop client sent, averaged over the last few seconds.</param>
+/// <param name="Quality">The JPEG quality of the last frame.</param>
+/// <param name="Mode">How the screen is captured, e.g. DXGI or GDI.</param>
+/// <param name="LatencyMs">The last round trip to the viewer.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record CaptureMetrics(double Fps, double MbpsOut, int Quality, string Mode, double LatencyMs);
 
 /// <summary>One of the device's displays, in physical pixels of the desktop they form together.</summary>
 /// <param name="Id">The display's device name, as Windows knows it.</param>

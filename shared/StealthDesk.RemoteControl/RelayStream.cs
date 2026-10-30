@@ -22,6 +22,7 @@ public sealed class RelayStream(WebSocket socket, TimeProvider clock, ILogger lo
   private const int BufferBytes = 64 * 1024;
 
   private readonly SemaphoreSlim _sending = new(1, 1);
+  private readonly TransferMeter _sent = new(clock, TimeSpan.FromSeconds(3));
   private readonly Lock _gate = new();
   private long _unacknowledged;
   private long _latencyTicks;
@@ -37,6 +38,9 @@ public sealed class RelayStream(WebSocket socket, TimeProvider clock, ILogger lo
       }
     }
   }
+
+  /// <summary>What this end sent over the last few seconds, acks included.</summary>
+  public double MbpsOut => _sent.Mbps;
 
   /// <summary>How long the last acknowledged message took to reach the other end and its ack to come back.</summary>
   public TimeSpan Latency => TimeSpan.FromTicks(Interlocked.Read(ref _latencyTicks));
@@ -192,6 +196,7 @@ public sealed class RelayStream(WebSocket socket, TimeProvider clock, ILogger lo
     try
     {
       await socket.SendAsync(bytes, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
+      _sent.Record(bytes.Length);
     }
     finally
     {

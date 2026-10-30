@@ -179,6 +179,9 @@ internal sealed class RemoteControlSessions(
         case StreamMessageType.RequestFullFrame:
           streamer.RequestFullFrame();
           break;
+        case StreamMessageType.CaptureSettings:
+          streamer.Apply(MessagePackSerializer.Deserialize<CaptureSettings>(message.Payload));
+          break;
         default:
           logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
           break;

@@ -49,6 +49,24 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   }
 
   [Fact]
+  public async Task TheViewersSettings_AndItsAskingForTheWholeScreen_AreTaken()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ScreenRegions)));
+
+    await viewer.SendAsync(StreamMessageType.CaptureSettings, new CaptureSettings(Encoding: ImageEncoding.Png), Token);
+    await viewer.SendAsync(StreamMessageType.RequestFullFrame, new RequestFullFrame(), Token);
+
+    // The fake screen never changes: only a whole frame asked for comes, encoded as now set.
+    Assert.True(await Wait.UntilAsync(() => received.Any(x =>
+      x.Type == StreamMessageType.ScreenRegions && Read<ScreenRegions>(x).Regions.Single().Encoding == ImageEncoding.Png)));
+  }
+
+  [Fact]
   public async Task ASession_JoinsTheRelay_AndTellsTheUser_WhenItStartsAndEnds()
   {
     var (relay, sessions) = await ConnectedAsync();
