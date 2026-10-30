@@ -195,12 +195,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           $container = docker create "${env:IMAGE}:candidate"
-          docker cp "${container}:/app/downloads/windows/StealthDesk.Agent.exe" dist/StealthDesk.Agent.exe
+          docker cp "${container}:/app/downloads/windows/StealthDesk.Agent.zip" dist/StealthDesk.Agent.zip
           docker rm $container | Out-Null
-          if (-not (Test-Path dist/StealthDesk.Agent.exe)) { throw "The image has no agent." }
-          $hash = (Get-FileHash -Algorithm SHA256 dist/StealthDesk.Agent.exe).Hash
-          "$hash  StealthDesk.Agent.exe" | Set-Content dist/StealthDesk.Agent.exe.sha256 -NoNewline
-          Write-Host "StealthDesk.Agent.exe $hash"
+          if (-not (Test-Path dist/StealthDesk.Agent.zip)) { throw "The image has no agent." }
+          $hash = (Get-FileHash -Algorithm SHA256 dist/StealthDesk.Agent.zip).Hash
+          "$hash  StealthDesk.Agent.zip" | Set-Content dist/StealthDesk.Agent.zip.sha256 -NoNewline
+          Write-Host "StealthDesk.Agent.zip $hash"
 
       - name: Create the release as a draft
         run: |
@@ -209,11 +209,11 @@ jobs:
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -eq 0) {
             # Published again by hand: the release is already there.
-            gh release upload $env:TAG dist/StealthDesk.Agent.exe dist/StealthDesk.Agent.exe.sha256 --clobber
+            gh release upload $env:TAG dist/StealthDesk.Agent.zip dist/StealthDesk.Agent.zip.sha256 --clobber
           } else {
             $flags = @('--draft', '--verify-tag', '--title', $env:TITLE, '--notes-file', 'notes.md')
             if ($env:PRERELEASE -eq 'true') { $flags += '--prerelease' }
-            gh release create $env:TAG @flags dist/StealthDesk.Agent.exe dist/StealthDesk.Agent.exe.sha256
+            gh release create $env:TAG @flags dist/StealthDesk.Agent.zip dist/StealthDesk.Agent.zip.sha256
           }
           if ($LASTEXITCODE -ne 0) { throw "The release wasn't created." }
 

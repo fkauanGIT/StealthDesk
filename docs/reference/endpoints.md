@@ -28,7 +28,7 @@ and the hubs until they change it.
 | Path | Transport | Purpose |
 |------|-----------|---------|
 | `/api/v1/deployment-options` | HTTP | What install commands use, for those who install agents: the tenant's agent instance, and the Windows agent the server hands out with its size and SHA-256. |
-| `/downloads/agent/windows` | HTTP | The Windows agent build, for anyone; 404 when the server has none. |
+| `/downloads/agent/windows` | HTTP | The Windows agent build, for anyone: a zip of the agent and its desktop client. 404 when the server has none. |
 | `/api/v1/installer-keys` | HTTP | The tenant's installer keys: list (`GET`), create (`POST`), rename (`PUT /{id}`), revoke (`DELETE /{id}`) and installs (`GET /{id}/usages`). Without `installer-key.manage-all`, only your own. |
 
 ## Signing in

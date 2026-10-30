@@ -4,3 +4,9 @@ GlobalMemoryStatusEx
 WTSEnumerateSessions
 WTSFreeMemory
 WTSQuerySessionInformation
+WTSGetActiveConsoleSessionId
+OpenProcess
+OpenProcessToken
+DuplicateTokenEx
+CreateProcessAsUser
+CloseHandle

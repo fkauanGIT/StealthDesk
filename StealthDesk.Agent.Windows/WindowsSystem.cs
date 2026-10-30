@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Inventory;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -74,6 +75,44 @@ internal static unsafe class WindowsSystem
       }
 
       return users.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+    finally
+    {
+      PInvoke.WTSFreeMemory(sessions);
+    }
+  }
+
+  /// <summary>
+  /// The console session, even with nobody logged on (its sign-in screen), and every other active session, which are
+  /// remote desktop sessions. None for the console while it is being switched between sessions.
+  /// </summary>
+  public static IReadOnlyList<DesktopSession> DesktopSessions()
+  {
+    var result = new List<DesktopSession>();
+    var console = PInvoke.WTSGetActiveConsoleSessionId();
+    if (console != uint.MaxValue)
+    {
+      result.Add(new DesktopSession((int)console, SessionUser(console), IsConsole: true));
+    }
+
+    WTS_SESSION_INFOW* sessions = null;
+    uint count = 0;
+    if (!PInvoke.WTSEnumerateSessions(HANDLE.Null, 0, 1, &sessions, &count))
+    {
+      return result;
+    }
+
+    try
+    {
+      for (var i = 0; i < count; i++)
+      {
+        if (sessions[i].State == WTS_CONNECTSTATE_CLASS.WTSActive && sessions[i].SessionId != console && sessions[i].SessionId != 0)
+        {
+          result.Add(new DesktopSession((int)sessions[i].SessionId, SessionUser(sessions[i].SessionId), IsConsole: false));
+        }
+      }
+
+      return result;
     }
     finally
     {

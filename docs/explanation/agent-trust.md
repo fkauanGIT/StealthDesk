@@ -25,8 +25,8 @@ change is refused: nobody can take over a device by claiming its id.
 
 ## The agent download
 
-The install command **Add device** gives downloads the agent from the server and runs it only if its SHA-256 is the
-one the page named. The hash guards the download, not the server: it catches a file changed on its way to the machine,
+The install command **Add device** gives downloads the agent's zip from the server and unpacks and runs it only if its
+SHA-256 is the one the page named. The hash guards the download, not the server: it catches a file changed on its way to the machine,
 but a server whose own build was replaced names the replacement's hash. Telling a genuine build from any other takes
 code signing, which the agent doesn't have yet.
 

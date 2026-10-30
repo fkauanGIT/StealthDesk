@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\StealthDesk.Agent\StealthDesk.Agent.csproj" />
     <ProjectReference Include="..\..\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
     <ProjectReference Include="..\..\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
+    <ProjectReference Include="..\..\StealthDesk.DesktopClient\StealthDesk.DesktopClient.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

@@ -83,7 +83,7 @@ See [Tenant settings](../guides/tenant-settings.md) and [Installing agents](../g
 | `Relay:PartnerTimeout` | `00:00:20` | How long the first end at the relay waits for the other before the session is given up. |
 | `Relay:MaxMessageBytes` | `16777216` | The largest message an end may send through the relay; a larger one ends the session. |
 | `InstallerKeys:UsageHistoryDays` | `90` | How long each key's installs are kept. Zero keeps them all. |
-| `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.exe` in it. The container image ships one. |
+| `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.zip` in it, with its desktop client. The container image ships one. |
 
 ## Logs and service accounts
 

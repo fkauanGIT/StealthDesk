@@ -17,6 +17,7 @@
   <Project Path="StealthDesk.Agent/StealthDesk.Agent.csproj" />
   <Project Path="StealthDesk.Agent.Core/StealthDesk.Agent.Core.csproj" />
   <Project Path="StealthDesk.Agent.Windows/StealthDesk.Agent.Windows.csproj" />
+  <Project Path="StealthDesk.DesktopClient/StealthDesk.DesktopClient.csproj" />
   <Project Path="StealthDesk.Web.Client/StealthDesk.Web.Client.csproj" />
   <Project Path="StealthDesk.Web.Server/StealthDesk.Web.Server.csproj" />
 </Solution>

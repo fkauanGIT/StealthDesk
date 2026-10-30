@@ -5,26 +5,29 @@ namespace StealthDesk.Web.Client.Tests;
 /// <summary>The command the Add device page copies: it downloads from the page's server and installs only what matches.</summary>
 public class AgentInstallCommandTests
 {
-  private static readonly AgentDownload Download = new("/downloads/agent/windows", "StealthDesk.Agent.exe", 53_000_000, "ABCDEF0123456789");
+  private static readonly AgentDownload Download = new("/downloads/agent/windows", "StealthDesk.Agent.zip", 53_000_000, "ABCDEF0123456789");
 
   [Fact]
   public void ItDownloadsFromTheServerThePageCameFrom()
   {
     var command = AgentInstallCommand.Windows(new Uri("https://desk.example.com/devices/add?x=1"), Download, "id:secret");
 
-    Assert.Contains("-Uri 'https://desk.example.com/downloads/agent/windows' -OutFile $agent", command, StringComparison.Ordinal);
+    Assert.Contains("-Uri 'https://desk.example.com/downloads/agent/windows' -OutFile $bundle", command, StringComparison.Ordinal);
     Assert.Contains("--server 'https://desk.example.com'", command, StringComparison.Ordinal);
   }
 
   [Fact]
-  public void ItInstallsOnlyWhenTheHashMatches_AndOtherwiseDeletesTheFile()
+  public void ItUnpacksAndInstallsOnlyWhenTheHashMatches_AndOtherwiseDeletesTheFile()
   {
     var command = AgentInstallCommand.Windows(new Uri("https://desk.example.com"), Download, "id:secret");
 
-    var check = command.IndexOf("if ((Get-FileHash -Algorithm SHA256 $agent).Hash -eq 'ABCDEF0123456789') {", StringComparison.Ordinal);
-    var install = command.IndexOf("& $agent install", StringComparison.Ordinal);
-    var otherwise = command.IndexOf("} else { Remove-Item $agent; Write-Error", StringComparison.Ordinal);
-    Assert.True(check >= 0 && install > check && otherwise > install, command);
+    var check = command.IndexOf("if ((Get-FileHash -Algorithm SHA256 $bundle).Hash -eq 'ABCDEF0123456789') {", StringComparison.Ordinal);
+    var unpack = command.IndexOf("Expand-Archive -LiteralPath $bundle -DestinationPath $folder", StringComparison.Ordinal);
+    var install = command.IndexOf("$agent = Join-Path $folder 'StealthDesk.Agent.exe'; try { & $agent install", StringComparison.Ordinal);
+    var cleanUp = command.IndexOf("finally { Remove-Item -Recurse -Force $folder }", StringComparison.Ordinal);
+    var otherwise = command.IndexOf("} else { Remove-Item $bundle; Write-Error", StringComparison.Ordinal);
+    Assert.True(check >= 0 && unpack > check && install > unpack && cleanUp > install && otherwise > cleanUp, command);
+    Assert.Single(System.Text.RegularExpressions.Regex.Matches(command, @"Expand-Archive"));
     Assert.Single(System.Text.RegularExpressions.Regex.Matches(command, @"& \$agent"));
   }
 
@@ -45,7 +48,7 @@ public class AgentInstallCommandTests
 
     var command = AgentInstallCommand.Windows(new Uri("https://desk.example.com"), Download, "id:secret", id, "office");
 
-    Assert.Contains("--installer-key 'id:secret' --device-id 3f2504e0-4f89-11d3-9a0c-0305e82c3301 --instance 'office'; Remove-Item $agent", command, StringComparison.Ordinal);
+    Assert.Contains("--installer-key 'id:secret' --device-id 3f2504e0-4f89-11d3-9a0c-0305e82c3301 --instance 'office' } finally", command, StringComparison.Ordinal);
   }
 
   [Fact]

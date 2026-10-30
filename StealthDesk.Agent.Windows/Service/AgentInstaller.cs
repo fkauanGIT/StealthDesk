@@ -172,17 +172,23 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
     }
   }
 
+  // The agent and its desktop clients, which would hold their files.
   private void StopProcessesFromInstallFolder()
   {
-    var name = Path.GetFileNameWithoutExtension(installation.ExecutableName);
-    foreach (var process in Process.GetProcessesByName(name))
+    StopProcesses(installation.ExecutablePath);
+    StopProcesses(Path.Combine(installation.InstallFolder, Brand.DesktopClientFolderName, $"{Brand.DesktopClientName}.exe"));
+  }
+
+  private static void StopProcesses(string executable)
+  {
+    foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(executable)))
     {
       using (process)
       {
         try
         {
           if (process.Id != Environment.ProcessId &&
-            string.Equals(process.MainModule?.FileName, installation.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+            string.Equals(process.MainModule?.FileName, executable, StringComparison.OrdinalIgnoreCase))
           {
             process.Kill(entireProcessTree: true);
             process.WaitForExit(TimeSpan.FromSeconds(15));

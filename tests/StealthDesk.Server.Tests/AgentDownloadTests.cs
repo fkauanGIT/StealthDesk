@@ -20,7 +20,7 @@ public sealed class AgentDownloadTests : IDisposable
 
   private static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
-  private string AgentFile => Path.Combine(_folder, "windows", "StealthDesk.Agent.exe");
+  private string AgentFile => Path.Combine(_folder, "windows", "StealthDesk.Agent.zip");
 
   public void Dispose() => Directory.Delete(_folder, recursive: true);
 
@@ -48,12 +48,13 @@ public sealed class AgentDownloadTests : IDisposable
 
     Assert.NotNull(agent);
     Assert.Equal(Routes.WindowsAgentDownload, agent.Path);
-    Assert.Equal("StealthDesk.Agent.exe", agent.FileName);
+    Assert.Equal("StealthDesk.Agent.zip", agent.FileName);
     Assert.Equal(bytes.Length, agent.Size);
     Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes)), agent.Sha256);
     Assert.Equal(HttpStatusCode.OK, download.StatusCode);
     Assert.Equal(bytes, await download.Content.ReadAsByteArrayAsync(Cancel));
-    Assert.Equal("StealthDesk.Agent.exe", download.Content.Headers.ContentDisposition?.FileName);
+    Assert.Equal("StealthDesk.Agent.zip", download.Content.Headers.ContentDisposition?.FileName);
+    Assert.Equal("application/zip", download.Content.Headers.ContentType?.MediaType);
   }
 
   [Fact]
@@ -79,7 +80,7 @@ public sealed class AgentDownloadTests : IDisposable
     var catalog = server.Services.GetRequiredService<StealthDesk.Web.Server.AgentDownloads.AgentDownloadCatalog>();
 
     Assert.Equal(
-      Path.Combine(server.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "downloads", "windows", "StealthDesk.Agent.exe"),
+      Path.Combine(server.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "downloads", "windows", "StealthDesk.Agent.zip"),
       catalog.WindowsAgentPath);
   }
 

@@ -3,6 +3,8 @@
     <OutputType>Exe</OutputType>
     <!-- Run from the project folder so `dotnet run` finds the appsettings files next to it. -->
     <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
+    <!-- The desktop client is referenced only to build it first; it is published on its own. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
@@ -17,4 +19,15 @@
     <ProjectReference Include="..\StealthDesk.Agent.Core\StealthDesk.Agent.Core.csproj" />
     <ProjectReference Include="..\StealthDesk.Agent.Windows\StealthDesk.Agent.Windows.csproj" />
   </ItemGroup>
+  <!-- The desktop client next to the agent, in DesktopClient\, as an installed agent has it. A single-file publish
+       leaves it out: the zip the server hands out puts the two published programs together. -->
+  <ItemGroup>
+    <ProjectReference Include="..\StealthDesk.DesktopClient\StealthDesk.DesktopClient.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+  <Target Name="CopyDesktopClient" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
+    <ItemGroup>
+      <DesktopClientFile Include="..\StealthDesk.DesktopClient\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DesktopClientFile)" DestinationFiles="@(DesktopClientFile->'$(OutDir)DesktopClient\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

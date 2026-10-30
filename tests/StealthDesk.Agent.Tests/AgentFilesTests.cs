@@ -2,7 +2,7 @@ using StealthDesk.Agent.Windows.Service;
 
 namespace StealthDesk.Agent.Tests;
 
-/// <summary>What install copies: a regular build's folder, or a single-file agent and nothing that sits next to it.</summary>
+/// <summary>What install copies: a regular build's folder, or a single-file agent with its desktop client and nothing else next to it.</summary>
 public sealed class AgentFilesTests : IDisposable
 {
   private readonly string _root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"sd-files-{Guid.NewGuid():N}")).FullName;
@@ -29,6 +29,23 @@ public sealed class AgentFilesTests : IDisposable
     var files = AgentFiles.Of(Path.Combine(downloads, "StealthDesk.Agent.exe"));
 
     Assert.Equal(["StealthDesk.Agent.exe"], files);
+  }
+
+  [Fact]
+  public void ASingleFileAgent_BringsTheDesktopClientNextToIt()
+  {
+    var bundle = Folder(
+      "bundle",
+      "StealthDesk.Agent.exe",
+      "someone-elses.dll",
+      Path.Combine("DesktopClient", "StealthDesk.DesktopClient.exe"),
+      Path.Combine("DesktopClient", "runtimes", "native.dll"));
+
+    var files = AgentFiles.Of(Path.Combine(bundle, "StealthDesk.Agent.exe"));
+
+    Assert.Equal(
+      new[] { "StealthDesk.Agent.exe", Path.Combine("DesktopClient", "StealthDesk.DesktopClient.exe"), Path.Combine("DesktopClient", "runtimes", "native.dll") }.Order(),
+      files.Order());
   }
 
   [Fact]

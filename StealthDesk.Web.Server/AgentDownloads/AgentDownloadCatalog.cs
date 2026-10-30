@@ -12,7 +12,8 @@ public sealed class AgentDownloadOptions
 
   /// <summary>
   /// Where the agent builds the server hands out are, relative to the server's folder unless absolute. The Windows
-  /// agent is <c>windows/StealthDesk.Agent.exe</c> in it. The container image ships one there.
+  /// agent is <c>windows/StealthDesk.Agent.zip</c> in it: the agent and its desktop client. The container image ships
+  /// one there.
   /// </summary>
   public string Folder { get; set; } = "downloads";
 }
@@ -23,7 +24,7 @@ public sealed class AgentDownloadOptions
 /// </summary>
 public sealed class AgentDownloadCatalog(IOptions<AgentDownloadOptions> options, IHostEnvironment environment)
 {
-  public static readonly string WindowsAgentFileName = $"{Brand.AgentName}.exe";
+  public static readonly string WindowsAgentFileName = $"{Brand.AgentName}.zip";
 
   private readonly Lock _gate = new();
   private (string Path, long Size, DateTime Written, string Sha256)? _known;
@@ -67,7 +68,7 @@ public static class AgentDownloadEndpoints
     // The machine being installed has no account here. The build isn't secret: install commands carry its hash.
     endpoints.MapGet(Routes.WindowsAgentDownload, (AgentDownloadCatalog catalog) =>
         File.Exists(catalog.WindowsAgentPath)
-          ? Results.File(catalog.WindowsAgentPath, "application/octet-stream", AgentDownloadCatalog.WindowsAgentFileName)
+          ? Results.File(catalog.WindowsAgentPath, "application/zip", AgentDownloadCatalog.WindowsAgentFileName)
           : Results.NotFound())
       .AllowAnonymous();
 
