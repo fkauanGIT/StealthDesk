@@ -7,7 +7,25 @@ public enum StreamMessageType
 {
   /// <summary>A <see cref="StreamAck"/>: the other end received a message.</summary>
   Ack = 1,
+
+  /// <summary><see cref="RemoteControl.ScreenRegions"/>, from the desktop client: what changed on the screen shown.</summary>
+  ScreenRegions = 2,
 }
+
+/// <summary>How a <see cref="ScreenRegion"/>'s image is encoded.</summary>
+public enum ImageEncoding
+{
+  Jpeg = 0,
+  Png = 1,
+}
+
+/// <summary>A rectangle of the screen shown, in its pixels, drawn over what the viewer has there.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record ScreenRegion(int X, int Y, int Width, int Height, byte[] Image, ImageEncoding Encoding);
+
+/// <summary>The regions that changed in one capture, drawn together.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record ScreenRegions(IReadOnlyList<ScreenRegion> Regions);
 
 /// <summary>
 /// One message between the viewer and the desktop client on the relay: a binary WebSocket message holding its type,
