@@ -313,6 +313,8 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
         joined.TrySetResult(address);
         return new TaskCompletionSource<System.Net.WebSockets.WebSocket>().Task.WaitAsync(token);
       },
+      () => new FakeScreen(),
+      FakeScreen.Encode,
       new SilentNotice(),
       TimeProvider.System,
       _clientLifetime,

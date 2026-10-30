@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +6,7 @@ using StealthDesk.Agent.Tests.Fakes;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.DesktopClient;
+using StealthDesk.RemoteControl;
 
 namespace StealthDesk.Agent.Tests;
 
@@ -26,6 +25,28 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private readonly List<IDisposable> _disposables = [];
 
   private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+  [Fact]
+  public async Task WhileASessionRuns_TheViewerGetsTheDisplays_AndTheScreen_AndCanSwitchDisplays()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ScreenRegions)));
+    var displays = Read<DisplayList>(received.First());
+    Assert.Equal([FakeScreen.Primary, FakeScreen.Second], displays.Displays);
+    Assert.Equal(FakeScreen.Primary.Id, displays.ShownId);
+    var first = Read<ScreenRegions>(received.First(x => x.Type == StreamMessageType.ScreenRegions));
+    Assert.Equal((0, 0, 64, 48), Single(first));
+
+    await viewer.SendAsync(StreamMessageType.ChangeDisplay, new ChangeDisplay(FakeScreen.Second.Id), Token);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ScreenRegions && Single(Read<ScreenRegions>(x)) == (0, 0, 32, 24))));
+    Assert.Contains(received, x => x.Type == StreamMessageType.DisplayList && Read<DisplayList>(x).ShownId == FakeScreen.Second.Id);
+  }
 
   [Fact]
   public async Task ASession_JoinsTheRelay_AndTellsTheUser_WhenItStartsAndEnds()
@@ -120,7 +141,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     notify);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()
@@ -133,21 +154,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     }));
   }
 
-  private async Task<(WebSocket Server, WebSocket Client)> SocketPairAsync()
-  {
-    using var listener = new TcpListener(IPAddress.Loopback, 0);
-    listener.Start();
-    var client = new TcpClient();
-    _disposables.Add(client);
-    var accepting = listener.AcceptTcpClientAsync(Token);
-    await client.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port, Token);
-    var server = await accepting;
-    _disposables.Add(server);
-    var serverSocket = WebSocket.CreateFromStream(server.GetStream(), isServer: true, subProtocol: null, keepAliveInterval: Timeout.InfiniteTimeSpan);
-    _disposables.Add(serverSocket);
-    var clientSocket = WebSocket.CreateFromStream(client.GetStream(), isServer: false, subProtocol: null, keepAliveInterval: Timeout.InfiniteTimeSpan);
-    return (serverSocket, clientSocket);
-  }
+  private Task<(WebSocket Server, WebSocket Client)> SocketPairAsync() => LocalWebSockets.ConnectAsync(_disposables, Token);
 
   // A close message, or the connection gone: either way the device's end left.
   private static async Task<bool> LeftAsync(WebSocket relay)
@@ -173,6 +180,12 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
       return false;
     }
   }
+
+  private static T Read<T>(StreamEnvelope message) => MessagePack.MessagePackSerializer.Deserialize<T>(message.Payload);
+
+  // The only region of a frame, where it is: the fake screen never changes, so every frame sent is a whole screen.
+  private static (int X, int Y, int Width, int Height) Single(ScreenRegions frame) =>
+    Assert.Single(frame.Regions) is var region ? (region.X, region.Y, region.Width, region.Height) : default;
 
   private sealed class Notices : IUserNotice
   {

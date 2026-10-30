@@ -10,7 +10,33 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.ScreenRegions"/>, from the desktop client: what changed on the screen shown.</summary>
   ScreenRegions = 2,
+
+  /// <summary><see cref="RemoteControl.DisplayList"/>, from the desktop client: at the start, and whenever it changes.</summary>
+  DisplayList = 3,
+
+  /// <summary><see cref="RemoteControl.ChangeDisplay"/>, from the viewer.</summary>
+  ChangeDisplay = 4,
+
+  /// <summary><see cref="RemoteControl.RequestFullFrame"/>, from the viewer: send the whole screen next.</summary>
+  RequestFullFrame = 5,
 }
+
+/// <summary>One of the device's displays, in physical pixels of the desktop they form together.</summary>
+/// <param name="Id">The display's device name, as Windows knows it.</param>
+/// <param name="Name">What to show for it.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record DisplayInfo(string Id, string Name, int Left, int Top, int Width, int Height, bool IsPrimary);
+
+/// <summary>The device's displays, and which one is shown.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record DisplayList(IReadOnlyList<DisplayInfo> Displays, string ShownId);
+
+/// <summary>Show this display instead; its whole screen comes next.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record ChangeDisplay(string Id);
+
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record RequestFullFrame;
 
 /// <summary>How a <see cref="ScreenRegion"/>'s image is encoded.</summary>
 public enum ImageEncoding

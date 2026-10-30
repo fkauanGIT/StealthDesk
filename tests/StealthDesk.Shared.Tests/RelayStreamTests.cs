@@ -1,9 +1,6 @@
 using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
 using System.Net.WebSockets;
 using MessagePack;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.RemoteControl;
@@ -174,21 +171,11 @@ public sealed class RelayStreamTests : IDisposable
 
   private async Task<(End Sender, End Receiver)> PairAsync(TimeProvider? clock = null)
   {
-    using var listener = new TcpListener(IPAddress.Loopback, 0);
-    listener.Start();
-    var client = new TcpClient();
-    _disposables.Add(client);
-    var accepting = listener.AcceptTcpClientAsync(Token);
-    await client.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port, Token);
-    var server = await accepting;
-    _disposables.Add(server);
-    var a = WebSocket.CreateFromStream(client.GetStream(), isServer: false, subProtocol: null, keepAliveInterval: Timeout.InfiniteTimeSpan);
-    var b = WebSocket.CreateFromStream(server.GetStream(), isServer: true, subProtocol: null, keepAliveInterval: Timeout.InfiniteTimeSpan);
-    _disposables.Add(a);
-    _disposables.Add(b);
+    var pair = await WebSocketPair.ConnectAsync(Token);
+    _disposables.Add(pair);
     return (
-      new End(a, new RelayStream(a, clock ?? TimeProvider.System, NullLogger.Instance)),
-      new End(b, new RelayStream(b, clock ?? TimeProvider.System, NullLogger.Instance)));
+      new End(pair.Client, WebSocketPair.Stream(pair.Client, clock)),
+      new End(pair.Server, WebSocketPair.Stream(pair.Server, clock)));
   }
 
   private sealed record End(WebSocket Socket, RelayStream Stream);

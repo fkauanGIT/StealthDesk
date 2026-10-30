@@ -3,3 +3,17 @@ WTSQuerySessionInformation
 WTSFreeMemory
 WTSSendMessage
 WTSGetActiveConsoleSessionId
+GetDC
+ReleaseDC
+CreateCompatibleDC
+DeleteDC
+CreateDIBSection
+SelectObject
+DeleteObject
+BitBlt
+EnumDisplayMonitors
+GetMonitorInfo
+MONITORINFOEXW
+MONITORINFOF_PRIMARY
+SetProcessDpiAwarenessContext
+DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2

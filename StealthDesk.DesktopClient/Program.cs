@@ -9,6 +9,7 @@ using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.DesktopClient;
 using StealthDesk.Hosting;
 using StealthDesk.Ipc;
+using StealthDesk.RemoteControl;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
@@ -16,6 +17,12 @@ using Windows.Win32.UI.WindowsAndMessaging;
 if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
 {
   return 1;
+}
+
+// Physical pixels on every display, whatever its scaling: what is captured is what is there.
+if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 15063))
+{
+  PInvoke.SetProcessDpiAwarenessContext(Windows.Win32.UI.HiDpi.DPI_AWARENESS_CONTEXT.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 }
 
 var start = DesktopClientCommandLine.Parse(args);
@@ -36,6 +43,8 @@ builder.Services.AddHostedService<LifetimeLogging>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IUserNotice, SessionMessageBox>();
 builder.Services.AddSingleton<RelayConnector>(RelaySocket.ConnectAsync);
+builder.Services.AddSingleton<Func<IScreenCapture>>(() => OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new GdiScreenCapture() : throw new PlatformNotSupportedException());
+builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(

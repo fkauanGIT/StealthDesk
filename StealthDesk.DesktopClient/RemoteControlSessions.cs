@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.RemoteControl;
+using MessagePack;
 
 namespace StealthDesk.DesktopClient;
 
@@ -63,10 +64,12 @@ internal sealed class RemoteControlSession(DesktopRemoteControlStart request)
 /// <summary>
 /// The remote control sessions of this desktop client. Each joins its relay session as the device's end, in the
 /// background, and lasts until the viewer leaves, the relay ends it, or the client closes. The user is told when one
-/// starts and ends unless the tenant turned that off.
+/// starts and ends unless the tenant turned that off. While it runs, the screen is streamed to the viewer.
 /// </summary>
 internal sealed class RemoteControlSessions(
   RelayConnector connect,
+  Func<IScreenCapture> captures,
+  RegionEncoder encode,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -124,7 +127,13 @@ internal sealed class RemoteControlSessions(
         }
 
         var stream = new RelayStream(socket, clock, logger);
-        var ended = await stream.RunAsync((message, _) => HandleAsync(session, message), lifetime.ApplicationStopping);
+        using var capture = captures();
+        var streamer = new ScreenStreamer(capture, encode, stream, clock, logger);
+        using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
+        var sending = streamer.RunAsync(streaming.Token);
+        var ended = await stream.RunAsync((message, _) => HandleAsync(session, streamer, message), lifetime.ApplicationStopping);
+        await streaming.CancelAsync();
+        await sending;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
       }
     }
@@ -153,10 +162,33 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  // Nothing the viewer sends is acted on yet.
-  private Task HandleAsync(RemoteControlSession session, StreamEnvelope message)
+  private Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, StreamEnvelope message)
   {
-    logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
+    try
+    {
+      switch (message.Type)
+      {
+        case StreamMessageType.ChangeDisplay:
+          var change = MessagePackSerializer.Deserialize<ChangeDisplay>(message.Payload);
+          if (!streamer.ShowDisplay(change.Id))
+          {
+            logger.LogDebug("Session {SessionId} was asked for display {Display}, which isn't there.", session.Id, change.Id);
+          }
+
+          break;
+        case StreamMessageType.RequestFullFrame:
+          streamer.RequestFullFrame();
+          break;
+        default:
+          logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
+          break;
+      }
+    }
+    catch (MessagePackSerializationException ex)
+    {
+      logger.LogDebug(ex, "Session {SessionId} couldn't read a {Type} message.", session.Id, message.Type);
+    }
+
     return Task.CompletedTask;
   }
 }
