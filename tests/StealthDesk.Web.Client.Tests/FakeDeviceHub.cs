@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 using StealthDesk.Web.Client.Devices;
 
@@ -127,6 +128,24 @@ internal sealed class FakeDeviceHub : IDeviceHub
   {
     Calls.Add($"close {terminalId}");
     return Task.FromResult(GatewayReply.Accept(terminalId));
+  }
+
+  public GatewayReply<IReadOnlyList<RemoteDesktopSession>> DesktopSessions { get; set; } =
+    GatewayReply.Accept<IReadOnlyList<RemoteDesktopSession>>([new RemoteDesktopSession(1, "user", IsConsole: true)]);
+
+  public GatewayReply<RemoteControlTicket> RemoteControlTicket { get; set; } =
+    GatewayReply.Accept(new RemoteControlTicket(Guid.NewGuid(), "viewer-token"));
+
+  public Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessionsAsync(Guid deviceId)
+  {
+    Calls.Add($"sessions {deviceId}");
+    return Task.FromResult(DesktopSessions);
+  }
+
+  public Task<GatewayReply<RemoteControlTicket>> StartRemoteControlAsync(Guid deviceId, int desktopSessionId)
+  {
+    Calls.Add($"remote {deviceId} {desktopSessionId}");
+    return Task.FromResult(RemoteControlTicket);
   }
 
   public void Send(Guid terminal, TerminalOutputKind kind, string text) =>

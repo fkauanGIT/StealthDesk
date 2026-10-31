@@ -69,6 +69,23 @@ else
                 }
             </div>
         }
+        @if (canSeeDesktop)
+        {
+            <div class="sd-push sd-device-actions">
+                @if (device.IsOnline)
+                {
+                    <a class="sd-btn sd-btn--secondary" href="devices/@device.Id/remote-control">
+                        <SdIcon Name="IconName.Monitor" />
+                        Remote control
+                    </a>
+                }
+                else
+                {
+                    <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Monitor" Disabled="true" aria-describedby="remote-offline">Remote control</SdButton>
+                    <span id="remote-offline" class="sd-muted">Available when the device is online</span>
+                }
+            </div>
+        }
     </header>
 
     @if (groupsError is not null)
@@ -182,7 +199,8 @@ else
     private IReadOnlyDictionary<Guid, string> groupNames = new Dictionary<Guid, string>();
     private readonly HashSet<Guid> chosen = [];
     private bool canReadGroups;
-    private bool canUseTerminal;
+    private bool canUseTerminal;
+    private bool canSeeDesktop;
     private bool actionsChecked;
     private bool canAssignGroups;
     private bool choosingGroups;
@@ -220,6 +238,7 @@ else
         device = lookup.Device;
         actionsChecked = false;
         canUseTerminal = false;
+        canSeeDesktop = false;
         await CheckActionsAsync();
 
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
@@ -311,6 +330,7 @@ else
         actionsChecked = true;
         var actions = await Hub.GetDeviceActionsAsync(Id);
         canUseTerminal = actions is { Accepted: true, Value.UseTerminal: true };
+        canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
     }
 
     private void OnLiveChanged() => InvokeAsync(async () =>

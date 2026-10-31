@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Web.Client.Devices;
@@ -170,6 +171,12 @@ public sealed class LiveUpdates(
 
   public Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId) =>
     CallAsync<Guid>(nameof(IDashboardHub.CloseTerminal), terminalId);
+
+  public Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessionsAsync(Guid deviceId) =>
+    CallAsync<IReadOnlyList<RemoteDesktopSession>>(nameof(IDashboardHub.GetDesktopSessions), deviceId);
+
+  public Task<GatewayReply<RemoteControlTicket>> StartRemoteControlAsync(Guid deviceId, int desktopSessionId) =>
+    CallAsync<RemoteControlTicket>(nameof(IDashboardHub.StartRemoteControl), deviceId, desktopSessionId);
 
   // A call that can't be made, or fails on the way, is answered like a refusal, with a reason to show.
   private async Task<GatewayReply<T>> CallAsync<T>(string method, params object[] args)

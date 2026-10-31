@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\shared\StealthDesk.Contracts\StealthDesk.Contracts.csproj" />
+    <ProjectReference Include="..\shared\StealthDesk.RemoteControl\StealthDesk.RemoteControl.csproj" />
   </ItemGroup>
 
 </Project>

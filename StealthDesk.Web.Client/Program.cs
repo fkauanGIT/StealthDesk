@@ -44,6 +44,7 @@ builder.Services.AddScoped(sp => new LiveUpdates(
   sp.GetRequiredService<ILogger<LiveUpdates>>()));
 builder.Services.AddScoped<ILiveUpdates>(sp => sp.GetRequiredService<LiveUpdates>());
 builder.Services.AddScoped<IDeviceHub>(sp => sp.GetRequiredService<LiveUpdates>());
+builder.Services.AddScoped<StealthDesk.Web.Client.RemoteControl.IRemoteDesktopConnections, StealthDesk.Web.Client.RemoteControl.RemoteDesktopConnections>();
 builder.Services.AddScoped<ITerminalKeys, TerminalKeys>();
 builder.Services.AddScoped<DeviceTerminal>();
 
