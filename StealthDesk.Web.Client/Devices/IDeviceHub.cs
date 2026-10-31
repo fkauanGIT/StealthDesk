@@ -1,5 +1,6 @@
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 
 namespace StealthDesk.Web.Client.Devices;
@@ -30,4 +31,10 @@ public interface IDeviceHub
   Task<GatewayReply<TerminalCompletions>> GetTerminalCompletionsAsync(Guid terminalId, TerminalCompletionRequest request);
 
   Task<GatewayReply<Guid>> CloseTerminalAsync(Guid terminalId);
+
+  /// <summary>The device's Windows sessions a remote control session can show, as its agent knows them now.</summary>
+  Task<GatewayReply<IReadOnlyList<RemoteDesktopSession>>> GetDesktopSessionsAsync(Guid deviceId);
+
+  /// <summary>Starts a remote control session of a Windows session; the answer is what this browser joins the relay with.</summary>
+  Task<GatewayReply<RemoteControlTicket>> StartRemoteControlAsync(Guid deviceId, int desktopSessionId);
 }
