@@ -24,4 +24,5 @@ public enum IconName
   Group,
   Settings,
   Terminal,
+  Monitor,
 }

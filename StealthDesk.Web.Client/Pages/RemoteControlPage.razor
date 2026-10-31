@@ -1,0 +1,424 @@
+@page "/devices/{Id:guid}/remote-control"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@using StealthDesk.Contracts.RemoteControl
+@using StealthDesk.Web.Client.RemoteControl
+@inject DeviceStore Store
+@inject ILiveUpdates Live
+@inject IDeviceHub Hub
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject TimeProvider Clock
+@inject IRemoteDesktopConnections Connections
+
+<PageTitle>Remote control · @(device?.Name ?? "Device") · StealthDesk</PageTitle>
+
+<a class="sd-back" href="devices/@Id">
+    <SdIcon Name="IconName.Back" Size="16" />
+    @(device?.Name ?? "Device")
+</a>
+
+@if (lookup is null)
+{
+    <SdLoading Text="Loading device..." />
+}
+else if (lookup.IsNotFound)
+{
+    <SdEmptyState Title="Device not found">It may have been removed, or the link is wrong.</SdEmptyState>
+}
+else if (device is null)
+{
+    <SdAlert>Could not load the device. Check that the server is running.</SdAlert>
+}
+else
+{
+    <header class="sd-page-header">
+        <div class="sd-device-icon"><SdIcon Name="IconName.Monitor" Size="26" /></div>
+        <div>
+            <h1 class="sd-page-title">Remote control</h1>
+            <p class="sd-muted">The desktop of @device.Name</p>
+        </div>
+        <DeviceStatus IsOnline="device.IsOnline" />
+    </header>
+
+    @if (canSeeDesktop == false)
+    {
+        <SdEmptyState Title="Not allowed">@accessError</SdEmptyState>
+    }
+    else if (!device.IsOnline)
+    {
+        <SdEmptyState Title="Device offline">Remote control is available when the device is online.</SdEmptyState>
+    }
+    else if (state == ViewState.ChoosingSession)
+    {
+        <h2 class="sd-section-title">Choose a session</h2>
+        <p class="sd-muted">This device has more than one Windows session. Pick the one to control.</p>
+        <div class="sd-session-list">
+            @foreach (var session in sessions)
+            {
+                <button class="sd-session-card" @onclick="() => ConnectAsync(session)">
+                    <SdIcon Name="IconName.Monitor" Size="20" />
+                    <span class="sd-session-name">@(session.UserName ?? "Sign-in screen")</span>
+                    <span class="sd-muted">@(session.IsConsole ? "Console" : "Remote")</span>
+                </button>
+            }
+        </div>
+    }
+    else if (state == ViewState.Ended)
+    {
+        <SdAlert Tone="Tone.Warning">The session ended: @endedReason</SdAlert>
+        <SdButton Icon="IconName.Refresh" OnClick="RestartAsync">Connect again</SdButton>
+    }
+    else if (state is ViewState.Connecting or ViewState.Starting)
+    {
+        <SdLoading Text="@(state == ViewState.Connecting ? "Connecting to the desktop..." : "Starting...")" />
+    }
+
+    @if (state == ViewState.Streaming)
+    {
+        <div class="sd-remote-toolbar">
+            @if (displays.Count > 1)
+            {
+                <select class="sd-select" value="@shownId" @onchange="ChangeDisplayAsync" aria-label="Display">
+                    @foreach (var display in displays)
+                    {
+                        <option value="@display.Id">@display.Name @(display.IsPrimary ? "(main)" : "")</option>
+                    }
+                </select>
+            }
+            <select class="sd-select" value="@quality" @onchange="ChangeQualityAsync" aria-label="Quality">
+                <option value="auto">Quality: auto</option>
+                <option value="high">Quality: high</option>
+                <option value="medium">Quality: medium</option>
+                <option value="low">Quality: low</option>
+            </select>
+            @if (canSendCtrlAltDel)
+            {
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="CtrlAltDelAsync">Ctrl+Alt+Del</SdButton>
+            }
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="FullScreenAsync">Full screen</SdButton>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="EndSession">End session</SdButton>
+            @if (!canInteract)
+            {
+                <span class="sd-muted">View only</span>
+            }
+        </div>
+    }
+
+    <div @ref="stage" class="sd-remote-stage" hidden="@(state != ViewState.Streaming)">
+        <canvas @ref="canvas" class="sd-remote-canvas"></canvas>
+    </div>
+}
+
+@code {
+    private enum ViewState { Idle, Connecting, ChoosingSession, Starting, Streaming, Ended }
+
+    private DeviceLookup? lookup;
+    private DeviceSummary? device;
+    private bool? canSeeDesktop;
+    private bool canInteract;
+    private bool canSendCtrlAltDel;
+    private string accessError = "You may not see this device's desktop.";
+    private ViewState state = ViewState.Idle;
+    private string endedReason = string.Empty;
+
+    private IReadOnlyList<RemoteDesktopSession> sessions = [];
+    private List<DisplayInfo> displays = [];
+    private string shownId = string.Empty;
+    private string quality = "auto";
+
+    private IRemoteDesktopConnection? connection;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<RemoteControlPage>? self;
+    private ElementReference canvas;
+    private ElementReference stage;
+    private CancellationTokenSource? cts;
+    private string viewId = string.Empty;
+    private (int Width, int Height)? pendingSize;
+    private bool startedOnce;
+    private bool inited;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Store.Changed += OnChanged;
+        Live.StateChanged += OnLiveChanged;
+        _ = Live.StartAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        lookup = await Store.FindAsync(Id);
+        device = lookup.Device;
+        await StartIfPossibleAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The canvas exists only once streaming, so set it up here, then let frames flow to a ready canvas.
+        if (state == ViewState.Streaming && !inited && connection is { } ready)
+        {
+            inited = true;
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/remote-desktop.js");
+            await module.InvokeVoidAsync("init", viewId, canvas);
+            if (pendingSize is { } size)
+            {
+                await module.InvokeVoidAsync("resize", viewId, size.Width, size.Height);
+            }
+
+            await ready.StartAsync(cts!.Token);
+            await ready.ApplyAsync(CurrentSettings());
+
+            // Capture the mouse and keyboard only for a viewer allowed to control; view-only never sends input.
+            if (canInteract)
+            {
+                self = DotNetObjectReference.Create(this);
+                await module.InvokeVoidAsync("attachInput", viewId, canvas, self);
+            }
+        }
+    }
+
+    private async Task StartIfPossibleAsync()
+    {
+        if (device is null || Live.State != LiveState.Live || startedOnce)
+        {
+            return;
+        }
+
+        if (canSeeDesktop is null)
+        {
+            var actions = await Hub.GetDeviceActionsAsync(Id);
+            canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
+            canInteract = actions is { Accepted: true, Value.ControlDesktop: true };
+            canSendCtrlAltDel = actions is { Accepted: true, Value.SendCtrlAltDel: true };
+            accessError = actions.Accepted ? "You may not see this device's desktop." : actions.Error ?? "The server refused.";
+        }
+
+        if (canSeeDesktop == true && device.IsOnline)
+        {
+            startedOnce = true;
+            await BeginAsync();
+        }
+    }
+
+    // Opens the visit and lists the sessions; one is shown at once, several are offered to choose from.
+    private async Task BeginAsync()
+    {
+        state = ViewState.Connecting;
+        StateHasChanged();
+
+        var access = await Hub.StartDeviceAccessAsync(Id);
+        if (!access.Accepted)
+        {
+            End(access.Error ?? "The server refused.");
+            return;
+        }
+
+        var offered = await Hub.GetDesktopSessionsAsync(Id);
+        if (!offered.Accepted || offered.Value is not { Count: > 0 } available)
+        {
+            End(offered.Accepted ? "The device has no desktop session to show." : offered.Error ?? "The server refused.");
+            return;
+        }
+
+        if (available.Count == 1)
+        {
+            await ConnectAsync(available[0]);
+            return;
+        }
+
+        sessions = available;
+        state = ViewState.ChoosingSession;
+        StateHasChanged();
+    }
+
+    private async Task ConnectAsync(RemoteDesktopSession session)
+    {
+        state = ViewState.Starting;
+        StateHasChanged();
+
+        var ticket = await Hub.StartRemoteControlAsync(Id, session.SessionId);
+        if (!ticket.Accepted || ticket.Value is not { } tickets)
+        {
+            End(ticket.Error ?? "The server refused.");
+            return;
+        }
+
+        viewId = tickets.RelaySessionId.ToString();
+        connection = Connections.Create(new Uri(Nav.BaseUri), tickets);
+        connection.DisplaysChanged += OnDisplays;
+        connection.RegionsReceived += OnRegions;
+        connection.Ended += reason => _ = InvokeAsync(() => End(reason));
+        cts = new CancellationTokenSource();
+
+        // OnAfterRenderAsync connects once the canvas is in the page.
+        state = ViewState.Streaming;
+        inited = false;
+        StateHasChanged();
+    }
+
+    private CaptureSettings CurrentSettings() => quality switch
+    {
+        "high" => new CaptureSettings(Quality: 85, ShowCursor: true),
+        "medium" => new CaptureSettings(Quality: 60, ShowCursor: true),
+        "low" => new CaptureSettings(Quality: 35, ShowCursor: true),
+        _ => new CaptureSettings(AutoQuality: true, ShowCursor: true),
+    };
+
+    private async Task ChangeDisplayAsync(ChangeEventArgs e)
+    {
+        if (connection is { } ready && e.Value?.ToString() is { Length: > 0 } id)
+        {
+            shownId = id;
+            await ready.ChangeDisplayAsync(id);
+        }
+    }
+
+    private async Task ChangeQualityAsync(ChangeEventArgs e)
+    {
+        quality = e.Value?.ToString() ?? "auto";
+        if (connection is { } ready)
+        {
+            await ready.ApplyAsync(CurrentSettings());
+        }
+    }
+
+    private Task CtrlAltDelAsync() => connection?.CtrlAltDelAsync() ?? Task.CompletedTask;
+
+    private async Task FullScreenAsync()
+    {
+        if (module is { } ready)
+        {
+            await ready.InvokeVoidAsync("fullScreen", stage);
+        }
+    }
+
+    private void EndSession() => Nav.NavigateTo($"devices/{Id}");
+
+    private void OnDisplays(DisplayList list)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            displays = [.. list.Displays];
+            shownId = list.ShownId;
+            if (list.Displays.FirstOrDefault(x => x.Id == list.ShownId) is { } shown)
+            {
+                pendingSize = (shown.Width, shown.Height);
+                if (module is { } ready)
+                {
+                    await ready.InvokeVoidAsync("resize", viewId, shown.Width, shown.Height);
+                }
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void OnRegions(ScreenRegions regions)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (module is not { } ready)
+            {
+                return;
+            }
+
+            foreach (var region in regions.Regions)
+            {
+                await ready.InvokeVoidAsync("drawRegion", viewId, region.X, region.Y, region.Width, region.Height, (int)region.Encoding, region.Image);
+            }
+        });
+    }
+
+    [JSInvokable]
+    public Task OnMove(double x, double y) => connection?.MovePointerAsync(x, y) ?? Task.CompletedTask;
+
+    [JSInvokable]
+    public Task OnButton(int button, bool isPressed, double x, double y) =>
+        connection?.MouseButtonAsync(button, isPressed, x, y) ?? Task.CompletedTask;
+
+    [JSInvokable]
+    public Task OnWheel(double x, double y, int deltaY, int deltaX) =>
+        connection?.MouseWheelAsync(x, y, deltaY, deltaX) ?? Task.CompletedTask;
+
+    [JSInvokable]
+    public Task OnKey(string key, string code, bool isPressed, bool control, bool shift, bool alt, bool meta) =>
+        connection?.KeyAsync(key, code, isPressed, new KeyModifiers(control, shift, alt, meta)) ?? Task.CompletedTask;
+
+    [JSInvokable]
+    public Task OnResetKeys() => connection?.ResetKeyboardAsync() ?? Task.CompletedTask;
+
+    private void End(string reason)
+    {
+        endedReason = reason;
+        state = ViewState.Ended;
+        StateHasChanged();
+    }
+
+    private async Task RestartAsync()
+    {
+        await TearDownAsync();
+        startedOnce = false;
+        canSeeDesktop = null;
+        await StartIfPossibleAsync();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(async () =>
+    {
+        lookup = await Store.FindAsync(Id);
+        device = lookup.Device;
+        StateHasChanged();
+    });
+
+    private void OnLiveChanged() => _ = InvokeAsync(async () =>
+    {
+        await StartIfPossibleAsync();
+        StateHasChanged();
+    });
+
+    private async Task TearDownAsync()
+    {
+        if (cts is { } token)
+        {
+            await token.CancelAsync();
+        }
+
+        if (connection is { } live)
+        {
+            await live.DisposeAsync();
+            connection = null;
+        }
+
+        if (module is { } ready)
+        {
+            try
+            {
+                await ready.InvokeVoidAsync("dispose", viewId);
+                await ready.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is going away.
+            }
+
+            module = null;
+        }
+
+        await Hub.EndDeviceAccessAsync();
+        self?.Dispose();
+        self = null;
+        cts?.Dispose();
+        cts = null;
+        inited = false;
+        state = ViewState.Idle;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Store.Changed -= OnChanged;
+        Live.StateChanged -= OnLiveChanged;
+        await TearDownAsync();
+    }
+}
