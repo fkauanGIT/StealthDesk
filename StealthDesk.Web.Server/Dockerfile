@@ -13,6 +13,7 @@ COPY shared/StealthDesk.Branding/StealthDesk.Branding.csproj shared/StealthDesk.
 COPY shared/StealthDesk.Contracts/StealthDesk.Contracts.csproj shared/StealthDesk.Contracts/
 COPY shared/StealthDesk.Core/StealthDesk.Core.csproj shared/StealthDesk.Core/
 COPY shared/StealthDesk.Observability/StealthDesk.Observability.csproj shared/StealthDesk.Observability/
+COPY shared/StealthDesk.RemoteControl/StealthDesk.RemoteControl.csproj shared/StealthDesk.RemoteControl/
 RUN dotnet restore StealthDesk.Web.Server/StealthDesk.Web.Server.csproj
 
 COPY StealthDesk.Web.Server/ StealthDesk.Web.Server/
