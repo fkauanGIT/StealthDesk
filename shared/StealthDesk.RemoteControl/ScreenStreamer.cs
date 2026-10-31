@@ -94,6 +94,18 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
     }
   }
 
+  /// <summary>The display being streamed now, which the viewer's mouse points at, or none before the first capture.</summary>
+  public DisplayInfo? Shown
+  {
+    get
+    {
+      lock (_gate)
+      {
+        return _shown;
+      }
+    }
+  }
+
   /// <summary>Shows the display with this id instead; false when there is none.</summary>
   public bool ShowDisplay(string id)
   {

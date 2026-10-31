@@ -28,6 +28,27 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.CursorShape"/>, from the desktop client, whenever the pointer changes shape.</summary>
   CursorShape = 8,
+
+  /// <summary><see cref="RemoteControl.MovePointer"/>, from the viewer: the pointer moved over the desktop.</summary>
+  MovePointer = 9,
+
+  /// <summary><see cref="RemoteControl.MouseButton"/>, from the viewer: a mouse button went down or up.</summary>
+  MouseButton = 10,
+
+  /// <summary><see cref="RemoteControl.MouseWheel"/>, from the viewer: the wheel turned.</summary>
+  MouseWheel = 11,
+
+  /// <summary><see cref="RemoteControl.KeyEvent"/>, from the viewer: a key went down or up.</summary>
+  KeyEvent = 12,
+
+  /// <summary><see cref="RemoteControl.TypeText"/>, from the viewer: text to type as is.</summary>
+  TypeText = 13,
+
+  /// <summary><see cref="RemoteControl.ResetKeyboard"/>, from the viewer: release every key held down.</summary>
+  ResetKeyboard = 14,
+
+  /// <summary><see cref="RemoteControl.CtrlAltDel"/>, from the viewer: send the secure attention sequence.</summary>
+  CtrlAltDel = 15,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>

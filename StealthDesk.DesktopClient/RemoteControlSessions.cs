@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.RemoteControl;
+using StealthDesk.RemoteControl.Input;
 using MessagePack;
 
 namespace StealthDesk.DesktopClient;
@@ -70,6 +71,7 @@ internal sealed class RemoteControlSessions(
   RelayConnector connect,
   Func<IScreenCapture> captures,
   RegionEncoder encode,
+  IInputInjector injector,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -129,9 +131,10 @@ internal sealed class RemoteControlSessions(
         var stream = new RelayStream(socket, clock, logger);
         using var capture = captures();
         var streamer = new ScreenStreamer(capture, encode, stream, clock, logger);
+        var input = new RemoteInput(injector, () => streamer.Shown, session.Permissions, logger);
         using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         var sending = streamer.RunAsync(streaming.Token);
-        var ended = await stream.RunAsync((message, _) => HandleAsync(session, streamer, message), lifetime.ApplicationStopping);
+        var ended = await stream.RunAsync((message, _) => HandleAsync(session, streamer, input, message), lifetime.ApplicationStopping);
         await streaming.CancelAsync();
         await sending;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
@@ -162,7 +165,7 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  private Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, StreamEnvelope message)
+  private Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, RemoteInput input, StreamEnvelope message)
   {
     try
     {
@@ -181,6 +184,27 @@ internal sealed class RemoteControlSessions(
           break;
         case StreamMessageType.CaptureSettings:
           streamer.Apply(MessagePackSerializer.Deserialize<CaptureSettings>(message.Payload));
+          break;
+        case StreamMessageType.MovePointer:
+          input.MovePointer(MessagePackSerializer.Deserialize<MovePointer>(message.Payload));
+          break;
+        case StreamMessageType.MouseButton:
+          input.MouseButton(MessagePackSerializer.Deserialize<MouseButton>(message.Payload));
+          break;
+        case StreamMessageType.MouseWheel:
+          input.MouseWheel(MessagePackSerializer.Deserialize<MouseWheel>(message.Payload));
+          break;
+        case StreamMessageType.KeyEvent:
+          input.Key(MessagePackSerializer.Deserialize<KeyEvent>(message.Payload));
+          break;
+        case StreamMessageType.TypeText:
+          input.TypeText(MessagePackSerializer.Deserialize<TypeText>(message.Payload));
+          break;
+        case StreamMessageType.ResetKeyboard:
+          input.ResetKeyboard();
+          break;
+        case StreamMessageType.CtrlAltDel:
+          input.CtrlAltDel();
           break;
         default:
           logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);

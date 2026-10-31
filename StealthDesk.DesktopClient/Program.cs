@@ -49,6 +49,7 @@ builder.Services.AddSingleton<Func<IScreenCapture>>(provider => () =>
   : OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new GdiScreenCapture()
   : throw new PlatformNotSupportedException());
 builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
+builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputInjector, WindowsInput>();
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(
