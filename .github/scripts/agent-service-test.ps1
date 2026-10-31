@@ -78,6 +78,9 @@ Check "also when it stops with an error" ((sc.exe qfailureflag $service | Out-St
 
 $apps = Get-ItemProperty $appsKey
 Check "Apps lists it" ($apps.DisplayName -eq "StealthDesk Agent")
+
+$sasKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+Check "install allows Ctrl+Alt+Del (SoftwareSASGeneration)" ((Get-ItemProperty $sasKey -Name SoftwareSASGeneration -ErrorAction SilentlyContinue).SoftwareSASGeneration -eq 3)
 Check "Apps uninstalls it from the install folder" ($apps.UninstallString -eq "`"$installFolder\StealthDesk.Agent.exe`" uninstall") $apps.UninstallString
 
 $script:deviceId = (Get-Content $settingsFile -Raw | ConvertFrom-Json).Agent.DeviceId
@@ -173,6 +176,7 @@ Check "the install folder is gone" (-not (Test-Path $installFolder))
 Check "no empty StealthDesk folder is left in Program Files" (-not (Test-Path (Split-Path $installFolder)))
 Check "the settings and device key are gone" (-not (Test-Path $dataFolder))
 Check "the Apps entry is gone" (-not (Test-Path $appsKey))
+Check "the Ctrl+Alt+Del policy was turned off" ($null -eq (Get-ItemProperty $sasKey -Name SoftwareSASGeneration -ErrorAction SilentlyContinue).SoftwareSASGeneration)
 Check "no copy is left in the temp folder" (-not (Get-ChildItem ([IO.Path]::GetTempPath()) -Directory -Filter "StealthDesk-agent-*"))
 WaitFor "the device to show offline" { -not (Online) } 10
 Write-Host "All service checks passed."
