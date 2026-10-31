@@ -44,7 +44,7 @@ Install copies the agent and its desktop client to `C:\Program Files\StealthDesk
 key and stops there if the server refuses it, then creates the `StealthDesk.Agent` service (LocalSystem, automatic
 start), lists it in Settings > Apps and starts it. The service itself never gets the key: the device joined already. Its settings,
 private key and logs are in `C:\ProgramData\StealthDesk\default`, which only administrators and SYSTEM can open.
-Stopping the service disconnects it, so the device shows offline at once.
+Stopping the service disconnects it, so the device shows offline at once. Install also turns on the `SoftwareSASGeneration` policy so a remote viewer can send Ctrl+Alt+Del; uninstall turns it off.
 
 ```powershell
 .\StealthDesk.Agent.exe uninstall

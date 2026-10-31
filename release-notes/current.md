@@ -28,6 +28,11 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   bandwidth cap, switching displays, the pointer's shape, and the pointer drawn in when asked; metrics every second
 - The person at the device is told in a message on its screen when a session starts and ends, unless the tenant
   turns that off in its settings (**Remote control**); the server's default is `TenantDefaults:NotifyUserOnRemoteControl`
+- The viewer's mouse and keyboard act on the device: moves, buttons, the wheel, keys with their modifiers and typed
+  text, placed on the shown display and mapped from the browser's key names to the device's own layout. A view-only
+  viewer (without `device.remote-control.interact`) injects nothing. Ctrl+Alt+Del, with `device.ctrl-alt-del.send`,
+  is sent from the session's desktop client, which runs as the local system; install allows it with the
+  `SoftwareSASGeneration` policy and uninstall turns it off
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;
