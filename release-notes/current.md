@@ -33,6 +33,10 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   viewer (without `device.remote-control.interact`) injects nothing. Ctrl+Alt+Del, with `device.ctrl-alt-del.send`,
   is sent from the session's desktop client, which runs as the local system; install allows it with the
   `SoftwareSASGeneration` policy and uninstall turns it off
+- A **Remote control** action on a device's page opens the desktop in the browser: it joins the relay, draws the
+  screen on a canvas as regions arrive, and (with the control permission) sends the viewer's mouse and keyboard;
+  view-only otherwise. A toolbar chooses the display and the quality, sends Ctrl+Alt+Del, goes full screen and ends
+  the session; when the device has several Windows sessions, one is chosen first. Leaving the page ends the session
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;
