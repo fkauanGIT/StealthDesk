@@ -90,6 +90,7 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
       AgentFiles.Copy(executable, installation.InstallFolder);
       ServiceManager.Create(installation, $"Keeps this device connected to its {Brand.Name} server.");
       WriteAppsEntry();
+      EnableSecureAttention();
       ServiceManager.Start(installation.ServiceName);
       output.WriteLine($"Installed: the {installation.ServiceName} service is running.");
       return 0;
@@ -118,6 +119,7 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
     DeleteEmptyParents(installation.InstallFolder);
     DeleteEmptyParents(installation.DataFolder);
     DeleteAppsEntry();
+    DisableSecureAttention();
     output.WriteLine("Uninstalled: the service, its files and the device's identity are gone.");
 
     if (IsACopy(startupFolder))
@@ -160,6 +162,7 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
     {
       RemoveService();
       DeleteAppsEntry();
+      DisableSecureAttention();
       DeleteFolder(installation.InstallFolder);
       if (!keepData)
       {
@@ -219,6 +222,31 @@ public sealed class AgentInstaller(AgentInstallation installation, TextWriter ou
   }
 
   private void DeleteAppsEntry() => Registry.LocalMachine.DeleteSubKeyTree(installation.UninstallKeyPath, throwOnMissingSubKey: false);
+
+  // Ctrl+Alt+Del from a viewer needs this; a failure here isn't worth failing the install over.
+  private void EnableSecureAttention()
+  {
+    try
+    {
+      SecureAttention.Enable();
+    }
+    catch (Exception ex)
+    {
+      output.WriteLine($"Couldn't allow Ctrl+Alt+Del (SoftwareSASGeneration): {ex.Message}");
+    }
+  }
+
+  private void DisableSecureAttention()
+  {
+    try
+    {
+      SecureAttention.Disable();
+    }
+    catch (Exception ex)
+    {
+      output.WriteLine($"Couldn't undo the Ctrl+Alt+Del policy: {ex.Message}");
+    }
+  }
 
   private static void DeleteFolder(string folder)
   {

@@ -29,3 +29,8 @@ GetCursorInfo
 LoadCursor
 GetIconInfo
 DrawIconEx
+SendInput
+GetSystemMetrics
+GetMessageExtraInfo
+GetAsyncKeyState
+SendSAS
