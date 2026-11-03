@@ -10,6 +10,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<ScreenRegions>? RegionsReceived;
 
+    event Action<string>? ClipboardTextReceived;
+
     event Action<string>? Ended;
 
     Task StartAsync(CancellationToken cancellationToken);
@@ -29,6 +31,10 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
     Task ResetKeyboardAsync();
 
     Task CtrlAltDelAsync();
+
+    Task SendClipboardTextAsync(string text);
+
+    Task RequestClipboardAsync();
 }
 
 /// <summary>Makes the connection for a session's ticket; replaced in tests so no real relay is reached.</summary>
