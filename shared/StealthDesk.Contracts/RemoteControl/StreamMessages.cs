@@ -58,6 +58,9 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.RequestClipboard"/>, from the viewer: send the device's clipboard text back.</summary>
   RequestClipboard = 17,
+
+  /// <summary><see cref="RemoteControl.SecureDesktop"/>, from the desktop client: a secure screen is or isn't shown.</summary>
+  SecureDesktop = 18,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>
