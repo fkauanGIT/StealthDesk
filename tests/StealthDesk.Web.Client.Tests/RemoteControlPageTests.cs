@@ -179,6 +179,20 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task ASecureScreen_IsShownToTheViewer_AndClearsWhenItGoesAway()
+  {
+    await LoadAsync(_device);
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    _remote.RaiseSecureDesktop(new SecureDesktop(true, "Winlogon"));
+    page.WaitForAssertion(() => Assert.Contains("secure screen", page.Markup));
+
+    _remote.RaiseSecureDesktop(new SecureDesktop(false, null));
+    page.WaitForAssertion(() => Assert.DoesNotContain("secure screen", page.Markup));
+  }
+
+  [Fact]
   public async Task WhenTheSessionEnds_ItSaysWhy()
   {
     await LoadAsync(_device);

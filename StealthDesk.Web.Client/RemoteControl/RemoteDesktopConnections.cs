@@ -12,6 +12,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<string>? ClipboardTextReceived;
 
+    event Action<SecureDesktop>? SecureDesktopChanged;
+
     event Action<string>? Ended;
 
     Task StartAsync(CancellationToken cancellationToken);

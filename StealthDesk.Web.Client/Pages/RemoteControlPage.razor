@@ -117,6 +117,11 @@ else
         </div>
     }
 
+    @if (state == ViewState.Streaming && secureScreen)
+    {
+        <SdAlert Tone="Tone.Warning">The device is showing a secure screen@(secureScreenName is { Length: > 0 } s ? $" ({s})" : ""), which you may not see. It will come back when the device leaves it.</SdAlert>
+    }
+
     <div @ref="stage" class="sd-remote-stage" hidden="@(state != ViewState.Streaming)">
         <canvas @ref="canvas" class="sd-remote-canvas"></canvas>
     </div>
@@ -133,6 +138,8 @@ else
     private bool canReadClipboard;
     private bool canWriteClipboard;
     private string clipboardNote = string.Empty;
+    private bool secureScreen;
+    private string? secureScreenName;
     private string accessError = "You may not see this device's desktop.";
     private ViewState state = ViewState.Idle;
     private string endedReason = string.Empty;
@@ -268,6 +275,7 @@ else
         connection.DisplaysChanged += OnDisplays;
         connection.RegionsReceived += OnRegions;
         connection.ClipboardTextReceived += OnClipboardText;
+        connection.SecureDesktopChanged += OnSecureDesktop;
         connection.Ended += reason => _ = InvokeAsync(() => End(reason));
         cts = new CancellationTokenSource();
 
@@ -405,6 +413,13 @@ else
 
     [JSInvokable]
     public Task OnResetKeys() => connection?.ResetKeyboardAsync() ?? Task.CompletedTask;
+
+    private void OnSecureDesktop(SecureDesktop message) => _ = InvokeAsync(() =>
+    {
+        secureScreen = message.Active;
+        secureScreenName = message.Screen;
+        StateHasChanged();
+    });
 
     private void End(string reason)
     {
