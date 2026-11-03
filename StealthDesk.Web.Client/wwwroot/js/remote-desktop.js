@@ -74,6 +74,25 @@ export function fullScreen(element) {
   element?.requestFullscreen?.();
 }
 
+// The browser's own clipboard, which only the browser may touch. It may refuse without a user gesture or over plain
+// HTTP, so both return whether they worked.
+export async function readClipboard() {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return null;
+  }
+}
+
+export async function writeClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function dispose(id) {
   const view = views.get(id);
   if (view?.input) {

@@ -72,6 +72,7 @@ internal sealed class RemoteControlSessions(
   Func<IScreenCapture> captures,
   RegionEncoder encode,
   IInputInjector injector,
+  IClipboard clipboard,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -134,7 +135,7 @@ internal sealed class RemoteControlSessions(
         var input = new RemoteInput(injector, () => streamer.Shown, session.Permissions, logger);
         using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         var sending = streamer.RunAsync(streaming.Token);
-        var ended = await stream.RunAsync((message, _) => HandleAsync(session, streamer, input, message), lifetime.ApplicationStopping);
+        var ended = await stream.RunAsync((message, ct) => HandleAsync(session, streamer, input, stream, message, ct), lifetime.ApplicationStopping);
         await streaming.CancelAsync();
         await sending;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
@@ -165,7 +166,7 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  private Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, RemoteInput input, StreamEnvelope message)
+  private async Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, RemoteInput input, RelayStream stream, StreamEnvelope message, CancellationToken cancellationToken)
   {
     try
     {
@@ -206,6 +207,12 @@ internal sealed class RemoteControlSessions(
         case StreamMessageType.CtrlAltDel:
           input.CtrlAltDel();
           break;
+        case StreamMessageType.ClipboardText:
+          await WriteClipboardAsync(session, MessagePackSerializer.Deserialize<ClipboardText>(message.Payload));
+          break;
+        case StreamMessageType.RequestClipboard:
+          await SendClipboardAsync(session, stream, cancellationToken);
+          break;
         default:
           logger.LogDebug("Session {SessionId} ignored a {Type} message.", session.Id, message.Type);
           break;
@@ -215,7 +222,30 @@ internal sealed class RemoteControlSessions(
     {
       logger.LogDebug(ex, "Session {SessionId} couldn't read a {Type} message.", session.Id, message.Type);
     }
+  }
 
-    return Task.CompletedTask;
+  // The viewer may set the device's clipboard only with the write permission.
+  private async Task WriteClipboardAsync(RemoteControlSession session, ClipboardText message)
+  {
+    if (!session.Permissions.WriteClipboard)
+    {
+      logger.LogDebug("A viewer without the clipboard-write permission tried to set session {SessionId}'s clipboard.", session.Id);
+      return;
+    }
+
+    await clipboard.SetTextAsync(Clipboard.Limit(message.Text));
+  }
+
+  // The device's clipboard goes back only with the read permission.
+  private async Task SendClipboardAsync(RemoteControlSession session, RelayStream stream, CancellationToken cancellationToken)
+  {
+    if (!session.Permissions.ReadClipboard)
+    {
+      logger.LogDebug("A viewer without the clipboard-read permission asked for session {SessionId}'s clipboard.", session.Id);
+      return;
+    }
+
+    var text = await clipboard.GetTextAsync() ?? string.Empty;
+    await stream.SendAsync(StreamMessageType.ClipboardText, new ClipboardText(Clipboard.Limit(text)), cancellationToken);
   }
 }

@@ -131,6 +131,54 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task TheClipboardButtons_FollowTheClipboardPermissions()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true, ReadClipboard: false, WriteClipboard: false));
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    Assert.DoesNotContain("Send clipboard", page.Markup);
+    Assert.DoesNotContain("Get clipboard", page.Markup);
+  }
+
+  [Fact]
+  public async Task SendClipboard_ReadsTheBrowsersClipboard_AndSendsIt()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true, WriteClipboard: true));
+    JSInterop.Setup<string?>("readClipboard").SetResult("from the browser");
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    page.FindAll("button").First(b => b.TextContent.Contains("Send clipboard")).Click();
+
+    page.WaitForAssertion(() => Assert.Contains("clipboard-set from the browser", _remote.Calls));
+  }
+
+  [Fact]
+  public async Task GetClipboard_AsksTheDevice_AndWritesTheAnswerToTheBrowser()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true, ReadClipboard: true));
+    JSInterop.Setup<bool>("writeClipboard", _ => true).SetResult(true);
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    page.FindAll("button").First(b => b.TextContent.Contains("Get clipboard")).Click();
+    page.WaitForAssertion(() => Assert.Contains("clipboard-get", _remote.Calls));
+
+    _remote.RaiseClipboardText("from the device");
+
+    page.WaitForAssertion(() => Assert.Contains(
+      JSInterop.Invocations,
+      i => i.Identifier == "writeClipboard" && (string?)i.Arguments[0] == "from the device"));
+  }
+
+  [Fact]
   public async Task WhenTheSessionEnds_ItSaysWhy()
   {
     await LoadAsync(_device);

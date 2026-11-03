@@ -96,11 +96,23 @@ else
             {
                 <SdButton Variant="ButtonVariant.Secondary" OnClick="CtrlAltDelAsync">Ctrl+Alt+Del</SdButton>
             }
+            @if (canWriteClipboard)
+            {
+                <SdButton Variant="ButtonVariant.Ghost" OnClick="SendClipboardAsync">Send clipboard</SdButton>
+            }
+            @if (canReadClipboard)
+            {
+                <SdButton Variant="ButtonVariant.Ghost" OnClick="GetClipboardAsync">Get clipboard</SdButton>
+            }
             <SdButton Variant="ButtonVariant.Ghost" OnClick="FullScreenAsync">Full screen</SdButton>
             <SdButton Variant="ButtonVariant.Ghost" OnClick="EndSession">End session</SdButton>
             @if (!canInteract)
             {
                 <span class="sd-muted">View only</span>
+            }
+            @if (clipboardNote is { Length: > 0 })
+            {
+                <span class="sd-muted">@clipboardNote</span>
             }
         </div>
     }
@@ -118,6 +130,9 @@ else
     private bool? canSeeDesktop;
     private bool canInteract;
     private bool canSendCtrlAltDel;
+    private bool canReadClipboard;
+    private bool canWriteClipboard;
+    private string clipboardNote = string.Empty;
     private string accessError = "You may not see this device's desktop.";
     private ViewState state = ViewState.Idle;
     private string endedReason = string.Empty;
@@ -193,6 +208,8 @@ else
             canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
             canInteract = actions is { Accepted: true, Value.ControlDesktop: true };
             canSendCtrlAltDel = actions is { Accepted: true, Value.SendCtrlAltDel: true };
+            canReadClipboard = actions is { Accepted: true, Value.ReadClipboard: true };
+            canWriteClipboard = actions is { Accepted: true, Value.WriteClipboard: true };
             accessError = actions.Accepted ? "You may not see this device's desktop." : actions.Error ?? "The server refused.";
         }
 
@@ -250,6 +267,7 @@ else
         connection = Connections.Create(new Uri(Nav.BaseUri), tickets);
         connection.DisplaysChanged += OnDisplays;
         connection.RegionsReceived += OnRegions;
+        connection.ClipboardTextReceived += OnClipboardText;
         connection.Ended += reason => _ = InvokeAsync(() => End(reason));
         cts = new CancellationTokenSource();
 
@@ -286,6 +304,44 @@ else
     }
 
     private Task CtrlAltDelAsync() => connection?.CtrlAltDelAsync() ?? Task.CompletedTask;
+
+    // Sends the browser's clipboard text to the device.
+    private async Task SendClipboardAsync()
+    {
+        if (connection is not { } ready || module is not { } js)
+        {
+            return;
+        }
+
+        var text = await js.InvokeAsync<string?>("readClipboard");
+        if (string.IsNullOrEmpty(text))
+        {
+            clipboardNote = "Nothing to send, or the browser blocked reading its clipboard.";
+            return;
+        }
+
+        await ready.SendClipboardTextAsync(text);
+        clipboardNote = "Clipboard sent to the device.";
+    }
+
+    // Asks the device for its clipboard; the answer arrives at OnClipboardText.
+    private async Task GetClipboardAsync()
+    {
+        if (connection is { } ready)
+        {
+            clipboardNote = "Getting the device's clipboard...";
+            await ready.RequestClipboardAsync();
+        }
+    }
+
+    private void OnClipboardText(string text) => _ = InvokeAsync(async () =>
+    {
+        var wrote = module is { } js && await js.InvokeAsync<bool>("writeClipboard", text);
+        clipboardNote = wrote
+            ? "The device's clipboard is now in your browser."
+            : "Got the device's clipboard, but the browser blocked writing it.";
+        StateHasChanged();
+    });
 
     private async Task FullScreenAsync()
     {

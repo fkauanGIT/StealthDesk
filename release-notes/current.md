@@ -37,6 +37,10 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   screen on a canvas as regions arrive, and (with the control permission) sends the viewer's mouse and keyboard;
   view-only otherwise. A toolbar chooses the display and the quality, sends Ctrl+Alt+Del, goes full screen and ends
   the session; when the device has several Windows sessions, one is chosen first. Leaving the page ends the session
+- The clipboard moves between the browser and the device on demand, from the remote control toolbar: **Send clipboard**
+  puts the browser's text on the device (with `device.clipboard.write`), **Get clipboard** brings the device's text
+  into the browser (with `device.clipboard.read`); each is refused without its permission, and the text is capped at
+  1 MB
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;

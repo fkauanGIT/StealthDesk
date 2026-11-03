@@ -30,6 +30,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   /// <summary>How the stream is doing, once a second.</summary>
   public event Action<CaptureMetrics>? MetricsReceived;
 
+  /// <summary>The device's clipboard text, in answer to a request.</summary>
+  public event Action<string>? ClipboardTextReceived;
+
   /// <summary>Done when the session ends, with why (the relay closing, the device leaving, an error).</summary>
   public event Action<string>? Ended;
 
@@ -70,6 +73,10 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   public Task ResetKeyboardAsync() => SendAsync(StreamMessageType.ResetKeyboard, new ResetKeyboard());
 
   public Task CtrlAltDelAsync() => SendAsync(StreamMessageType.CtrlAltDel, new CtrlAltDel());
+
+  public Task SendClipboardTextAsync(string text) => SendAsync(StreamMessageType.ClipboardText, new ClipboardText(Clipboard.Limit(text)));
+
+  public Task RequestClipboardAsync() => SendAsync(StreamMessageType.RequestClipboard, new RequestClipboard());
 
   public async ValueTask DisposeAsync()
   {
@@ -129,6 +136,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
           break;
         case StreamMessageType.CaptureMetrics:
           MetricsReceived?.Invoke(MessagePackSerializer.Deserialize<CaptureMetrics>(message.Payload));
+          break;
+        case StreamMessageType.ClipboardText:
+          ClipboardTextReceived?.Invoke(MessagePackSerializer.Deserialize<ClipboardText>(message.Payload).Text);
           break;
         default:
           logger.LogDebug("The viewer ignored a {Type} message.", message.Type);

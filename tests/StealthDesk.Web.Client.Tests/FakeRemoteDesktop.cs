@@ -8,6 +8,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
 {
     public event Action<DisplayList>? DisplaysChanged;
     public event Action<ScreenRegions>? RegionsReceived;
+    public event Action<string>? ClipboardTextReceived;
     public event Action<string>? Ended;
 
     public List<string> Calls { get; } = [];
@@ -54,6 +55,12 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public Task ResetKeyboardAsync() => Record("reset");
 
     public Task CtrlAltDelAsync() => Record("ctrlaltdel");
+
+    public Task SendClipboardTextAsync(string text) => Record($"clipboard-set {text}");
+
+    public Task RequestClipboardAsync() => Record("clipboard-get");
+
+    public void RaiseClipboardText(string text) => ClipboardTextReceived?.Invoke(text);
 
     public ValueTask DisposeAsync()
     {
