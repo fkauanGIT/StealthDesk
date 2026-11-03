@@ -20,6 +20,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private static readonly Uri Address = new("wss://desk.example.com/relay?sessionId=1&role=Device&token=secret");
 
   private readonly Notices _notices = new();
+  private readonly Fakes.FakeClipboard _clipboard = new();
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
@@ -151,15 +152,78 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     return ValueTask.CompletedTask;
   }
 
-  private static DesktopRemoteControlStart Request(bool notify) => new(
+  private static DesktopRemoteControlStart Request(bool notify, ViewerPermissions? permissions = null) => new(
     Guid.Parse("6f1c2d6e-8a51-4c3b-9a9e-1d2f3a4b5c6d"),
     Address,
     "tech@example.com",
-    new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false),
+    permissions ?? new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false),
     notify);
 
+  [Fact]
+  public async Task TheViewerSetsTheClipboard_WithTheWritePermission()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Writer));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    _ = viewer.RunAsync((_, _) => Task.CompletedTask, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.ClipboardText, new ClipboardText("copied text"), Token);
+
+    Assert.True(await Wait.UntilAsync(() => _clipboard.Text == "copied text"));
+  }
+
+  [Fact]
+  public async Task WithoutTheWritePermission_TheClipboardIsNotSet()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Reader));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    _ = viewer.RunAsync((_, _) => Task.CompletedTask, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.ClipboardText, new ClipboardText("blocked"), Token);
+    await Task.Delay(300, Token);
+
+    Assert.Null(_clipboard.Text);
+  }
+
+  [Fact]
+  public async Task TheViewerGetsTheDevicesClipboard_WithTheReadPermission()
+  {
+    _clipboard.Text = "device clipboard";
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Reader));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.RequestClipboard, new RequestClipboard(), Token);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ClipboardText)));
+    Assert.Equal("device clipboard", Read<ClipboardText>(received.First(x => x.Type == StreamMessageType.ClipboardText)).Text);
+  }
+
+  [Fact]
+  public async Task WithoutTheReadPermission_TheClipboardIsNotSentBack()
+  {
+    _clipboard.Text = "secret";
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Writer));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.RequestClipboard, new RequestClipboard(), Token);
+    await Task.Delay(300, Token);
+
+    Assert.DoesNotContain(received, x => x.Type == StreamMessageType.ClipboardText);
+  }
+
+  private static ViewerPermissions Writer => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: true);
+
+  private static ViewerPermissions Reader => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false);
+
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, new Fakes.NoInput(), _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, new Fakes.NoInput(), _clipboard, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

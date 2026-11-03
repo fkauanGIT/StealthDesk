@@ -34,3 +34,8 @@ GetSystemMetrics
 GetMessageExtraInfo
 GetAsyncKeyState
 SendSAS
+OpenClipboard
+CloseClipboard
+GetClipboardData
+SetClipboardData
+EmptyClipboard

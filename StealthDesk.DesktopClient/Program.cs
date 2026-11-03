@@ -50,6 +50,7 @@ builder.Services.AddSingleton<Func<IScreenCapture>>(provider => () =>
   : throw new PlatformNotSupportedException());
 builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputInjector, WindowsInput>();
+builder.Services.AddSingleton<IClipboard, WindowsClipboard>();
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(
