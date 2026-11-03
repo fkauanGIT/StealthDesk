@@ -375,8 +375,10 @@ jobs:
           dotnet build tests/StealthDesk.Web.UITests --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The browser tests didn't build." }
 
-      # One step: a process a step starts is ended with that step on Windows runners.
-      - name: Run the terminal and remote control end to end, through the server, from a browser
+      # One step: a process a step starts is ended with that step on Windows runners. Each end-to-end class gets its
+      # own server: the first user to register becomes the owner and closes public registration, so a second class on
+      # the same server couldn't register its own admin.
+      - name: Run a terminal on the image's agent, through the server, from a browser
         run: |
           $env:ASPNETCORE_ENVIRONMENT = "Development"
           $server = Start-Process dotnet -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-errors.log -ArgumentList `
@@ -391,12 +393,39 @@ jobs:
 
             $env:STEALTHDESK_UI_SERVER = "http://localhost:5099"
             $env:STEALTHDESK_UI_AGENT = "$PWD/image-agent/StealthDesk.Agent.exe"
-            dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.TerminalEndToEndTests -class StealthDesk.Web.UITests.RemoteControlEndToEndTests
-            if ($LASTEXITCODE -ne 0) { throw "The end-to-end tests failed." }
+            dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.TerminalEndToEndTests
+            if ($LASTEXITCODE -ne 0) { throw "The terminal end-to-end tests failed." }
           }
           catch {
             Write-Host "--- server log"
             Get-Content server.log, server-errors.log -ErrorAction SilentlyContinue
+            throw
+          }
+          finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Drive remote control on the image's agent, through the server, from a browser
+        run: |
+          $env:ASPNETCORE_ENVIRONMENT = "Development"
+          $server = Start-Process dotnet -PassThru -RedirectStandardOutput rc-server.log -RedirectStandardError rc-server-errors.log -ArgumentList `
+            "run", "--project", "StealthDesk.Web.Server", "--configuration", "Release", "--no-build", "--no-launch-profile", "--",
+            "--urls", "http://localhost:5100", "--UseInMemoryDatabase", "true"
+          try {
+            $ready = $false
+            for ($attempt = 1; $attempt -le 60 -and -not $ready; $attempt++) {
+              try { Invoke-RestMethod http://localhost:5100/health/ready | Out-Null; $ready = $true } catch { Start-Sleep -Seconds 2 }
+            }
+            if (-not $ready) { throw "The server didn't become ready." }
+
+            $env:STEALTHDESK_UI_SERVER = "http://localhost:5100"
+            $env:STEALTHDESK_UI_AGENT = "$PWD/image-agent/StealthDesk.Agent.exe"
+            dotnet run --project tests/StealthDesk.Web.UITests --configuration Release --no-build -- -class StealthDesk.Web.UITests.RemoteControlEndToEndTests
+            if ($LASTEXITCODE -ne 0) { throw "The remote control end-to-end tests failed." }
+          }
+          catch {
+            Write-Host "--- server log"
+            Get-Content rc-server.log, rc-server-errors.log -ErrorAction SilentlyContinue
             throw
           }
           finally {
