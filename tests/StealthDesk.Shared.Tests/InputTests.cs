@@ -160,3 +160,41 @@ public class RemoteInputTests
     public void CtrlAltDel() => Log.Add("ctrlaltdel");
   }
 }
+
+public class SecureDesktopTrackerTests
+{
+  [Fact]
+  public void WithoutPermission_ItNotifiesEnteringAndLeavingASecureScreen_Once()
+  {
+    var tracker = new SecureDesktopTracker();
+
+    Assert.Null(tracker.Poll("Default", canUseSecureScreens: false).Notify);
+    var entered = tracker.Poll("Winlogon", canUseSecureScreens: false);
+    Assert.Equal(new StealthDesk.Contracts.RemoteControl.SecureDesktop(true, "Winlogon"), entered.Notify);
+    Assert.False(entered.Follow);
+    Assert.Null(tracker.Poll("Winlogon", canUseSecureScreens: false).Notify);
+    var left = tracker.Poll("Default", canUseSecureScreens: false);
+    Assert.Equal(new StealthDesk.Contracts.RemoteControl.SecureDesktop(false, null), left.Notify);
+  }
+
+  [Fact]
+  public void WithPermission_ItFollowsTheSecureScreen_AndNeverNotifies()
+  {
+    var tracker = new SecureDesktopTracker();
+
+    var secure = tracker.Poll("Winlogon", canUseSecureScreens: true);
+    Assert.True(secure.Follow);
+    Assert.Null(secure.Notify);
+    var normal = tracker.Poll("Default", canUseSecureScreens: true);
+    Assert.False(normal.Follow);
+    Assert.Null(normal.Notify);
+  }
+
+  [Fact]
+  public void AnUnreadableDesktop_CountsAsNormal()
+  {
+    var tracker = new SecureDesktopTracker();
+    Assert.Null(tracker.Poll(null, canUseSecureScreens: false).Notify);
+    Assert.False(tracker.Poll(null, canUseSecureScreens: true).Follow);
+  }
+}

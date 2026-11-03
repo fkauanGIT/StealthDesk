@@ -73,6 +73,7 @@ internal sealed class RemoteControlSessions(
   RegionEncoder encode,
   IInputInjector injector,
   IClipboard clipboard,
+  IInputDesktop inputDesktop,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -135,9 +136,11 @@ internal sealed class RemoteControlSessions(
         var input = new RemoteInput(injector, () => streamer.Shown, session.Permissions, logger);
         using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         var sending = streamer.RunAsync(streaming.Token);
+        var guarding = MonitorDesktopAsync(session, stream, streaming.Token);
         var ended = await stream.RunAsync((message, ct) => HandleAsync(session, streamer, input, stream, message, ct), lifetime.ApplicationStopping);
         await streaming.CancelAsync();
         await sending;
+        await guarding;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
       }
     }
@@ -163,6 +166,42 @@ internal sealed class RemoteControlSessions(
       }
 
       session.Finish();
+    }
+  }
+
+  /// <summary>How often the input desktop is checked, to follow a secure screen or tell the viewer about it.</summary>
+  private static readonly TimeSpan DesktopCheck = TimeSpan.FromMilliseconds(500);
+
+  // Follows the input desktop onto a secure screen for a viewer allowed to use it, and tells a viewer who isn't that
+  // one is up (and when it goes away).
+  private async Task MonitorDesktopAsync(RemoteControlSession session, RelayStream stream, CancellationToken cancellationToken)
+  {
+    var tracker = new SecureDesktopTracker();
+    try
+    {
+      while (!cancellationToken.IsCancellationRequested)
+      {
+        var decision = tracker.Poll(inputDesktop.Name(), session.Permissions.UseSecureScreens);
+        if (decision.Follow)
+        {
+          inputDesktop.SwitchToInput();
+        }
+
+        if (decision.Notify is { } notify)
+        {
+          await stream.SendAsync(StreamMessageType.SecureDesktop, notify, cancellationToken);
+        }
+
+        await Task.Delay(DesktopCheck, clock, cancellationToken);
+      }
+    }
+    catch (OperationCanceledException)
+    {
+      // The session ended.
+    }
+    catch (Exception ex)
+    {
+      logger.LogDebug(ex, "Watching the input desktop of session {SessionId} stopped.", session.Id);
     }
   }
 

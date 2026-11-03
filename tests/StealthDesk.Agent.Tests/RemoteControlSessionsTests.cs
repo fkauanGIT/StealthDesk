@@ -21,6 +21,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
 
   private readonly Notices _notices = new();
   private readonly Fakes.FakeClipboard _clipboard = new();
+  private readonly Fakes.FakeInputDesktop _inputDesktop = new();
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
@@ -218,12 +219,44 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     Assert.DoesNotContain(received, x => x.Type == StreamMessageType.ClipboardText);
   }
 
+  [Fact]
+  public async Task WithoutTheElevatedPermission_TheViewerIsToldAboutASecureScreen()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Reader));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    _inputDesktop.Set("Winlogon");
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.SecureDesktop && Read<SecureDesktop>(x).Active)));
+    Assert.Equal(0, _inputDesktop.Followed);
+  }
+
+  [Fact]
+  public async Task WithTheElevatedPermission_TheClientFollowsTheSecureScreen()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Elevated));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    _inputDesktop.Set("Winlogon");
+
+    Assert.True(await Wait.UntilAsync(() => _inputDesktop.Followed > 0));
+    Assert.DoesNotContain(received, x => x.Type == StreamMessageType.SecureDesktop);
+  }
+
+  private static ViewerPermissions Elevated => new(Interact: true, UseSecureScreens: true, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false);
+
   private static ViewerPermissions Writer => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: true);
 
   private static ViewerPermissions Reader => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, new Fakes.NoInput(), _clipboard, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, new Fakes.NoInput(), _clipboard, _inputDesktop, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

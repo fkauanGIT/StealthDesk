@@ -39,3 +39,8 @@ CloseClipboard
 GetClipboardData
 SetClipboardData
 EmptyClipboard
+OpenInputDesktop
+GetThreadDesktop
+SetThreadDesktop
+CloseDesktop
+GetUserObjectInformation

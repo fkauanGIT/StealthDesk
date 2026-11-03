@@ -33,6 +33,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   /// <summary>The device's clipboard text, in answer to a request.</summary>
   public event Action<string>? ClipboardTextReceived;
 
+  /// <summary>The device moved to or away from a secure screen the viewer may not see.</summary>
+  public event Action<SecureDesktop>? SecureDesktopChanged;
+
   /// <summary>Done when the session ends, with why (the relay closing, the device leaving, an error).</summary>
   public event Action<string>? Ended;
 
@@ -139,6 +142,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
           break;
         case StreamMessageType.ClipboardText:
           ClipboardTextReceived?.Invoke(MessagePackSerializer.Deserialize<ClipboardText>(message.Payload).Text);
+          break;
+        case StreamMessageType.SecureDesktop:
+          SecureDesktopChanged?.Invoke(MessagePackSerializer.Deserialize<SecureDesktop>(message.Payload));
           break;
         default:
           logger.LogDebug("The viewer ignored a {Type} message.", message.Type);

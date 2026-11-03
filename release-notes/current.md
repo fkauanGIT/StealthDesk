@@ -41,6 +41,10 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   puts the browser's text on the device (with `device.clipboard.write`), **Get clipboard** brings the device's text
   into the browser (with `device.clipboard.read`); each is refused without its permission, and the text is capped at
   1 MB
+- Remote control follows the device onto secure screens (a UAC prompt, the lock screen, Ctrl+Alt+Del): with
+  `device.remote-control.elevated-desktop` the viewer sees and uses them; without it, the viewer is told a secure
+  screen is up and that the view will return when it goes away. The agent keeps a desktop client running through
+  session changes
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;

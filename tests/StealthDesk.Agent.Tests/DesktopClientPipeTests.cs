@@ -317,6 +317,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
       FakeScreen.Encode,
       new Fakes.NoInput(),
       new Fakes.FakeClipboard(),
+      new Fakes.FakeInputDesktop(),
       new SilentNotice(),
       TimeProvider.System,
       _clientLifetime,

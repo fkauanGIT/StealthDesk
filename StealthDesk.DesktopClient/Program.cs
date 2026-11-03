@@ -51,6 +51,7 @@ builder.Services.AddSingleton<Func<IScreenCapture>>(provider => () =>
 builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputInjector, WindowsInput>();
 builder.Services.AddSingleton<IClipboard, WindowsClipboard>();
+builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputDesktop, WindowsInputDesktop>();
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(

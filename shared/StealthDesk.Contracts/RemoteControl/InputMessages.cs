@@ -63,6 +63,15 @@ public sealed record ClipboardText(string Text);
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record RequestClipboard;
 
+/// <summary>
+/// The device moved to, or away from, a secure screen (a UAC prompt, the lock screen, or Ctrl+Alt+Del), which a
+/// viewer without the elevated-desktop permission can't see. The viewer shows a message while <paramref name="Active"/>.
+/// </summary>
+/// <param name="Active">A secure screen is shown now.</param>
+/// <param name="Screen">The desktop's name, for the message; null when it went back to the normal desktop.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record SecureDesktop(bool Active, string? Screen);
+
 /// <summary>Limits shared by both ends for the clipboard.</summary>
 public static class Clipboard
 {
