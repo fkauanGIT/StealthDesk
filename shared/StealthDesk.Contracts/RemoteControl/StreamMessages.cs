@@ -49,6 +49,15 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.CtrlAltDel"/>, from the viewer: send the secure attention sequence.</summary>
   CtrlAltDel = 15,
+
+  /// <summary>
+  /// <see cref="RemoteControl.ClipboardText"/>: from the viewer to set the device's clipboard, and from the desktop
+  /// client in answer to <see cref="RequestClipboard"/>.
+  /// </summary>
+  ClipboardText = 16,
+
+  /// <summary><see cref="RemoteControl.RequestClipboard"/>, from the viewer: send the device's clipboard text back.</summary>
+  RequestClipboard = 17,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>

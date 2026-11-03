@@ -51,3 +51,24 @@ public sealed record ResetKeyboard;
 /// <summary>Send Ctrl+Alt+Del to the device's session.</summary>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record CtrlAltDel;
+
+/// <summary>
+/// Clipboard text, sent to set the device's clipboard or returned as the device's clipboard. Text longer than
+/// <see cref="Clipboard.MaxTextLength"/> is cut, so one side can't flood the other.
+/// </summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record ClipboardText(string Text);
+
+/// <summary>Ask the device for its clipboard text, which comes back as a <see cref="ClipboardText"/>.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record RequestClipboard;
+
+/// <summary>Limits shared by both ends for the clipboard.</summary>
+public static class Clipboard
+{
+  /// <summary>The most clipboard text carried in one direction; longer text is cut to this.</summary>
+  public const int MaxTextLength = 1024 * 1024;
+
+  /// <summary>Text no longer than the limit.</summary>
+  public static string Limit(string text) => text.Length > MaxTextLength ? text[..MaxTextLength] : text;
+}
