@@ -45,6 +45,8 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   `device.remote-control.elevated-desktop` the viewer sees and uses them; without it, the viewer is told a secure
   screen is up and that the view will return when it goes away. The agent keeps a desktop client running through
   session changes
+- Remote control is tested end to end in CI on Windows: a real agent and the server, driven from a browser, cover
+  the permission to connect and the page's states
 
 **Installing agents**
 - The server hands out a zip of the agent and its desktop client (`StealthDesk.Agent.zip`) instead of the agent alone;
