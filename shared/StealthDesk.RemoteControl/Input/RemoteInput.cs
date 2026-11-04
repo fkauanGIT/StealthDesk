@@ -91,6 +91,18 @@ public sealed class RemoteInput(IInputInjector injector, Func<DisplayInfo?> show
     injector.CtrlAltDel();
   }
 
+  /// <summary>Blocks or unblocks the device's own mouse and keyboard; null without the permission, else the result.</summary>
+  public bool? SetBlockInput(bool active)
+  {
+    if (!permissions.BlockInput)
+    {
+      logger.LogDebug("A viewer without the block-input permission tried to use it.");
+      return null;
+    }
+
+    return injector.SetBlockInput(active);
+  }
+
   // A plain character the device's own layout should produce, as opposed to a named or shortcut key.
   private static bool IsTypable(string key, KeyModifiers modifiers) =>
     key.Length == 1 && !char.IsControl(key[0]) && !modifiers.HasShortcut;

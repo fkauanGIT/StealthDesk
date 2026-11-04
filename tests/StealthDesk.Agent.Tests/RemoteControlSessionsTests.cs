@@ -22,6 +22,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private readonly Notices _notices = new();
   private readonly Fakes.FakeClipboard _clipboard = new();
   private readonly Fakes.FakeInputDesktop _inputDesktop = new();
+  private readonly Fakes.NoInput _input = new();
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
@@ -77,7 +78,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     var session = Assert.Single(sessions.Running);
     Assert.True(await Wait.UntilAsync(() => _notices.Shown.Count == 1));
     Assert.Equal(Address, Assert.Single(_joined));
-    Assert.Equal(new ViewerPermissions(Interact: true, false, false, ReadClipboard: true, false), session.Permissions);
+    Assert.Equal(new ViewerPermissions(Interact: true, false, false, ReadClipboard: true, false, false), session.Permissions);
 
     await relay.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "The other end left.", Token);
     await session.Ended.WaitAsync(TimeSpan.FromSeconds(5), Token);
@@ -157,7 +158,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     Guid.Parse("6f1c2d6e-8a51-4c3b-9a9e-1d2f3a4b5c6d"),
     Address,
     "tech@example.com",
-    permissions ?? new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false),
+    permissions ?? new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false, BlockInput: false),
     notify);
 
   [Fact]
@@ -220,6 +221,53 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   }
 
   [Fact]
+  public async Task TheViewerBlocksInput_WithThePermission_AndGetsItConfirmed()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Blocker));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.BlockInput, new BlockInput(true), Token);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.BlockInput)));
+    Assert.True(Read<BlockInput>(received.First(x => x.Type == StreamMessageType.BlockInput)).Active);
+  }
+
+  [Fact]
+  public async Task WhenTheSessionEnds_InputIsUnblocked_EvenIfItNeverWasBlocked()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Blocker));
+    var session = Assert.Single(sessions.Running);
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    _ = viewer.RunAsync((_, _) => Task.CompletedTask, _lifetime.ApplicationStopping);
+    await viewer.SendAsync(StreamMessageType.BlockInput, new BlockInput(true), Token);
+    Assert.True(await Wait.UntilAsync(() => _input.BlockInputCalls.Contains(true)));
+
+    await relay.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "The other end left.", Token);
+    await session.Ended.WaitAsync(TimeSpan.FromSeconds(5), Token);
+
+    Assert.False(Assert.Single(_input.BlockInputCalls, x => !x));
+  }
+
+  [Fact]
+  public async Task WithoutThePermission_BlockInputIsIgnored()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, Reader));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.BlockInput, new BlockInput(true), Token);
+    await Task.Delay(300, Token);
+
+    Assert.DoesNotContain(received, x => x.Type == StreamMessageType.BlockInput);
+  }
+
+  [Fact]
   public async Task WithoutTheElevatedPermission_TheViewerIsToldAboutASecureScreen()
   {
     var (relay, sessions) = await ConnectedAsync();
@@ -249,14 +297,16 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     Assert.DoesNotContain(received, x => x.Type == StreamMessageType.SecureDesktop);
   }
 
-  private static ViewerPermissions Elevated => new(Interact: true, UseSecureScreens: true, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false);
+  private static ViewerPermissions Elevated => new(Interact: true, UseSecureScreens: true, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: false);
 
-  private static ViewerPermissions Writer => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: true);
+  private static ViewerPermissions Writer => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: true, BlockInput: false);
 
-  private static ViewerPermissions Reader => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false);
+  private static ViewerPermissions Reader => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: true, WriteClipboard: false, BlockInput: false);
+
+  private static ViewerPermissions Blocker => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: true);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, new Fakes.NoInput(), _clipboard, _inputDesktop, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

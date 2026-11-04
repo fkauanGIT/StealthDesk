@@ -10,6 +10,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public event Action<ScreenRegions>? RegionsReceived;
     public event Action<string>? ClipboardTextReceived;
     public event Action<SecureDesktop>? SecureDesktopChanged;
+    public event Action<bool>? BlockInputChanged;
     public event Action<string>? Ended;
 
     public List<string> Calls { get; } = [];
@@ -57,6 +58,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
 
     public Task CtrlAltDelAsync() => Record("ctrlaltdel");
 
+    public Task SetBlockInputAsync(bool active) => Record($"blockinput {active}");
+
     public Task SendClipboardTextAsync(string text) => Record($"clipboard-set {text}");
 
     public Task RequestClipboardAsync() => Record("clipboard-get");
@@ -64,6 +67,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public void RaiseClipboardText(string text) => ClipboardTextReceived?.Invoke(text);
 
     public void RaiseSecureDesktop(SecureDesktop message) => SecureDesktopChanged?.Invoke(message);
+
+    public void RaiseBlockInput(bool active) => BlockInputChanged?.Invoke(active);
 
     public ValueTask DisposeAsync()
     {

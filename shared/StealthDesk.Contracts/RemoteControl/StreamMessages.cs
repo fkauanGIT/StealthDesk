@@ -61,6 +61,12 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.SecureDesktop"/>, from the desktop client: a secure screen is or isn't shown.</summary>
   SecureDesktop = 18,
+
+  /// <summary>
+  /// <see cref="RemoteControl.BlockInput"/>: from the viewer, to block or unblock the device's own mouse and
+  /// keyboard; from the desktop client, in answer, with the blocking's actual state.
+  /// </summary>
+  BlockInput = 19,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>

@@ -179,6 +179,39 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task TheBlockInputButton_FollowsThePermission_AndTogglesOnClick()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true, BlockInput: false));
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    Assert.DoesNotContain("Block input", page.Markup);
+  }
+
+  [Fact]
+  public async Task WithThePermission_TheBlockInputButton_TogglesAndShowsTheDevicesConfirmation()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true, BlockInput: true));
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    page.FindAll("button").First(b => b.TextContent == "Block input").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("blockinput True", _remote.Calls));
+    Assert.Contains("Block input", page.Markup);
+
+    _remote.RaiseBlockInput(true);
+    page.WaitForAssertion(() => Assert.Contains("Unblock input", page.Markup));
+
+    page.FindAll("button").First(b => b.TextContent == "Unblock input").Click();
+    page.WaitForAssertion(() => Assert.Contains("blockinput False", _remote.Calls));
+  }
+
+  [Fact]
   public async Task ASecureScreen_IsShownToTheViewer_AndClearsWhenItGoesAway()
   {
     await LoadAsync(_device);

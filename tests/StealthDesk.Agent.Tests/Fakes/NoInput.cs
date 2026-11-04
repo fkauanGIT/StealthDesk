@@ -5,6 +5,8 @@ namespace StealthDesk.Agent.Tests.Fakes;
 /// <summary>An input injector that does nothing, for sessions whose input isn't what a test looks at.</summary>
 internal sealed class NoInput : IInputInjector
 {
+  public List<bool> BlockInputCalls { get; } = [];
+
   public void MovePointer(int x, int y) { }
 
   public void MouseButton(int x, int y, int button, bool isPressed) { }
@@ -18,4 +20,10 @@ internal sealed class NoInput : IInputInjector
   public void ResetKeys() { }
 
   public void CtrlAltDel() { }
+
+  public bool SetBlockInput(bool active)
+  {
+    BlockInputCalls.Add(active);
+    return true;
+  }
 }

@@ -96,6 +96,10 @@ else
             {
                 <SdButton Variant="ButtonVariant.Secondary" OnClick="CtrlAltDelAsync">Ctrl+Alt+Del</SdButton>
             }
+            @if (canBlockInput)
+            {
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="ToggleBlockInputAsync">@(blockInputActive ? "Unblock input" : "Block input")</SdButton>
+            }
             @if (canWriteClipboard)
             {
                 <SdButton Variant="ButtonVariant.Ghost" OnClick="SendClipboardAsync">Send clipboard</SdButton>
@@ -137,6 +141,8 @@ else
     private bool canSendCtrlAltDel;
     private bool canReadClipboard;
     private bool canWriteClipboard;
+    private bool canBlockInput;
+    private bool blockInputActive;
     private string clipboardNote = string.Empty;
     private bool secureScreen;
     private string? secureScreenName;
@@ -217,6 +223,7 @@ else
             canSendCtrlAltDel = actions is { Accepted: true, Value.SendCtrlAltDel: true };
             canReadClipboard = actions is { Accepted: true, Value.ReadClipboard: true };
             canWriteClipboard = actions is { Accepted: true, Value.WriteClipboard: true };
+            canBlockInput = actions is { Accepted: true, Value.BlockInput: true };
             accessError = actions.Accepted ? "You may not see this device's desktop." : actions.Error ?? "The server refused.";
         }
 
@@ -276,6 +283,7 @@ else
         connection.RegionsReceived += OnRegions;
         connection.ClipboardTextReceived += OnClipboardText;
         connection.SecureDesktopChanged += OnSecureDesktop;
+        connection.BlockInputChanged += OnBlockInput;
         connection.Ended += reason => _ = InvokeAsync(() => End(reason));
         cts = new CancellationTokenSource();
 
@@ -312,6 +320,14 @@ else
     }
 
     private Task CtrlAltDelAsync() => connection?.CtrlAltDelAsync() ?? Task.CompletedTask;
+
+    private Task ToggleBlockInputAsync() => connection?.SetBlockInputAsync(!blockInputActive) ?? Task.CompletedTask;
+
+    private void OnBlockInput(bool active) => _ = InvokeAsync(() =>
+    {
+        blockInputActive = active;
+        StateHasChanged();
+    });
 
     // Sends the browser's clipboard text to the device.
     private async Task SendClipboardAsync()
@@ -478,6 +494,7 @@ else
         }
 
         await Hub.EndDeviceAccessAsync();
+        blockInputActive = false;
         self?.Dispose();
         self = null;
         cts?.Dispose();

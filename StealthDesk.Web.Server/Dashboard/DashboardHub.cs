@@ -118,7 +118,8 @@ public sealed class DashboardHub(
       UseSecureScreens: await MayAsync(device, PermissionNames.DeviceRemoteControlElevatedDesktop),
       SendCtrlAltDel: await MayAsync(device, PermissionNames.DeviceCtrlAltDelSend),
       ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
-      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite)));
+      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite),
+      BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput)));
   }
 
   /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>
@@ -210,7 +211,8 @@ public sealed class DashboardHub(
       UseSecureScreens: await MayAsync(device, PermissionNames.DeviceRemoteControlElevatedDesktop),
       SendCtrlAltDel: await MayAsync(device, PermissionNames.DeviceCtrlAltDelSend),
       ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
-      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite));
+      WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite),
+      BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput));
     var notifyUser = await tenantSettings.NotifyUserOnRemoteControlAsync(device.TenantId, Context.ConnectionAborted);
     var viewerName = Context.User?.Identity?.Name ?? "A technician";
 

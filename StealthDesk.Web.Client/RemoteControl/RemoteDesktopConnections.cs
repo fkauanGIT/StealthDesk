@@ -14,6 +14,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<SecureDesktop>? SecureDesktopChanged;
 
+    event Action<bool>? BlockInputChanged;
+
     event Action<string>? Ended;
 
     Task StartAsync(CancellationToken cancellationToken);
@@ -33,6 +35,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
     Task ResetKeyboardAsync();
 
     Task CtrlAltDelAsync();
+
+    Task SetBlockInputAsync(bool active);
 
     Task SendClipboardTextAsync(string text);
 

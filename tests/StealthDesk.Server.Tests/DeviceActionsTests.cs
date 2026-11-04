@@ -94,6 +94,7 @@ public class DeviceActionsTests
     [PermissionNames.DeviceRemoteControlConnect] = x => x.SeeDesktop,
     [PermissionNames.DeviceRemoteControlInteract] = x => x.ControlDesktop,
     [PermissionNames.DeviceRemoteControlElevatedDesktop] = x => x.UseSecureScreens,
+    [PermissionNames.DeviceRemoteControlBlockInput] = x => x.BlockInput,
     [PermissionNames.DeviceCtrlAltDelSend] = x => x.SendCtrlAltDel,
     [PermissionNames.DeviceClipboardRead] = x => x.ReadClipboard,
     [PermissionNames.DeviceClipboardWrite] = x => x.WriteClipboard,

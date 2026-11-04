@@ -71,7 +71,7 @@ public class RemoteControlSessionTests
     await world.StartAsync();
 
     Assert.Equal(
-      [ViewerPermissions.ViewOnly, new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: true, ReadClipboard: true, WriteClipboard: false)],
+      [ViewerPermissions.ViewOnly, new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: true, ReadClipboard: true, WriteClipboard: false, BlockInput: false)],
       world.Agent.Requests.Select(x => x.Permissions));
   }
 

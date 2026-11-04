@@ -379,7 +379,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
     "device-token",
     desktopSession,
     "tech@example.com",
-    new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false),
+    new ViewerPermissions(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: false),
     NotifyUser: false);
 
   private DesktopClientRemoteControl RemoteControl() => new(

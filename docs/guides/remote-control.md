@@ -7,9 +7,10 @@ Remote control shows a device's desktop in the browser and lets you drive its mo
 
 Seeing the desktop takes `device.remote-control.connect`, on the device, a device group it is in, or the tenant.
 Controlling the mouse and keyboard also needs `device.remote-control.interact`; without it the session is view-only.
-`device.remote-control.elevated-desktop`, `device.ctrl-alt-del.send`, `device.clipboard.read` and
-`device.clipboard.write` each unlock one more thing, described below. The **Device Superuser** preset includes all
-of them. [Permissions](../explanation/permissions.md) explains how grants and denies combine.
+`device.remote-control.elevated-desktop`, `device.ctrl-alt-del.send`, `device.clipboard.read`,
+`device.clipboard.write` and `device.remote-control.block-input` each unlock one more thing, described below. The
+**Device Superuser** preset includes all of them. [Permissions](../explanation/permissions.md) explains how grants
+and denies combine.
 
 ## Opening a session
 
@@ -30,6 +31,7 @@ the whole screen comes first.
 | **Ctrl+Alt+Del** | Sends the secure attention sequence to the device's session | `device.ctrl-alt-del.send` |
 | **Send clipboard** | Reads the browser's clipboard and sets the device's | `device.clipboard.write` |
 | **Get clipboard** | Reads the device's clipboard into the browser's | `device.clipboard.read` |
+| **Block input** / **Unblock input** | Blocks or unblocks the device's own mouse and keyboard | `device.remote-control.block-input` |
 | **Full screen** | The desktop fills the browser window | — |
 | **End session** | Leaves and returns to the device's page | — |
 
@@ -55,6 +57,8 @@ A session ends when:
 - you choose **End session**, or leave the device's pages;
 - either end leaves the relay, or the browser's connection to the server drops;
 - the device goes offline.
+
+Blocking the device's input, if it was on, lifts automatically whenever the session ends, however it ends.
 
 ## What is recorded
 

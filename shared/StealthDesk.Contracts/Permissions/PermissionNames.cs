@@ -41,6 +41,7 @@ public static class PermissionNames
   public const string DeviceCtrlAltDelSend = "device.ctrl-alt-del.send";
   public const string DeviceGroupAssignDevices = "device-group.assign-devices";
   public const string DeviceRead = "device.read";
+  public const string DeviceRemoteControlBlockInput = "device.remote-control.block-input";
   public const string DeviceRemoteControlConnect = "device.remote-control.connect";
   public const string DeviceRemoteControlElevatedDesktop = "device.remote-control.elevated-desktop";
   public const string DeviceRemoteControlInteract = "device.remote-control.interact";

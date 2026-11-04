@@ -26,4 +26,7 @@ public interface IInputInjector
 
   /// <summary>Sends Ctrl+Alt+Del to this session.</summary>
   void CtrlAltDel();
+
+  /// <summary>Blocks or unblocks the session's own mouse and keyboard; true if it took effect.</summary>
+  bool SetBlockInput(bool active);
 }

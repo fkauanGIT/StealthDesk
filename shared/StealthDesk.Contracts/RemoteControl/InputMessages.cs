@@ -53,6 +53,14 @@ public sealed record ResetKeyboard;
 public sealed record CtrlAltDel;
 
 /// <summary>
+/// Block or unblock the device's own mouse and keyboard, from the viewer, and the desktop client's answer with the
+/// blocking's actual state.
+/// </summary>
+/// <param name="Active">Block the device's own mouse and keyboard while true.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record BlockInput(bool Active);
+
+/// <summary>
 /// Clipboard text, sent to set the device's clipboard or returned as the device's clipboard. Text longer than
 /// <see cref="Clipboard.MaxTextLength"/> is cut, so one side can't flood the other.
 /// </summary>
