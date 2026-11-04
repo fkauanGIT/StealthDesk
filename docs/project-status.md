@@ -95,4 +95,16 @@ terminal on a device, from the browser, for the people allowed to use it.
 - Each visit and terminal call is traced with the user and the device, never with what is typed
 - Tested end to end on Windows: the agent from the container image, through the server, from a browser
 
-Next up: **v0.7**, remote desktop.
+**v0.7 - Remote desktop (MVP)** ([#27](https://github.com/fkauanGIT/StealthDesk/issues/27)) is complete: seeing and
+driving a device's desktop from the browser.
+
+- A **Remote control** action opens a device's desktop in a `<canvas>`, streamed through a relay the server pairs the
+  browser and the device's desktop client on; DXGI desktop duplication, falling back to GDI, captures the screen
+- `device.remote-control.connect` to see it, `.interact` to drive the mouse and keyboard (otherwise view-only),
+  `.elevated-desktop` to follow secure screens such as UAC, `device.ctrl-alt-del.send` and `device.clipboard.read` /
+  `.write`, all part of the **Device Superuser** preset
+- The person at the device is told when a session starts and ends, unless the tenant turns that off
+- A desktop client the agent keeps running in every Windows session, built and shipped with the agent in one zip
+- Tested end to end on Windows: a real agent and the server, through a browser
+
+Next up: **v0.8**, remote desktop extras.
