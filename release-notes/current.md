@@ -1,7 +1,4 @@
-# vX.Y.Z — Name
-
-What the next release brings, written as each change lands. The heading becomes the release's title: before
-tagging, give it the version, which has to match the tag and Directory.Build.props.
+# v0.7.0 — Remote desktop (MVP)
 
 ## What's in it
 

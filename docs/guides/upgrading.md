@@ -11,7 +11,7 @@ Each [release](https://github.com/fkauanGIT/StealthDesk/releases) publishes the 
 3. In `docker-compose/.env`, set the new version, then start it:
 
     ```bash
-    # SERVER_IMAGE_TAG=0.6.0 in .env
+    # SERVER_IMAGE_TAG=0.7.0 in .env
     docker compose pull server
     docker compose up -d --wait
     ```
