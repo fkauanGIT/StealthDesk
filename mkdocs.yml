@@ -66,6 +66,7 @@ nav:
       - Encrypting the data protection keys: guides/encrypting-keys.md
       - Installing agents: guides/installing-agents.md
       - Using the terminal: guides/terminal.md
+      - Using remote control: guides/remote-control.md
       - Backing up and restoring: guides/backup-and-restore.md
       - Upgrading and rolling back: guides/upgrading.md
       - Accounts and sign-in: guides/accounts.md

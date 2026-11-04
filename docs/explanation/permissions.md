@@ -27,6 +27,15 @@ can. It is separate from reading the device (`device.read`), is part of the **De
 again on every command, so a deny takes effect on the next line typed. Give it only to people trusted with the
 devices' administrator passwords, on the devices or device groups they look after rather than the whole tenant.
 
+## Remote control
+
+`device.remote-control.connect` lets someone see a device's desktop in a [remote control](../guides/remote-control.md)
+session; `device.remote-control.interact` adds the mouse and keyboard, without which a session is view-only.
+`device.remote-control.elevated-desktop` follows the device onto secure screens such as UAC; `device.ctrl-alt-del.send`
+sends that key sequence; `device.clipboard.read` and `device.clipboard.write` move clipboard text each way. Each is
+separate from reading the device (`device.read`) and from each other, and all are part of the **Device Superuser**
+preset.
+
 ## Where they are checked
 
 Every API route and dashboard hub method checks its permission, and the device list, each device and live updates
