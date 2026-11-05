@@ -11,6 +11,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public event Action<string>? ClipboardTextReceived;
     public event Action<SecureDesktop>? SecureDesktopChanged;
     public event Action<bool>? BlockInputChanged;
+    public event Action<bool>? PrivacyScreenChanged;
     public event Action<string>? Ended;
 
     public List<string> Calls { get; } = [];
@@ -60,6 +61,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
 
     public Task SetBlockInputAsync(bool active) => Record($"blockinput {active}");
 
+    public Task SetPrivacyScreenAsync(bool active) => Record($"privacyscreen {active}");
+
     public Task SendClipboardTextAsync(string text) => Record($"clipboard-set {text}");
 
     public Task RequestClipboardAsync() => Record("clipboard-get");
@@ -69,6 +72,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public void RaiseSecureDesktop(SecureDesktop message) => SecureDesktopChanged?.Invoke(message);
 
     public void RaiseBlockInput(bool active) => BlockInputChanged?.Invoke(active);
+
+    public void RaisePrivacyScreen(bool active) => PrivacyScreenChanged?.Invoke(active);
 
     public ValueTask DisposeAsync()
     {

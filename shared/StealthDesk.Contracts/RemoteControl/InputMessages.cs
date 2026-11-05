@@ -61,6 +61,15 @@ public sealed record CtrlAltDel;
 public sealed record BlockInput(bool Active);
 
 /// <summary>
+/// Show or hide an opaque overlay covering every one of the device's displays, from the viewer, and the desktop
+/// client's answer with the overlay's actual state. The viewer's own screen capture keeps showing the real desktop
+/// underneath.
+/// </summary>
+/// <param name="Active">Show the overlay while true.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record PrivacyScreen(bool Active);
+
+/// <summary>
 /// Clipboard text, sent to set the device's clipboard or returned as the device's clipboard. Text longer than
 /// <see cref="Clipboard.MaxTextLength"/> is cut, so one side can't flood the other.
 /// </summary>

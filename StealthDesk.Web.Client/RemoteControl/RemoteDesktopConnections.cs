@@ -16,6 +16,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<bool>? BlockInputChanged;
 
+    event Action<bool>? PrivacyScreenChanged;
+
     event Action<string>? Ended;
 
     Task StartAsync(CancellationToken cancellationToken);
@@ -37,6 +39,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
     Task CtrlAltDelAsync();
 
     Task SetBlockInputAsync(bool active);
+
+    Task SetPrivacyScreenAsync(bool active);
 
     Task SendClipboardTextAsync(string text);
 

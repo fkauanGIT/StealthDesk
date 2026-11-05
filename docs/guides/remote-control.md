@@ -32,6 +32,7 @@ the whole screen comes first.
 | **Send clipboard** | Reads the browser's clipboard and sets the device's | `device.clipboard.write` |
 | **Get clipboard** | Reads the device's clipboard into the browser's | `device.clipboard.read` |
 | **Block input** / **Unblock input** | Blocks or unblocks the device's own mouse and keyboard | `device.remote-control.block-input` |
+| **Privacy screen** / **Hide privacy screen** | Blanks the device's own displays, on Windows; you keep seeing the real desktop | `device.remote-control.interact` |
 | **Full screen** | The desktop fills the browser window | — |
 | **End session** | Leaves and returns to the device's page | — |
 
@@ -58,7 +59,8 @@ A session ends when:
 - either end leaves the relay, or the browser's connection to the server drops;
 - the device goes offline.
 
-Blocking the device's input, if it was on, lifts automatically whenever the session ends, however it ends.
+Blocking the device's input and the privacy screen, if either was on, lift automatically whenever the session ends,
+however it ends.
 
 ## What is recorded
 
