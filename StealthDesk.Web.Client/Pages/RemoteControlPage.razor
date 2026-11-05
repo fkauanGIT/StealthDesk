@@ -100,6 +100,10 @@ else
             {
                 <SdButton Variant="ButtonVariant.Secondary" OnClick="ToggleBlockInputAsync">@(blockInputActive ? "Unblock input" : "Block input")</SdButton>
             }
+            @if (canInteract)
+            {
+                <SdButton Variant="ButtonVariant.Secondary" OnClick="TogglePrivacyScreenAsync">@(privacyScreenActive ? "Hide privacy screen" : "Privacy screen")</SdButton>
+            }
             @if (canWriteClipboard)
             {
                 <SdButton Variant="ButtonVariant.Ghost" OnClick="SendClipboardAsync">Send clipboard</SdButton>
@@ -143,6 +147,7 @@ else
     private bool canWriteClipboard;
     private bool canBlockInput;
     private bool blockInputActive;
+    private bool privacyScreenActive;
     private string clipboardNote = string.Empty;
     private bool secureScreen;
     private string? secureScreenName;
@@ -284,6 +289,7 @@ else
         connection.ClipboardTextReceived += OnClipboardText;
         connection.SecureDesktopChanged += OnSecureDesktop;
         connection.BlockInputChanged += OnBlockInput;
+        connection.PrivacyScreenChanged += OnPrivacyScreen;
         connection.Ended += reason => _ = InvokeAsync(() => End(reason));
         cts = new CancellationTokenSource();
 
@@ -326,6 +332,14 @@ else
     private void OnBlockInput(bool active) => _ = InvokeAsync(() =>
     {
         blockInputActive = active;
+        StateHasChanged();
+    });
+
+    private Task TogglePrivacyScreenAsync() => connection?.SetPrivacyScreenAsync(!privacyScreenActive) ?? Task.CompletedTask;
+
+    private void OnPrivacyScreen(bool active) => _ = InvokeAsync(() =>
+    {
+        privacyScreenActive = active;
         StateHasChanged();
     });
 
@@ -495,6 +509,7 @@ else
 
         await Hub.EndDeviceAccessAsync();
         blockInputActive = false;
+        privacyScreenActive = false;
         self?.Dispose();
         self = null;
         cts?.Dispose();

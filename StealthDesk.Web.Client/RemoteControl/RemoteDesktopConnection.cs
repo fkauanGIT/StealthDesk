@@ -39,6 +39,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   /// <summary>The device's own mouse and keyboard are now blocked or unblocked, as the device just confirmed.</summary>
   public event Action<bool>? BlockInputChanged;
 
+  /// <summary>The privacy screen on the device is now shown or hidden, as the device just confirmed.</summary>
+  public event Action<bool>? PrivacyScreenChanged;
+
   /// <summary>Done when the session ends, with why (the relay closing, the device leaving, an error).</summary>
   public event Action<string>? Ended;
 
@@ -81,6 +84,8 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   public Task CtrlAltDelAsync() => SendAsync(StreamMessageType.CtrlAltDel, new CtrlAltDel());
 
   public Task SetBlockInputAsync(bool active) => SendAsync(StreamMessageType.BlockInput, new BlockInput(active));
+
+  public Task SetPrivacyScreenAsync(bool active) => SendAsync(StreamMessageType.PrivacyScreen, new PrivacyScreen(active));
 
   public Task SendClipboardTextAsync(string text) => SendAsync(StreamMessageType.ClipboardText, new ClipboardText(Clipboard.Limit(text)));
 
@@ -153,6 +158,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
           break;
         case StreamMessageType.BlockInput:
           BlockInputChanged?.Invoke(MessagePackSerializer.Deserialize<BlockInput>(message.Payload).Active);
+          break;
+        case StreamMessageType.PrivacyScreen:
+          PrivacyScreenChanged?.Invoke(MessagePackSerializer.Deserialize<PrivacyScreen>(message.Payload).Active);
           break;
         default:
           logger.LogDebug("The viewer ignored a {Type} message.", message.Type);

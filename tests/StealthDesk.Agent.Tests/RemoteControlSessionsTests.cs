@@ -23,6 +23,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private readonly Fakes.FakeClipboard _clipboard = new();
   private readonly Fakes.FakeInputDesktop _inputDesktop = new();
   private readonly Fakes.NoInput _input = new();
+  private readonly Fakes.FakePrivacyScreen _privacyScreen = new();
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
@@ -268,6 +269,55 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   }
 
   [Fact]
+  public async Task TheViewerShowsThePrivacyScreen_WithTheInteractPermission_AndGetsItConfirmed()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.PrivacyScreen, new PrivacyScreen(true), Token);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.PrivacyScreen)));
+    Assert.True(Read<PrivacyScreen>(received.First(x => x.Type == StreamMessageType.PrivacyScreen)).Active);
+    Assert.Contains(true, _privacyScreen.Calls);
+  }
+
+  [Fact]
+  public async Task WhenTheSessionEnds_ThePrivacyScreenIsLifted()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var session = Assert.Single(sessions.Running);
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    _ = viewer.RunAsync((_, _) => Task.CompletedTask, _lifetime.ApplicationStopping);
+    await viewer.SendAsync(StreamMessageType.PrivacyScreen, new PrivacyScreen(true), Token);
+    Assert.True(await Wait.UntilAsync(() => _privacyScreen.Calls.Contains(true)));
+
+    await relay.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "The other end left.", Token);
+    await session.Ended.WaitAsync(TimeSpan.FromSeconds(5), Token);
+
+    Assert.False(Assert.Single(_privacyScreen.Calls, x => !x));
+  }
+
+  [Fact]
+  public async Task WithoutTheInteractPermission_PrivacyScreenIsIgnored()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false, ViewerPermissions.ViewOnly));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    await viewer.SendAsync(StreamMessageType.PrivacyScreen, new PrivacyScreen(true), Token);
+    await Task.Delay(300, Token);
+
+    Assert.DoesNotContain(received, x => x.Type == StreamMessageType.PrivacyScreen);
+    Assert.Empty(_privacyScreen.Calls);
+  }
+
+  [Fact]
   public async Task WithoutTheElevatedPermission_TheViewerIsToldAboutASecureScreen()
   {
     var (relay, sessions) = await ConnectedAsync();
@@ -306,7 +356,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private static ViewerPermissions Blocker => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: true);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _privacyScreen, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

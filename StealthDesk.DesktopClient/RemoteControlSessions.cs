@@ -74,6 +74,7 @@ internal sealed class RemoteControlSessions(
   IInputInjector injector,
   IClipboard clipboard,
   IInputDesktop inputDesktop,
+  IPrivacyScreen privacyScreen,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -163,6 +164,15 @@ internal sealed class RemoteControlSessions(
       catch (Exception ex)
       {
         logger.LogWarning(ex, "Couldn't unblock input after session {SessionId} ended.", session.Id);
+      }
+
+      try
+      {
+        privacyScreen.SetActive(false);
+      }
+      catch (Exception ex)
+      {
+        logger.LogWarning(ex, "Couldn't lift the privacy screen after session {SessionId} ended.", session.Id);
       }
 
       _sessions.TryRemove(new KeyValuePair<Guid, RemoteControlSession>(session.Id, session));
@@ -264,6 +274,9 @@ internal sealed class RemoteControlSessions(
           }
 
           break;
+        case StreamMessageType.PrivacyScreen:
+          await SetPrivacyScreenAsync(session, stream, MessagePackSerializer.Deserialize<PrivacyScreen>(message.Payload), cancellationToken);
+          break;
         case StreamMessageType.ClipboardText:
           await WriteClipboardAsync(session, MessagePackSerializer.Deserialize<ClipboardText>(message.Payload));
           break;
@@ -279,6 +292,19 @@ internal sealed class RemoteControlSessions(
     {
       logger.LogDebug(ex, "Session {SessionId} couldn't read a {Type} message.", session.Id, message.Type);
     }
+  }
+
+  // The viewer may show or hide the privacy screen only with the interact permission, under which the button appears.
+  private async Task SetPrivacyScreenAsync(RemoteControlSession session, RelayStream stream, PrivacyScreen requested, CancellationToken cancellationToken)
+  {
+    if (!session.Permissions.Interact)
+    {
+      logger.LogDebug("A viewer without the interact permission tried to use the privacy screen of session {SessionId}.", session.Id);
+      return;
+    }
+
+    var active = privacyScreen.SetActive(requested.Active);
+    await stream.SendAsync(StreamMessageType.PrivacyScreen, new PrivacyScreen(active), cancellationToken);
   }
 
   // The viewer may set the device's clipboard only with the write permission.

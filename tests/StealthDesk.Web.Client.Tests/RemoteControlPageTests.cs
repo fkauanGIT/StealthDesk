@@ -212,6 +212,38 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task ThePrivacyScreenButton_FollowsTheInteractPermission_AndTogglesOnClick()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: false));
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    Assert.DoesNotContain("Privacy screen", page.Markup);
+  }
+
+  [Fact]
+  public async Task WithInteract_ThePrivacyScreenButton_TogglesAndShowsTheDevicesConfirmation()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktop: true, ControlDesktop: true));
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    page.FindAll("button").First(b => b.TextContent == "Privacy screen").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("privacyscreen True", _remote.Calls));
+
+    _remote.RaisePrivacyScreen(true);
+    page.WaitForAssertion(() => Assert.Contains("Hide privacy screen", page.Markup));
+
+    page.FindAll("button").First(b => b.TextContent == "Hide privacy screen").Click();
+    page.WaitForAssertion(() => Assert.Contains("privacyscreen False", _remote.Calls));
+  }
+
+  [Fact]
   public async Task ASecureScreen_IsShownToTheViewer_AndClearsWhenItGoesAway()
   {
     await LoadAsync(_device);

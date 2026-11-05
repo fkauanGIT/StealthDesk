@@ -52,6 +52,9 @@ builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputInjector, WindowsInput>();
 builder.Services.AddSingleton<IClipboard, WindowsClipboard>();
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputDesktop, WindowsInputDesktop>();
+builder.Services.AddSingleton<IPrivacyScreen>(provider =>
+  OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041) ? new WindowsPrivacyScreen(provider.GetRequiredService<ILogger<WindowsPrivacyScreen>>())
+  : new NoPrivacyScreen());
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(

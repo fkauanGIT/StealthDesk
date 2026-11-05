@@ -67,6 +67,12 @@ public enum StreamMessageType
   /// keyboard; from the desktop client, in answer, with the blocking's actual state.
   /// </summary>
   BlockInput = 19,
+
+  /// <summary>
+  /// <see cref="RemoteControl.PrivacyScreen"/>: from the viewer, to show or hide the overlay on the device's own
+  /// displays; from the desktop client, in answer, with the overlay's actual state.
+  /// </summary>
+  PrivacyScreen = 20,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>
