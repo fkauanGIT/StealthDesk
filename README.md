@@ -10,7 +10,8 @@ A lightweight agent runs on each managed machine and keeps a signed, real-time S
 the server, which tracks every device and lets technicians reach them from the browser.
 
 > **Early development:** until v1.0 there may be breaking changes between versions. Since v0.5 the server runs in a
-> container behind HTTPS with its keys encrypted, but it has not had a security review yet.
+> container behind HTTPS with its keys encrypted, but it has not had a security review yet. See the
+> [security model](docs/explanation/security.md) for what protects a tenant's devices and data today.
 
 ## Project Status
 
