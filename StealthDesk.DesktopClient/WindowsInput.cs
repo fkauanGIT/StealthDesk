@@ -130,6 +130,10 @@ internal sealed unsafe class WindowsInput(ILogger<WindowsInput> logger) : IInput
     }
   }
 
+  // BlockInput discards hardware-generated mouse and keyboard input but leaves SendInput, used for every call above,
+  // free to keep driving the session for the viewer.
+  public bool SetBlockInput(bool active) => PInvoke.BlockInput(active);
+
   private static INPUT MouseAt(MOUSE_EVENT_FLAGS flags, uint data) => new()
   {
     type = INPUT_TYPE.INPUT_MOUSE,

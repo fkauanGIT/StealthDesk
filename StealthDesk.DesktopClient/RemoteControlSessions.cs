@@ -155,6 +155,16 @@ internal sealed class RemoteControlSessions(
     }
     finally
     {
+      // However the session ended, the device's own mouse and keyboard must work again.
+      try
+      {
+        injector.SetBlockInput(false);
+      }
+      catch (Exception ex)
+      {
+        logger.LogWarning(ex, "Couldn't unblock input after session {SessionId} ended.", session.Id);
+      }
+
       _sessions.TryRemove(new KeyValuePair<Guid, RemoteControlSession>(session.Id, session));
       if (joined)
       {
@@ -245,6 +255,14 @@ internal sealed class RemoteControlSessions(
           break;
         case StreamMessageType.CtrlAltDel:
           input.CtrlAltDel();
+          break;
+        case StreamMessageType.BlockInput:
+          var requested = MessagePackSerializer.Deserialize<BlockInput>(message.Payload);
+          if (input.SetBlockInput(requested.Active) is { } active)
+          {
+            await stream.SendAsync(StreamMessageType.BlockInput, new BlockInput(active), cancellationToken);
+          }
+
           break;
         case StreamMessageType.ClipboardText:
           await WriteClipboardAsync(session, MessagePackSerializer.Deserialize<ClipboardText>(message.Payload));

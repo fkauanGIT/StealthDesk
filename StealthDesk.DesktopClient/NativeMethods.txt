@@ -30,6 +30,7 @@ LoadCursor
 GetIconInfo
 DrawIconEx
 SendInput
+BlockInput
 GetSystemMetrics
 GetMessageExtraInfo
 GetAsyncKeyState

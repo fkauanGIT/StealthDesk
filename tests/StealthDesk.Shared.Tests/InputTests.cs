@@ -129,6 +129,16 @@ public class RemoteInputTests
   }
 
   [Fact]
+  public void BlockInput_NeedsItsOwnPermission()
+  {
+    Assert.Null(For(ViewerPermissions.ViewOnly with { Interact = true }).SetBlockInput(true));
+    Assert.Empty(_injector.Log);
+
+    Assert.Equal(true, For(ViewerPermissions.ViewOnly with { BlockInput = true }).SetBlockInput(true));
+    Assert.Equal(["blockinput on"], _injector.Log);
+  }
+
+  [Fact]
   public void WithNoDisplayShownYet_MouseInputIsDropped()
   {
     var input = new RemoteInput(_injector, () => null, ViewerPermissions.ViewOnly with { Interact = true }, NullLogger.Instance);
@@ -158,6 +168,12 @@ public class RemoteInputTests
     public void ResetKeys() => Log.Add("reset");
 
     public void CtrlAltDel() => Log.Add("ctrlaltdel");
+
+    public bool SetBlockInput(bool active)
+    {
+      Log.Add($"blockinput {(active ? "on" : "off")}");
+      return true;
+    }
   }
 }
 

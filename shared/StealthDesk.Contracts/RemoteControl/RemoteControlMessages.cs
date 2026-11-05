@@ -8,15 +8,17 @@ namespace StealthDesk.Contracts.RemoteControl;
 /// </summary>
 /// <param name="Interact">Use the mouse and keyboard.</param>
 /// <param name="UseSecureScreens">See and use UAC prompts and the lock screen.</param>
+/// <param name="BlockInput">Block the device's own mouse and keyboard while interacting.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record ViewerPermissions(
   bool Interact,
   bool UseSecureScreens,
   bool SendCtrlAltDel,
   bool ReadClipboard,
-  bool WriteClipboard)
+  bool WriteClipboard,
+  bool BlockInput)
 {
-  public static ViewerPermissions ViewOnly { get; } = new(false, false, false, false, false);
+  public static ViewerPermissions ViewOnly { get; } = new(false, false, false, false, false, false);
 }
 
 /// <summary>A Windows session of a device with a desktop client in it: one a remote control session can show.</summary>

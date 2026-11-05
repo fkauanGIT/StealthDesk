@@ -9,6 +9,7 @@ namespace StealthDesk.Contracts.Devices;
 /// <param name="SeeDesktop">Start remote control and see the desktop.</param>
 /// <param name="ControlDesktop">Use the mouse and keyboard during remote control.</param>
 /// <param name="UseSecureScreens">See and use UAC prompts and the lock screen.</param>
+/// <param name="BlockInput">Block the device's own mouse and keyboard during remote control.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record DeviceActions(
   bool UseTerminal,
@@ -17,4 +18,5 @@ public sealed record DeviceActions(
   bool UseSecureScreens = false,
   bool SendCtrlAltDel = false,
   bool ReadClipboard = false,
-  bool WriteClipboard = false);
+  bool WriteClipboard = false,
+  bool BlockInput = false);

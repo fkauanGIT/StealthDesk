@@ -83,6 +83,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceRemoteControlConnect, Categories.Devices, "See the desktop", "Start remote control on a device and see the desktop of a session logged on to it.", Devices),
     new(PermissionNames.DeviceRemoteControlInteract, Categories.Devices, "Control the desktop", "Use a device's mouse and keyboard during remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlElevatedDesktop, Categories.Devices, "Use secure screens", "See and use UAC prompts and the lock screen during remote control.", Devices),
+    new(PermissionNames.DeviceRemoteControlBlockInput, Categories.Devices, "Block input", "Block a device's own mouse and keyboard during remote control.", Devices),
     new(PermissionNames.DeviceCtrlAltDelSend, Categories.Devices, "Send Ctrl+Alt+Del", "Send Ctrl+Alt+Del to a device during remote control.", Devices),
     new(PermissionNames.DeviceClipboardRead, Categories.Devices, "Read the clipboard", "Get text from a device's clipboard during remote control.", Devices),
     new(PermissionNames.DeviceClipboardWrite, Categories.Devices, "Write the clipboard", "Put text on a device's clipboard during remote control.", Devices),

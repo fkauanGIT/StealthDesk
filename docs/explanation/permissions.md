@@ -32,7 +32,8 @@ devices' administrator passwords, on the devices or device groups they look afte
 `device.remote-control.connect` lets someone see a device's desktop in a [remote control](../guides/remote-control.md)
 session; `device.remote-control.interact` adds the mouse and keyboard, without which a session is view-only.
 `device.remote-control.elevated-desktop` follows the device onto secure screens such as UAC; `device.ctrl-alt-del.send`
-sends that key sequence; `device.clipboard.read` and `device.clipboard.write` move clipboard text each way. Each is
+sends that key sequence; `device.clipboard.read` and `device.clipboard.write` move clipboard text each way;
+`device.remote-control.block-input` blocks the device's own mouse and keyboard while the session is open. Each is
 separate from reading the device (`device.read`) and from each other, and all are part of the **Device Superuser**
 preset.
 
