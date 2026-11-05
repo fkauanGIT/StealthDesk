@@ -45,5 +45,6 @@ Why StealthDesk works the way it does.
 - [Architecture](explanation/architecture.md): the server, the agent, the web client and the code that holds them
 - [Permissions](explanation/permissions.md): who may do what, and why a deny always wins
 - [How agents are trusted](explanation/agent-trust.md): installer keys, signed reports and the device's identity
+- [Security model](explanation/security.md): what protects a tenant's devices and data today, and what doesn't yet
 
 [Project status and roadmap](project-status.md) lists what each version brought and what comes next.

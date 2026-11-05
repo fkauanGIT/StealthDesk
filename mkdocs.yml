@@ -82,4 +82,5 @@ nav:
       - Architecture: explanation/architecture.md
       - Permissions: explanation/permissions.md
       - How agents are trusted: explanation/agent-trust.md
+      - Security model: explanation/security.md
   - Project status: project-status.md
