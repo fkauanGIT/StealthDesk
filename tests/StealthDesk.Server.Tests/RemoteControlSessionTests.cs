@@ -121,13 +121,13 @@ public class RemoteControlSessionTests
   }
 
   [Theory]
-  [InlineData(null, null, true)]
-  [InlineData("false", null, false)]
-  [InlineData(null, "false", false)]
-  [InlineData("true", "false", true)]
-  public async Task TheUserIsNotified_AsTheTenantSettingSays_OrTheServersDefault(string? tenantValue, string? serverDefault, bool notified)
+  [InlineData(null, true, true)]
+  [InlineData(null, false, false)]
+  [InlineData("true", false, true)]
+  [InlineData("false", true, false)]
+  public async Task TheUserIsNotified_AsTheTenantSettingSays_OrTheViewersOwnPreference(string? tenantValue, bool viewerPreference, bool notified)
   {
-    await using var world = await World.CreateAsync(notifyDefault: serverDefault);
+    await using var world = await World.CreateAsync(viewerNotifyPreference: viewerPreference);
     if (tenantValue is not null)
     {
       await world.SetTenantSettingAsync(TenantSettingNames.NotifyUserOnRemoteControl, tenantValue);
@@ -311,14 +311,9 @@ public class RemoteControlSessionTests
     public UserRecord User => _user;
 
     public static async Task<World> CreateAsync(
-      bool canSee = true, bool ownTenant = true, string? notifyDefault = null, string? ticketLifetime = null)
+      bool canSee = true, bool ownTenant = true, bool viewerNotifyPreference = true, string? ticketLifetime = null)
     {
       var server = await ServerHost.OnPostgresAsync();
-      if (notifyDefault is not null)
-      {
-        server.With("TenantDefaults:NotifyUserOnRemoteControl", notifyDefault);
-      }
-
       if (ticketLifetime is not null)
       {
         server.With("Relay:TicketLifetime", ticketLifetime);
@@ -339,6 +334,11 @@ public class RemoteControlSessionTests
 
       var userTenant = ownTenant ? world._tenant : await TestTenants.CreateAsync(server, "Other tenant");
       world._user = await TestAccounts.CreateUserAsync(server, "tech@example.com", userTenant);
+      if (!viewerNotifyPreference)
+      {
+        await server.WithDbAsync(db => db.Users.Where(x => x.Id == world._user.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.NotifyOnRemoteControl, false)));
+      }
+
       if (ownTenant)
       {
         await world.AssignAsync(PermissionNames.DeviceRead, PermissionScopeKind.Tenant);

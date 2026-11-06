@@ -33,15 +33,16 @@ public class TenantSettingApiTests
   }
 
   [Fact]
-  public async Task TheRemoteControlNotice_IsOnByDefault_AndTakesTrueOrFalse()
+  public async Task TheRemoteControlNotice_HasNoServerDefault_AndTakesTrueOrFalse()
   {
     using var server = await ServerHost.OnPostgresAsync();
     var (admin, tenant) = await RegisterAsync(server, "admin@example.com");
 
+    // Unset, it's left to each user's own preference, not a server-wide default.
     var before = Setting(await ListAsync(admin, tenant), TenantSettingNames.NotifyUserOnRemoteControl);
     var set = await admin.PutAsJsonAsync(One(TenantSettingNames.NotifyUserOnRemoteControl, tenant), new SetTenantSettingRequest(" FALSE "), Cancel);
 
-    Assert.Equal("true", before.DefaultValue);
+    Assert.Null(before.DefaultValue);
     Assert.Null(before.Value);
     Assert.Equal(HttpStatusCode.OK, set.StatusCode);
     Assert.Equal("false", (await set.Content.ReadFromJsonAsync<TenantSetting>(Cancel))!.Value);

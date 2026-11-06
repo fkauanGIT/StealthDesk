@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using StealthDesk.Contracts;
 using StealthDesk.Contracts.Accounts;
 using StealthDesk.Web.Client.Accounts;
 using StealthDesk.Web.Client.Devices;
@@ -20,13 +21,15 @@ public class ManageAccountPageTests : AccountTestContext
     Services.AddSingleton<ILiveUpdates>(_live);
   }
 
-  private static AccountProfile Ana(bool confirmed = true, bool hasPassword = true) => new()
+  private static AccountProfile Ana(bool confirmed = true, bool hasPassword = true, bool notifyOnRemoteControl = true, bool notifyOverriddenByTenant = false) => new()
   {
     Id = Guid.Parse("0199a7c4-0000-7000-8000-000000000001"),
     Email = "ana@example.com",
     EmailConfirmed = confirmed,
     PhoneNumber = "+55 11 98765-4321",
     HasPassword = hasPassword,
+    NotifyOnRemoteControl = notifyOnRemoteControl,
+    NotifyOnRemoteControlOverriddenByTenant = notifyOverriddenByTenant,
   };
 
   private static object Errors(string code, string message) =>
@@ -75,6 +78,50 @@ public class ManageAccountPageTests : AccountTestContext
     Render<Profile>();
 
     Assert.Equal("account/sign-in?returnUrl=%2Faccount%2Fmanage", Location);
+  }
+
+  // ---------- Remote control notice ----------
+
+  [Fact]
+  public void Profile_RemoteControlNotice_TogglesAndSaves()
+  {
+    Api.RespondWith(Ana());
+    var page = Render<Profile>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-notify-choice]")));
+    Assert.Equal("The user at the device is told when a session starts and ends.", page.Find("[data-notify-preview]").TextContent);
+
+    Api.Respond(HttpStatusCode.NoContent);
+    page.Find("[data-notify-choice] .sd-segmented").QuerySelectorAll("button").Single(x => x.TextContent.Trim() == "Off").Click();
+
+    page.WaitForAssertion(() => Assert.Equal("The user at the device isn't told about sessions.", page.Find("[data-notify-preview]").TextContent));
+    Assert.Contains($"PUT {Routes.AccountNotifyOnRemoteControl}", Api.Requests);
+    Assert.Contains("\"notifyOnRemoteControl\":false", Api.Bodies[^1]);
+  }
+
+  [Fact]
+  public void Profile_RemoteControlNotice_PutBack_WhenItCantBeSaved()
+  {
+    Api.RespondWith(Ana());
+    var page = Render<Profile>();
+    page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-notify-choice]")));
+
+    Api.Respond(HttpStatusCode.InternalServerError);
+    page.Find("[data-notify-choice] .sd-segmented").QuerySelectorAll("button").Single(x => x.TextContent.Trim() == "Off").Click();
+
+    page.WaitForAssertion(() => Assert.NotNull(page.Find(".sd-alert")));
+    Assert.Equal("The user at the device is told when a session starts and ends.", page.Find("[data-notify-preview]").TextContent);
+  }
+
+  [Fact]
+  public void Profile_RemoteControlNotice_OverriddenByTenant_CantBeChanged()
+  {
+    Api.RespondWith(Ana(notifyOnRemoteControl: false, notifyOverriddenByTenant: true));
+
+    var page = Render<Profile>();
+
+    page.WaitForAssertion(() => Assert.Equal("The user at the device isn't told about sessions.", page.Find("[data-notify-preview]").TextContent));
+    Assert.Contains("Your tenant sets this for everyone", page.Markup);
+    Assert.Empty(page.FindAll("[data-notify-choice]"));
   }
 
   // ---------- Email ----------
