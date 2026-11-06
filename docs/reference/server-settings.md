@@ -83,6 +83,7 @@ See [Tenant settings](../guides/tenant-settings.md) and [Installing agents](../g
 | `Relay:TicketLifetime` | `00:01:00` | How long a remote control session's tokens can be used before either end connects to the relay. |
 | `Relay:PartnerTimeout` | `00:00:20` | How long the first end at the relay waits for the other before the session is given up. |
 | `Relay:MaxMessageBytes` | `16777216` | The largest message an end may send through the relay; a larger one ends the session. |
+| `RemoteControl:EnableDesktopPreview` | `true` | Whether a desktop preview may be requested at all, regardless of anyone's permission. |
 | `InstallerKeys:UsageHistoryDays` | `90` | How long each key's installs are kept. Zero keeps them all. |
 | `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.zip` in it, with its desktop client. The container image ships one. |
 

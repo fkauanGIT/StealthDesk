@@ -1,6 +1,7 @@
 using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Inventory;
 using StealthDesk.Agent.Core.Terminal;
+using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.RemoteControl;
@@ -41,6 +42,9 @@ public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRem
 
   public async Task<GatewayReply<Guid>> StartRemoteControl(RemoteControlRequest request, CancellationToken cancellationToken) =>
     Reply(await remoteControl.StartAsync(request, cancellationToken));
+
+  public async Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
+    Reply(await remoteControl.PreviewAsync(cancellationToken));
 
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);

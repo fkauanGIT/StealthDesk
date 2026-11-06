@@ -47,7 +47,11 @@ internal sealed class RealtimeChannel<TServer, TCallbacks>(
         .Build();
 
       connection.Reconnected += _ => Raise(Restored);
-      connection.Closed += error => Raise(Lost, error);
+      connection.Closed += error =>
+      {
+        logger.LogWarning(error, "The realtime channel closed.");
+        return Raise(Lost, error);
+      };
       ListenForCallbacks(connection);
 
       _connection = connection;

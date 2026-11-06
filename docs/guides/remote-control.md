@@ -12,6 +12,14 @@ Controlling the mouse and keyboard also needs `device.remote-control.interact`; 
 **Device Superuser** preset includes all of them. [Permissions](../explanation/permissions.md) explains how grants
 and denies combine.
 
+## A preview before connecting
+
+With `device.desktop-preview.read`, the device's page shows a still picture of its current desktop while it is
+online, so you can check what is on screen before opening a session. On Windows, it's the console session's screen,
+or the first one answering if there's none; nothing is shown if the device has no desktop client connected, or the
+server turned the feature off entirely (`RemoteControl:EnableDesktopPreview`, see
+[server settings](../reference/server-settings.md)), regardless of anyone's permission.
+
 ## Opening a session
 
 1. Open the device from **Devices**.

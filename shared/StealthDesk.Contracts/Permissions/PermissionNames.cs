@@ -39,6 +39,7 @@ public static class PermissionNames
   public const string DeviceClipboardRead = "device.clipboard.read";
   public const string DeviceClipboardWrite = "device.clipboard.write";
   public const string DeviceCtrlAltDelSend = "device.ctrl-alt-del.send";
+  public const string DeviceDesktopPreviewRead = "device.desktop-preview.read";
   public const string DeviceGroupAssignDevices = "device-group.assign-devices";
   public const string DeviceRead = "device.read";
   public const string DeviceRemoteControlBlockInput = "device.remote-control.block-input";

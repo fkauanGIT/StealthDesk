@@ -88,6 +88,16 @@ else
         }
     </header>
 
+    @* Not conditioned on device.IsOnline, which a live push can flip back and forth: that would tear down and
+       recreate this element, fetching the preview again each time. Offline just answers 404, handled by onerror. *@
+    @if (canSeeDesktopPreview)
+    {
+        @* Hidden, never removed: taking the element out of the DOM ourselves would leave Blazor's own record of it
+           dangling, breaking the next render (even on another page) with "No element is currently associated with
+           component ...". *@
+        <img class="sd-desktop-preview" src="@Routes.DeviceDesktopPreview(device.Id)" alt="A preview of @(device.Name)'s desktop" onerror="this.style.display='none'" />
+    }
+
     @if (groupsError is not null)
     {
         <SdAlert>@groupsError</SdAlert>
@@ -199,8 +209,9 @@ else
     private IReadOnlyDictionary<Guid, string> groupNames = new Dictionary<Guid, string>();
     private readonly HashSet<Guid> chosen = [];
     private bool canReadGroups;
-    private bool canUseTerminal;
+    private bool canUseTerminal;
     private bool canSeeDesktop;
+    private bool canSeeDesktopPreview;
     private bool actionsChecked;
     private bool canAssignGroups;
     private bool choosingGroups;
@@ -239,6 +250,7 @@ else
         actionsChecked = false;
         canUseTerminal = false;
         canSeeDesktop = false;
+        canSeeDesktopPreview = false;
         await CheckActionsAsync();
 
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
@@ -331,6 +343,7 @@ else
         var actions = await Hub.GetDeviceActionsAsync(Id);
         canUseTerminal = actions is { Accepted: true, Value.UseTerminal: true };
         canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
+        canSeeDesktopPreview = actions is { Accepted: true, Value.SeeDesktopPreview: true };
     }
 
     private void OnLiveChanged() => InvokeAsync(async () =>

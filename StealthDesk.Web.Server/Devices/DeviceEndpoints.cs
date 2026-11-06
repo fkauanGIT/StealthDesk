@@ -1,7 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 using StealthDesk.Contracts.Permissions;
+using StealthDesk.Contracts.RemoteControl;
+using StealthDesk.Web.Server.Gateway;
 using StealthDesk.Web.Server.Permissions;
+using StealthDesk.Web.Server.RemoteControl;
 
 namespace StealthDesk.Web.Server.Devices;
 
@@ -38,6 +42,36 @@ public static class DeviceEndpoints
 
       return Results.Ok(ToSummary(device));
     });
+
+    endpoints.MapGet($"{Routes.Devices}/{{id:guid}}/desktop-preview", async (
+      Guid id,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IOptions<RemoteControlOptions> options,
+      IAgentCalls agents,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
+    {
+      // Never why it's missing: not found, no permission and the feature turned off all answer the same.
+      if (!options.Value.EnableDesktopPreview)
+      {
+        return Results.NotFound();
+      }
+
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceDesktopPreviewRead))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      var preview = await agents.CallAsync(device.Id, (agent, token) => agent.GetDesktopPreview(token), cancellationToken);
+      if (!preview.Accepted)
+      {
+        return Results.NotFound();
+      }
+
+      return Results.Bytes(preview.Value!.Image, preview.Value.Encoding == ImageEncoding.Png ? "image/png" : "image/jpeg");
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceDesktopPreviewRead);
 
     return endpoints;
   }

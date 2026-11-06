@@ -75,6 +75,7 @@ public static class PermissionPresets
       PermissionNames.DeviceRead,
       PermissionNames.DeviceTerminalUse,
       PermissionNames.DeviceRemoteControlConnect,
+      PermissionNames.DeviceDesktopPreviewRead,
       PermissionNames.DeviceRemoteControlInteract,
       PermissionNames.DeviceRemoteControlElevatedDesktop,
       PermissionNames.DeviceRemoteControlBlockInput,

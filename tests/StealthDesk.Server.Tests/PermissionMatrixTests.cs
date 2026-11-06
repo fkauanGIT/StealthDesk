@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR.Client;
 using StealthDesk.Contracts.AuthorizationLogs;
+using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.DeviceGroups;
 using StealthDesk.Contracts.InstallerKeys;
 using StealthDesk.Contracts.Invites;
@@ -12,6 +13,7 @@ using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.PersonalAccessTokens;
 using StealthDesk.Contracts.Realtime;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.ServerSettings;
 using StealthDesk.Contracts.ServiceAccounts;
 using StealthDesk.Contracts.Tenants;
@@ -364,6 +366,10 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Get, "/api/v1/devices/{id:guid}/desktop-preview", PermissionNames.DeviceDesktopPreviewRead, (w, _) => Task.FromResult(new Call(HttpMethod.Get, Routes.DeviceDesktopPreview(w.Device))))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -547,14 +553,13 @@ public class PermissionMatrixTests
         Tenant = await TestTenants.CreateAsync(server),
         OtherTenant = await TestTenants.CreateAsync(server, "Other tenant"),
       };
-      world.Device = await server.WithDbAsync(async db =>
-      {
-        var device = new DeviceRecord { Id = Guid.NewGuid(), TenantId = world.Tenant, Name = "MATRIX-PC" };
-        db.Devices.Add(device);
-        await db.SaveChangesAsync();
-        return device.Id;
-      });
+      world.Device = Guid.NewGuid();
       world.Remember(world.Device);
+      // Online, with an agent answering the desktop preview: the only row here whose success needs one. Joins with
+      // its own key of this tenant, so the device lands here rather than in TestAgent's own default tenant.
+      var key = await TestInstallerKeys.CreateAsync(server, world.Tenant);
+      var agent = await TestAgent.ConnectAsync(server, withInstallerKey: false, callbacks: new DesktopPreviewAgent());
+      Assert.True((await agent.ReportAsync(TestAgent.Report(world.Device, "MATRIX-PC") with { InstallerKey = key })).Accepted);
       world._admin = (await world.CallerAsync([.. PermissionCatalog.All.Select(x => x.Name)])).Client;
       world.Outsider = await world.CallerAsync([.. PermissionCatalog.All.Where(x => x.AllowsTenantScope).Select(x => x.Name)], world.OtherTenant);
       return world;
@@ -677,5 +682,12 @@ public class PermissionMatrixTests
       created.TryGetProperty("id", out var id)
         ? id.GetGuid()
         : created.EnumerateObject().Where(x => x.Value.ValueKind == JsonValueKind.Object).Select(x => x.Value.GetProperty("id").GetGuid()).First();
+  }
+
+  /// <summary>Answers the desktop preview row's call with a small picture; refuses everything else.</summary>
+  private sealed class DesktopPreviewAgent : RefusingAgent
+  {
+    public override Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Accept(new DesktopPreview([1, 2, 3, 4], ImageEncoding.Png)));
   }
 }

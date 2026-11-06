@@ -11,6 +11,7 @@ public static class Routes
 
   public const string Devices = "/api/v1/devices";
   public static string Device(Guid id) => $"{Devices}/{id}";
+  public static string DeviceDesktopPreview(Guid id) => $"{Device(id)}/desktop-preview";
   public const string ServerVersion = "/api/internal/version/server";
 
   /// <summary>A tenant's authorization change log (<c>?tenantId=</c>), and the server's own entries.</summary>

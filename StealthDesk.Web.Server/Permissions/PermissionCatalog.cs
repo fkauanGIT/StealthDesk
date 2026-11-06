@@ -81,6 +81,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceRead, Categories.Devices, "Read devices", "View devices, their details and their live status.", Devices),
     new(PermissionNames.DeviceTerminalUse, Categories.Devices, "Use the terminal", "Open a terminal on a device and run commands on it as the agent's account, LocalSystem on Windows.", Devices),
     new(PermissionNames.DeviceRemoteControlConnect, Categories.Devices, "See the desktop", "Start remote control on a device and see the desktop of a session logged on to it.", Devices),
+    new(PermissionNames.DeviceDesktopPreviewRead, Categories.Devices, "See a desktop preview", "See a still picture of a device's current desktop, without starting remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlInteract, Categories.Devices, "Control the desktop", "Use a device's mouse and keyboard during remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlElevatedDesktop, Categories.Devices, "Use secure screens", "See and use UAC prompts and the lock screen during remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlBlockInput, Categories.Devices, "Block input", "Block a device's own mouse and keyboard during remote control.", Devices),
