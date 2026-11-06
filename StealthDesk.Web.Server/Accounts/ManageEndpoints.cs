@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using StealthDesk.Contracts.Accounts;
 using StealthDesk.Web.Server.Permissions;
+using StealthDesk.Web.Server.TenantSettings;
 
 namespace StealthDesk.Web.Server.Accounts;
 
@@ -17,10 +18,10 @@ public static class ManageEndpoints
   {
     var account = endpoints.MapGroup(Routes.Account).RequireAuthorization().OwnAccount();
 
-    account.MapGet("/profile", async (ClaimsPrincipal principal, UserManager<UserRecord> users) =>
-      await users.GetUserAsync(principal) is { } user ? Results.Ok(await ProfileAsync(users, user)) : Results.Unauthorized());
+    account.MapGet("/profile", async (ClaimsPrincipal principal, UserManager<UserRecord> users, TenantSettingService tenantSettings, CancellationToken cancellationToken) =>
+      await users.GetUserAsync(principal) is { } user ? Results.Ok(await ProfileAsync(users, user, tenantSettings, cancellationToken)) : Results.Unauthorized());
 
-    account.MapPut("/profile", async (ProfileUpdate update, HttpContext context, SignInManager<UserRecord> signIn) =>
+    account.MapPut("/profile", async (ProfileUpdate update, HttpContext context, SignInManager<UserRecord> signIn, TenantSettingService tenantSettings, CancellationToken cancellationToken) =>
     {
       var users = signIn.UserManager;
       if (await users.GetUserAsync(context.User) is not { } user)
@@ -46,7 +47,7 @@ public static class ManageEndpoints
         await RefreshCookieAsync(context, signIn, user);
       }
 
-      return Results.Ok(await ProfileAsync(users, user));
+      return Results.Ok(await ProfileAsync(users, user, tenantSettings, cancellationToken));
     });
 
     account.MapPut("/theme", async (ThemeUpdate update, ClaimsPrincipal principal, UserManager<UserRecord> users) =>
@@ -62,6 +63,18 @@ public static class ManageEndpoints
       }
 
       user.Theme = update.Theme;
+      var result = await users.UpdateAsync(user);
+      return result.Succeeded ? Results.NoContent() : ValidationProblem(result);
+    });
+
+    account.MapPut("/notify-on-remote-control", async (NotifyOnRemoteControlUpdate update, ClaimsPrincipal principal, UserManager<UserRecord> users) =>
+    {
+      if (await users.GetUserAsync(principal) is not { } user)
+      {
+        return Results.Unauthorized();
+      }
+
+      user.NotifyOnRemoteControl = update.NotifyOnRemoteControl;
       var result = await users.UpdateAsync(user);
       return result.Succeeded ? Results.NoContent() : ValidationProblem(result);
     });
@@ -158,14 +171,20 @@ public static class ManageEndpoints
     }
   }
 
-  private static async Task<AccountProfile> ProfileAsync(UserManager<UserRecord> users, UserRecord user) => new()
+  private static async Task<AccountProfile> ProfileAsync(UserManager<UserRecord> users, UserRecord user, TenantSettingService tenantSettings, CancellationToken cancellationToken)
   {
-    Id = user.Id,
-    Email = user.Email ?? string.Empty,
-    EmailConfirmed = user.EmailConfirmed,
-    PhoneNumber = user.PhoneNumber,
-    HasPassword = await users.HasPasswordAsync(user),
-  };
+    var tenantNotify = await tenantSettings.NotifyOnRemoteControlOverrideAsync(user.TenantId, cancellationToken);
+    return new()
+    {
+      Id = user.Id,
+      Email = user.Email ?? string.Empty,
+      EmailConfirmed = user.EmailConfirmed,
+      PhoneNumber = user.PhoneNumber,
+      HasPassword = await users.HasPasswordAsync(user),
+      NotifyOnRemoteControl = tenantNotify ?? user.NotifyOnRemoteControl,
+      NotifyOnRemoteControlOverriddenByTenant = tenantNotify is not null,
+    };
+  }
 
   // Browsers keep the session in a cookie that must carry the new security stamp. Bearer tokens have nothing to renew.
   internal static async Task RefreshCookieAsync(HttpContext context, SignInManager<UserRecord> signIn, UserRecord user)

@@ -7,5 +7,5 @@ The install commands **Add device** gives can name an agent instance (`--instanc
 share a machine. See [Installing agents](installing-agents.md).
 
 When someone starts a remote control session of a device, the person at the device is told in a message on its
-screen, and again when the session ends. A tenant can turn that off under **Remote control**; the server's default is
-`TenantDefaults:NotifyUserOnRemoteControl`, on unless changed.
+screen, and again when the session ends. Each user chooses this for themselves, on their account page (**Manage account** → Remote control); a tenant can
+force it on or off for everyone under **Remote control** here, which then can't be changed per user.

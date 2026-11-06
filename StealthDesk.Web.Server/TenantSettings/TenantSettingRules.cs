@@ -12,8 +12,6 @@ public sealed class TenantDefaultsOptions
 
   /// <summary>None makes one from the server's address.</summary>
   public string? InstanceName { get; set; }
-
-  public bool NotifyUserOnRemoteControl { get; set; } = true;
 }
 
 /// <summary>A value checked and written the one way it's stored, or why it can't be.</summary>
@@ -47,11 +45,14 @@ public static class TenantSettingRules
     };
   }
 
+  /// <summary>
+  /// The server's default, or none when a setting has no server-wide fallback (e.g. <see
+  /// cref="TenantSettingNames.NotifyUserOnRemoteControl"/>, which falls to each user's own preference instead).
+  /// </summary>
   public static string? DefaultOf(string name, TenantDefaultsOptions defaults) => name switch
   {
     TenantSettingNames.AppendInstanceName => defaults.AppendInstanceName ? "true" : "false",
     TenantSettingNames.InstanceName => string.IsNullOrWhiteSpace(defaults.InstanceName) ? null : defaults.InstanceName.Trim(),
-    TenantSettingNames.NotifyUserOnRemoteControl => defaults.NotifyUserOnRemoteControl ? "true" : "false",
     _ => null,
   };
 }

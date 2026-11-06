@@ -20,6 +20,10 @@ public class UserRecord : IdentityUser<Guid>
 
   /// <summary>How the web client looks for this user, wherever they sign in.</summary>
   public ThemeMode Theme { get; set; }
+
+  /// <summary>Whether the user at a device is told, on its screen, when this user starts a remote control session of
+  /// it. A tenant setting can override this for everyone; see <see cref="TenantSettings.TenantSettingService"/>.</summary>
+  public bool NotifyOnRemoteControl { get; set; } = true;
 }
 
 public enum AccountType

@@ -55,9 +55,15 @@ public sealed class TenantSettingService(StealthDeskDb db, IOptionsMonitor<Tenan
     return Results.Ok(new DeploymentOptions(append ? name : null, downloads.WindowsAgent()));
   }
 
-  /// <summary>Whether the user at a device of the tenant is told when a remote control session of it starts and ends.</summary>
-  public async Task<bool> NotifyUserOnRemoteControlAsync(Guid tenant, CancellationToken cancellationToken) =>
-    Effective(TenantSettingNames.NotifyUserOnRemoteControl, await OwnAsync(tenant, cancellationToken)) == "true";
+  /// <summary>
+  /// The tenant's own choice for whether the user at a device is told when a remote control session of it starts
+  /// and ends, or null when it left that to each user's own preference.
+  /// </summary>
+  public async Task<bool?> NotifyOnRemoteControlOverrideAsync(Guid tenant, CancellationToken cancellationToken)
+  {
+    var own = await OwnAsync(tenant, cancellationToken);
+    return own.TryGetValue(TenantSettingNames.NotifyUserOnRemoteControl, out var value) ? value == "true" : null;
+  }
 
   private async Task<IResult> SetManyAsync(Guid tenant, IReadOnlyDictionary<string, string?> values, string? single, CancellationToken cancellationToken)
   {

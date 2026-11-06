@@ -216,7 +216,9 @@ public sealed class DashboardHub(
       ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
       WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite),
       BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput));
-    var notifyUser = await tenantSettings.NotifyUserOnRemoteControlAsync(device.TenantId, Context.ConnectionAborted);
+    // The tenant's choice, when it made one, overrides what the viewer themselves prefers.
+    var tenantNotify = await tenantSettings.NotifyOnRemoteControlOverrideAsync(device.TenantId, Context.ConnectionAborted);
+    var notifyUser = tenantNotify ?? (await users.FindByIdAsync(UserId))?.NotifyOnRemoteControl ?? true;
     var viewerName = Context.User?.Identity?.Name ?? "A technician";
 
     var tickets = relay.Issue(Guid.Parse(UserId));
