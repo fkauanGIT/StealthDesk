@@ -72,6 +72,10 @@ public sealed class AccountApi(HttpClient http)
   public Task<AccountResult> SetThemeAsync(ThemeMode theme) =>
     SendAsync(HttpMethod.Put, Routes.AccountTheme, new ThemeUpdate(theme));
 
+  /// <summary>Keeps the signed-in user's choice of whether the device's user is told about their sessions.</summary>
+  public Task<AccountResult> SetNotifyOnRemoteControlAsync(bool notify) =>
+    SendAsync(HttpMethod.Put, Routes.AccountNotifyOnRemoteControl, new NotifyOnRemoteControlUpdate(notify));
+
   public Task<AccountResult> UpdateProfileAsync(string? phoneNumber) =>
     SendAsync(HttpMethod.Put, Routes.AccountProfile, new ProfileUpdate { PhoneNumber = phoneNumber });
 

@@ -115,15 +115,17 @@ else
 
     private IReadOnlyList<(string, string)> NotifyOptions =>
     [
-        (string.Empty, $"Server default ({OnOff(Default(TenantSettingNames.NotifyUserOnRemoteControl))})"),
+        (string.Empty, "Left to each user"),
         ("true", "On"),
         ("false", "Off"),
     ];
 
-    private string NotifyPreview =>
-        (notify.Length > 0 ? notify : Default(TenantSettingNames.NotifyUserOnRemoteControl)) == "true"
-            ? "The user at the device is told when a session starts and ends."
-            : "The user at the device isn't told about sessions.";
+    private string NotifyPreview => notify switch
+    {
+        "true" => "The user at the device is told when a session starts and ends.",
+        "false" => "The user at the device isn't told about sessions.",
+        _ => "Each person chooses, for themselves, whether to tell the user at the device.",
+    };
 
     private IReadOnlyList<(string, string)> AppendOptions =>
     [

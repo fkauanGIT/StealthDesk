@@ -36,13 +36,41 @@
     <ThemePicker />
 </SdCard>
 
+<SdCard Title="Remote control">
+    <p class="sd-muted">The person at a device can be told, in a message on their screen, when you start a remote control session of it.</p>
+    @if (profile is { NotifyOnRemoteControlOverriddenByTenant: true })
+    {
+        <p data-notify-preview><strong>@NotifyPreview</strong></p>
+        <p class="sd-muted">Your tenant sets this for everyone; you can't change it here.</p>
+    }
+    else
+    {
+        <div data-notify-choice>
+        <SdSegmented TValue="bool" Label="Tell the user at the device" Options="NotifyOptions" Value="notifyOnRemoteControl" ValueChanged="SaveNotifyAsync" />
+        <p class="sd-field-hint" data-notify-preview>@NotifyPreview</p>
+        </div>
+        @if (notifyError is not null)
+        {
+            <SdAlert>@notifyError</SdAlert>
+        }
+    }
+</SdCard>
+
 @code {
+    private static readonly IReadOnlyList<(bool, string)> NotifyOptions = [(true, "On"), (false, "Off")];
+
     private AccountProfile? profile;
     private string? phoneNumber;
     private bool busy;
     private bool saved;
     private string? error;
     private string? phoneError;
+    private bool notifyOnRemoteControl;
+    private string? notifyError;
+
+    private string NotifyPreview => notifyOnRemoteControl
+        ? "The user at the device is told when a session starts and ends."
+        : "The user at the device isn't told about sessions.";
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,6 +82,20 @@
         }
 
         phoneNumber = profile.PhoneNumber;
+        notifyOnRemoteControl = profile.NotifyOnRemoteControl;
+    }
+
+    private async Task SaveNotifyAsync(bool notify)
+    {
+        notifyError = null;
+        var previous = notifyOnRemoteControl;
+        notifyOnRemoteControl = notify;
+        var result = await Accounts.SetNotifyOnRemoteControlAsync(notify);
+        if (!result.Succeeded)
+        {
+            notifyOnRemoteControl = previous;
+            notifyError = result.Error;
+        }
     }
 
     private async Task SaveAsync()

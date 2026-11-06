@@ -28,7 +28,7 @@ public class TenantSettingsPageTests : AccountTestContext
   };
 
   private static TenantSettingList Settings(
-    string? append = null, string? name = null, string? defaultAppend = "false", string? defaultName = null, string? notify = null, string? defaultNotify = "true") => new()
+    string? append = null, string? name = null, string? defaultAppend = "false", string? defaultName = null, string? notify = null, string? defaultNotify = null) => new()
   {
     Items =
     [
@@ -116,7 +116,7 @@ public class TenantSettingsPageTests : AccountTestContext
   }
 
   [Fact]
-  public void TheRemoteControlNotice_ShowsTheDefault_AndIsSavedOnItsOwn()
+  public void TheRemoteControlNotice_LeftUnset_LeavesItToEachUser_AndIsSavedOnItsOwn()
   {
     Api.RespondWith(Me(PermissionNames.TenantSettingsWrite));
     Api.RespondWith(Settings());
@@ -124,8 +124,8 @@ public class TenantSettingsPageTests : AccountTestContext
     page.WaitForAssertion(() => Assert.NotNull(page.Find("form[data-remote-control]")));
     var card = () => page.Find("form[data-remote-control]");
 
-    Assert.Contains("Server default (on)", card().QuerySelector(".sd-segmented")!.TextContent);
-    Assert.Equal("The user at the device is told when a session starts and ends.", page.Find("[data-notify-preview]").TextContent);
+    Assert.Contains("Left to each user", card().QuerySelector(".sd-segmented")!.TextContent);
+    Assert.Equal("Each person chooses, for themselves, whether to tell the user at the device.", page.Find("[data-notify-preview]").TextContent);
 
     card().QuerySelectorAll(".sd-segmented button").Single(x => x.TextContent.Trim() == "Off").Click();
     Assert.Equal("The user at the device isn't told about sessions.", page.Find("[data-notify-preview]").TextContent);
