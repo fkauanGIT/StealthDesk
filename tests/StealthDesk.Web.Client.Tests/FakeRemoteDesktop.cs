@@ -8,6 +8,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
 {
     public event Action<DisplayList>? DisplaysChanged;
     public event Action<ScreenRegions>? RegionsReceived;
+    public event Action<CaptureMetrics>? MetricsReceived;
     public event Action<string>? ClipboardTextReceived;
     public event Action<SecureDesktop>? SecureDesktopChanged;
     public event Action<bool>? BlockInputChanged;
@@ -84,6 +85,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public void RaiseDisplays(DisplayList displays) => DisplaysChanged?.Invoke(displays);
 
     public void RaiseRegions(ScreenRegions regions) => RegionsReceived?.Invoke(regions);
+
+    public void RaiseMetrics(CaptureMetrics metrics) => MetricsReceived?.Invoke(metrics);
 
     public void RaiseEnded(string reason) => Ended?.Invoke(reason);
 

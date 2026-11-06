@@ -10,6 +10,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<ScreenRegions>? RegionsReceived;
 
+    event Action<CaptureMetrics>? MetricsReceived;
+
     event Action<string>? ClipboardTextReceived;
 
     event Action<SecureDesktop>? SecureDesktopChanged;

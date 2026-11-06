@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @implements IAsyncDisposable
 @using StealthDesk.Contracts.RemoteControl
+@using System.Globalization
 @using StealthDesk.Web.Client.RemoteControl
 @inject DeviceStore Store
 @inject ILiveUpdates Live
@@ -118,6 +119,10 @@ else
             {
                 <span class="sd-muted">View only</span>
             }
+            @if (metrics is { } m)
+            {
+                <span class="sd-muted">@m.Fps.ToString("0", CultureInfo.InvariantCulture) fps · @m.MbpsOut.ToString("0.0", CultureInfo.InvariantCulture) Mbps · @m.LatencyMs.ToString("0", CultureInfo.InvariantCulture) ms</span>
+            }
             @if (clipboardNote is { Length: > 0 })
             {
                 <span class="sd-muted">@clipboardNote</span>
@@ -148,6 +153,7 @@ else
     private bool canBlockInput;
     private bool blockInputActive;
     private bool privacyScreenActive;
+    private CaptureMetrics? metrics;
     private string clipboardNote = string.Empty;
     private bool secureScreen;
     private string? secureScreenName;
@@ -286,6 +292,7 @@ else
         connection = Connections.Create(new Uri(Nav.BaseUri), tickets);
         connection.DisplaysChanged += OnDisplays;
         connection.RegionsReceived += OnRegions;
+        connection.MetricsReceived += OnMetrics;
         connection.ClipboardTextReceived += OnClipboardText;
         connection.SecureDesktopChanged += OnSecureDesktop;
         connection.BlockInputChanged += OnBlockInput;
@@ -340,6 +347,12 @@ else
     private void OnPrivacyScreen(bool active) => _ = InvokeAsync(() =>
     {
         privacyScreenActive = active;
+        StateHasChanged();
+    });
+
+    private void OnMetrics(CaptureMetrics received) => _ = InvokeAsync(() =>
+    {
+        metrics = received;
         StateHasChanged();
     });
 
@@ -510,6 +523,7 @@ else
         await Hub.EndDeviceAccessAsync();
         blockInputActive = false;
         privacyScreenActive = false;
+        metrics = null;
         self?.Dispose();
         self = null;
         cts?.Dispose();

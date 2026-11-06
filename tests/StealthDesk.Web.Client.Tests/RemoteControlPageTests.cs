@@ -244,6 +244,21 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task CaptureMetrics_AreShownToTheViewer_AsTheyArrive()
+  {
+    await LoadAsync(_device);
+
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    Assert.DoesNotContain("fps", page.Markup);
+
+    _remote.RaiseMetrics(new CaptureMetrics(Fps: 29.6, MbpsOut: 1.23, Quality: 60, Mode: "GDI", LatencyMs: 17.8));
+
+    page.WaitForAssertion(() => Assert.Contains("30 fps · 1.2 Mbps · 18 ms", page.Markup));
+  }
+
+  [Fact]
   public async Task ASecureScreen_IsShownToTheViewer_AndClearsWhenItGoesAway()
   {
     await LoadAsync(_device);
