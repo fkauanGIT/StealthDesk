@@ -3,7 +3,9 @@ using System.Runtime.Versioning;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.DesktopClients;
+using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Ipc;
+using StealthDesk.RemoteControl;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.System.RemoteDesktop;
@@ -14,9 +16,34 @@ namespace StealthDesk.DesktopClient;
 [SupportedOSPlatform("windows6.1")]
 internal sealed class DesktopClientEndpoint(
   RemoteControlSessions remoteControl,
+  Func<IScreenCapture> captures,
+  RegionEncoder encode,
   IHostApplicationLifetime lifetime,
   ILogger<DesktopClientEndpoint> logger) : IDesktopClientEndpoint
 {
+  /// <summary>Light enough for a quick look, not for driving the mouse by.</summary>
+  private const int PreviewQuality = 60;
+
+  public Task<DesktopPreview> CapturePreview(CancellationToken cancellationToken)
+  {
+    using var capture = captures();
+    var displays = capture.Displays();
+    var display = displays.FirstOrDefault(x => x.IsPrimary) ?? displays.FirstOrDefault();
+    if (display is null)
+    {
+      return Task.FromException<DesktopPreview>(new InvalidOperationException("This session has no display to capture."));
+    }
+
+    var captured = capture.Capture(display, fullFrame: true, drawCursor: true);
+    if (captured.Frame is not { } frame)
+    {
+      return Task.FromException<DesktopPreview>(new InvalidOperationException(captured.Error ?? "The screen couldn't be captured."));
+    }
+
+    var region = encode(frame, [frame.Bounds], ImageEncoding.Jpeg, PreviewQuality).Regions.Single();
+    return Task.FromResult(new DesktopPreview(region.Image, region.Encoding));
+  }
+
   public Task<DesktopSessionInfo> GetSessionInfo(CancellationToken cancellationToken)
   {
     var sessionId = CurrentSession.Id;

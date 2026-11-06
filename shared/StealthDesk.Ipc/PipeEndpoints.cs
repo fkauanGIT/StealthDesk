@@ -28,4 +28,7 @@ public partial interface IDesktopClientEndpoint
   /// and throws with why when it isn't.
   /// </summary>
   Task StartRemoteControl(DesktopRemoteControlStart request, CancellationToken cancellationToken);
+
+  /// <summary>One still picture of this session's current screen, taken without starting a remote control session.</summary>
+  Task<DesktopPreview> CapturePreview(CancellationToken cancellationToken);
 }

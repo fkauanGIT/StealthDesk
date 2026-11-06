@@ -1176,6 +1176,15 @@ a.sd-btn:hover {
   background: var(--sd-raised);
 }
 
+.sd-desktop-preview {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  border: 1px solid var(--sd-border-strong);
+  border-radius: 14px;
+  margin-bottom: var(--sd-space-3);
+}
+
 .sd-back {
   display: inline-flex;
   align-items: center;

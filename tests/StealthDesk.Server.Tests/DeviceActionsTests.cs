@@ -98,6 +98,7 @@ public class DeviceActionsTests
     [PermissionNames.DeviceCtrlAltDelSend] = x => x.SendCtrlAltDel,
     [PermissionNames.DeviceClipboardRead] = x => x.ReadClipboard,
     [PermissionNames.DeviceClipboardWrite] = x => x.WriteClipboard,
+    [PermissionNames.DeviceDesktopPreviewRead] = x => x.SeeDesktopPreview,
   };
 
   public static TheoryData<string> RemoteControlPermissions => [.. RemoteControlActions.Keys];

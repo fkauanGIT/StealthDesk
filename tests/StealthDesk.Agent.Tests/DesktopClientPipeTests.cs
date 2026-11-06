@@ -323,7 +323,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
       TimeProvider.System,
       _clientLifetime,
       NullLogger<RemoteControlSessions>.Instance);
-    var (_, clientSide) = await ConnectAsync(new DesktopClientEndpoint(sessions, _clientLifetime, NullLogger<DesktopClientEndpoint>.Instance));
+    var (_, clientSide) = await ConnectAsync(new DesktopClientEndpoint(sessions, () => new FakeScreen(), FakeScreen.Encode, _clientLifetime, NullLogger<DesktopClientEndpoint>.Instance));
     await clientSide.Remote.ClientReady(Hello, Token);
     var request = Request(desktopSession: Hello.SessionId);
 
@@ -337,6 +337,32 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
     var session = Assert.Single(sessions.Running);
     Assert.Equal(request.RelaySessionId, session.Id);
     Assert.Equal(request.Permissions, session.Permissions);
+  }
+
+  [Fact]
+  public async Task TheDesktopClient_CapturesItsPrimaryDisplay_AsAWholeFrame()
+  {
+    var endpoint = new DesktopClientEndpoint(
+      new RemoteControlSessions(
+        (_, _) => new TaskCompletionSource<System.Net.WebSockets.WebSocket>().Task,
+        () => new FakeScreen(),
+        FakeScreen.Encode,
+        new Fakes.NoInput(),
+        new Fakes.FakeClipboard(),
+        new Fakes.FakeInputDesktop(),
+        new Fakes.FakePrivacyScreen(),
+        new SilentNotice(),
+        TimeProvider.System,
+        _clientLifetime,
+        NullLogger<RemoteControlSessions>.Instance),
+      () => new FakeScreen(),
+      FakeScreen.Encode,
+      _clientLifetime,
+      NullLogger<DesktopClientEndpoint>.Instance);
+
+    var preview = await endpoint.CapturePreview(Token);
+
+    Assert.Equal(ImageEncoding.Jpeg, preview.Encoding);
   }
 
   [Fact]
@@ -361,6 +387,58 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
     var sessions = await RemoteControl().SessionsAsync(Token);
 
     Assert.Equal([new RemoteDesktopSession(7, "bob", IsConsole: true)], sessions);
+  }
+
+  [Fact]
+  public async Task APreview_ComesFromTheOnlyClient()
+  {
+    await ConnectAsync(new TestClientEndpoint { Preview = new DesktopPreview([9, 9], ImageEncoding.Png) });
+
+    var preview = await RemoteControl().PreviewAsync(Token);
+
+    Assert.True(preview.Succeeded, preview.Error);
+    Assert.Equal<byte[]>([9, 9], preview.Value!.Image);
+    Assert.Equal(ImageEncoding.Png, preview.Value.Encoding);
+  }
+
+  [Fact]
+  public async Task APreview_PrefersTheConsoleSessionOverAnother()
+  {
+    await ConnectAsync(new TestClientEndpoint
+    {
+      Info = new DesktopSessionInfo(8, "carol", IsConsole: false),
+      Preview = new DesktopPreview([1], ImageEncoding.Jpeg),
+    });
+    await ConnectAsync(new TestClientEndpoint
+    {
+      Info = new DesktopSessionInfo(7, "bob", IsConsole: true),
+      Preview = new DesktopPreview([2], ImageEncoding.Jpeg),
+    });
+
+    var preview = await RemoteControl().PreviewAsync(Token);
+
+    Assert.True(preview.Succeeded, preview.Error);
+    Assert.Equal<byte[]>([2], preview.Value!.Image);
+  }
+
+  [Fact]
+  public async Task APreview_WithNoClientConnected_IsRefused()
+  {
+    var preview = await RemoteControl().PreviewAsync(Token);
+
+    Assert.False(preview.Succeeded);
+    Assert.Equal("No desktop client is connected.", preview.Error);
+  }
+
+  [Fact]
+  public async Task APreview_TheClientRefuses_WithWhy()
+  {
+    await ConnectAsync(new TestClientEndpoint { RefusePreview = "The screen is locked." });
+
+    var preview = await RemoteControl().PreviewAsync(Token);
+
+    Assert.False(preview.Succeeded);
+    Assert.Equal("The screen is locked.", preview.Error);
   }
 
   public ValueTask DisposeAsync()
@@ -430,11 +508,17 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
   {
     public string? Refuse { get; init; }
 
+    public string? RefusePreview { get; init; }
+
     public bool Hang { get; init; }
 
     public bool Cancelled { get; private set; }
 
     public List<string> Shutdowns { get; } = [];
+
+    public DesktopSessionInfo Info { get; init; } = new(7, "bob", IsConsole: true);
+
+    public DesktopPreview Preview { get; init; } = new([1, 2, 3], ImageEncoding.Jpeg);
 
     public async Task<DesktopSessionInfo> GetSessionInfo(CancellationToken cancellationToken)
     {
@@ -456,7 +540,7 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
         }
       }
 
-      return new DesktopSessionInfo(7, "bob", IsConsole: true);
+      return Info;
     }
 
     public Task Shutdown(string reason, CancellationToken cancellationToken)
@@ -477,6 +561,11 @@ public sealed class DesktopClientPipeTests : IAsyncDisposable
       RemoteControlStarts.Add(request);
       return Task.CompletedTask;
     }
+
+    public Task<DesktopPreview> CapturePreview(CancellationToken cancellationToken) =>
+      RefusePreview is not null
+        ? Task.FromException<DesktopPreview>(new InvalidOperationException(RefusePreview))
+        : Task.FromResult(Preview);
   }
 
   private sealed class SilentNotice : IUserNotice

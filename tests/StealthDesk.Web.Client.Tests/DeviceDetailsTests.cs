@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using StealthDesk.Contracts;
 using StealthDesk.Contracts.Devices;
+using StealthDesk.Contracts.Messaging;
 using StealthDesk.Web.Client.Devices;
 using StealthDesk.Web.Client.Pages;
 
@@ -9,15 +11,18 @@ namespace StealthDesk.Web.Client.Tests;
 public class DeviceDetailsTests : BunitContext
 {
   private readonly FakeApi _api = new();
+  private readonly FakeDeviceHub _hub = new();
+  private readonly FakeLiveUpdates _live = new();
 
   public DeviceDetailsTests()
   {
     Services.AddSingleton(_api.CreateClient());
     Services.AddSingleton<DeviceStore>();
-    Services.AddSingleton<ILiveUpdates>(new FakeLiveUpdates());
-    Services.AddSingleton<IDeviceHub>(new FakeDeviceHub());
+    Services.AddSingleton<ILiveUpdates>(_live);
+    Services.AddSingleton<IDeviceHub>(_hub);
     Services.AddSingleton<StealthDesk.Web.Client.DeviceGroups.DeviceGroupApi>();
     AddAuthorization();
+    _live.Become(LiveState.Live);
   }
 
   private DeviceStore Store => Services.GetRequiredService<DeviceStore>();
@@ -86,6 +91,63 @@ public class DeviceDetailsTests : BunitContext
     Store.Apply(device with { IsOnline = false, LastSeen = device.LastSeen.AddMinutes(1) });
 
     page.WaitForAssertion(() => Assert.Equal("Offline", page.Find(".device-status").TextContent));
+  }
+
+  [Fact]
+  public void WithThePermission_TheDesktopPreview_IsShown()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktopPreview: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Contains("sd-desktop-preview", page.Markup));
+    var image = page.Find("img.sd-desktop-preview");
+    Assert.Equal(Routes.DeviceDesktopPreview(device.Id), image.GetAttribute("src"));
+  }
+
+  [Fact]
+  public void WithoutThePermission_TheDesktopPreview_IsNotShown()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktopPreview: false));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain("sd-desktop-preview", page.Markup);
+  }
+
+  [Fact]
+  public void WithThePermission_ButOffline_TheDesktopPreview_IsStillRendered()
+  {
+    // Not conditioned on IsOnline: a live push flipping it would tear the element down and fetch again. An offline
+    // device's request just answers 404, handled by the image's own onerror at the browser level.
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktopPreview: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Contains("sd-desktop-preview", page.Markup));
+  }
+
+  [Fact]
+  public async Task APushThatFlipsOnlineStatus_LeavesTheDesktopPreview_Rendered()
+  {
+    var device = Detailed();
+    _api.RespondWith(new[] { device });
+    await Store.LoadAsync();
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SeeDesktopPreview: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains("sd-desktop-preview", page.Markup));
+
+    Store.Apply(device with { IsOnline = false, LastSeen = device.LastSeen.AddMinutes(1) });
+    Store.Apply(device with { IsOnline = true, LastSeen = device.LastSeen.AddMinutes(2) });
+
+    page.WaitForAssertion(() => Assert.Contains("sd-desktop-preview", page.Markup));
   }
 
   [Fact]

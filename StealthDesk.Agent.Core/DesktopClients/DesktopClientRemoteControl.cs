@@ -76,4 +76,34 @@ public sealed class DesktopClientRemoteControl(
       request.DesktopSessionId);
     return request.RelaySessionId;
   }
+
+  /// <summary>
+  /// One still picture of the device's current desktop: the console session's, or the first one answering if there
+  /// is no console session connected.
+  /// </summary>
+  public async Task<Outcome<DesktopPreview>> PreviewAsync(CancellationToken cancellationToken)
+  {
+    var clientList = clients.All;
+    if (clientList.Count == 0)
+    {
+      return Outcome.Failure<DesktopPreview>("No desktop client is connected.");
+    }
+
+    var withInfo = await Task.WhenAll(clientList.Select(async client =>
+      (Client: client, Info: await client.Pipe.Ask((remote, token) => remote.GetSessionInfo(token), AnswerTimeLimit, cancellationToken))));
+    var chosen = withInfo
+      .Where(x => x.Info.Answered)
+      .OrderByDescending(x => x.Info.Value!.IsConsole)
+      .FirstOrDefault();
+    if (chosen.Client is null)
+    {
+      return Outcome.Failure<DesktopPreview>("No desktop client answered.");
+    }
+
+    var preview = await chosen.Client.Pipe.Ask((remote, token) => remote.CapturePreview(token), PreviewTimeLimit, cancellationToken);
+    return preview.Answered ? preview.Value! : Outcome.Failure<DesktopPreview>(preview.Refusal!);
+  }
+
+  /// <summary>How long a desktop client gets to capture and encode a preview: heavier than a ping.</summary>
+  private static readonly TimeSpan PreviewTimeLimit = TimeSpan.FromSeconds(10);
 }

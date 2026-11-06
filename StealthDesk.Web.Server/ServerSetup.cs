@@ -53,9 +53,12 @@ public static class ServerSetup
       .Validate(x => x.PartnerTimeout > TimeSpan.Zero, $"{RelayOptions.Section}:{nameof(RelayOptions.PartnerTimeout)} must be longer than zero.")
       .Validate(x => x.MaxMessageBytes > 0, $"{RelayOptions.Section}:{nameof(RelayOptions.MaxMessageBytes)} must be more than zero.")
       .ValidateOnStart();
+    builder.Services.AddOptions<RemoteControlOptions>()
+      .Bind(builder.Configuration.GetSection(RemoteControlOptions.Section));
     builder.Services.AddSingleton<RelaySessions>();
     builder.Services.AddSingleton<IRelaySessions>(provider => provider.GetRequiredService<RelaySessions>());
-    builder.Services.AddSignalR().AddMessagePackProtocol();
+    // Above the 32 KB default: a desktop preview's picture, answered over this same gateway, is usually bigger.
+    builder.Services.AddSignalR(options => options.MaximumReceiveMessageSize = 4 * 1024 * 1024).AddMessagePackProtocol();
     // SignalR logs every hub call with its arguments below Information: what is typed in a terminal, passwords
     // included, and what commands print. Added after the configuration's rules, so turning Debug on can't reach it.
     builder.Logging.AddFilter("Microsoft.AspNetCore.SignalR.Internal.DefaultHubDispatcher", level => level >= LogLevel.Information);

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Permissions;
@@ -36,6 +37,7 @@ public sealed class DashboardHub(
   IRelaySessions relay,
   IRemoteControlSessions remoteControl,
   TenantSettingService tenantSettings,
+  IOptions<RemoteControlOptions> desktopPreview,
   StealthDeskDb db,
   TimeProvider clock,
   ILogger<DashboardHub> logger)
@@ -119,7 +121,8 @@ public sealed class DashboardHub(
       SendCtrlAltDel: await MayAsync(device, PermissionNames.DeviceCtrlAltDelSend),
       ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
       WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite),
-      BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput)));
+      BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput),
+      SeeDesktopPreview: desktopPreview.Value.EnableDesktopPreview && await MayAsync(device, PermissionNames.DeviceDesktopPreviewRead)));
   }
 
   /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>

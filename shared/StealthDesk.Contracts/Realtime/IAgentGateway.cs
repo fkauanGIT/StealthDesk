@@ -1,4 +1,5 @@
 using StealthDesk.Contracts.Devices;
+using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
@@ -50,4 +51,7 @@ public interface IAgentCallbacks
   /// id once the client took the request, before it joins: the other end joins only after the answer.
   /// </summary>
   Task<GatewayReply<Guid>> StartRemoteControl(RemoteControlRequest request, CancellationToken cancellationToken);
+
+  /// <summary>One still picture of the device's current desktop, without starting a remote control session.</summary>
+  Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken);
 }

@@ -28,3 +28,7 @@ public sealed record DesktopRemoteControlStart(
   string ViewerName,
   ViewerPermissions Permissions,
   bool NotifyUser);
+
+/// <summary>One still picture of a desktop client's current screen, taken outside of any remote control session.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record DesktopPreview(byte[] Image, ImageEncoding Encoding);

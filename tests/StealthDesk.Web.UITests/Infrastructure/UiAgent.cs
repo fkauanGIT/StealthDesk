@@ -172,6 +172,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<Guid>> StartRemoteControl(StealthDesk.Contracts.RemoteControl.RemoteControlRequest request, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+    public Task<GatewayReply<StealthDesk.Contracts.DesktopClients.DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.DesktopClients.DesktopPreview>(NoAnswers));
   }
 }
 
