@@ -48,6 +48,9 @@ Each clipboard button shows only with its permission, and says what happened ("C
 or that the browser itself blocked reading or writing its clipboard, which it can without a user gesture or over
 plain HTTP).
 
+The toolbar also shows how the capture is doing — frames per second, outgoing bandwidth and round-trip latency —
+updated about once a second for as long as the session is open. No permission is needed; it comes with the session.
+
 ## Secure screens
 
 A UAC prompt, the lock screen and Ctrl+Alt+Del's own screen all run apart from the desktop you were on. With
