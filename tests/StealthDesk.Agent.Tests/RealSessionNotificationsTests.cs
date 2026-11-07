@@ -19,7 +19,13 @@ public sealed class RealSessionNotificationsTests : IDisposable
   private const int WTS_SESSION_LOCK = 7;
   private const int WTS_SESSION_REMOTE_CONTROL = 9;
 
-  private readonly WindowsSessionNotifications _notifications = new(NullLogger<WindowsSessionNotifications>.Instance);
+  private readonly WindowsSessionNotifications _notifications;
+
+  public RealSessionNotificationsTests()
+  {
+    Assert.SkipUnless(OperatingSystem.IsWindowsVersionAtLeast(6, 1), "Needs Windows.");
+    _notifications = new WindowsSessionNotifications(NullLogger<WindowsSessionNotifications>.Instance);
+  }
 
   [Fact]
   public async Task AKnownReason_ArrivesAsItsKind_AndAnUnrelatedOneIsIgnored()
