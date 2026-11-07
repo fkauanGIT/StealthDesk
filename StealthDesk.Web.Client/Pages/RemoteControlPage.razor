@@ -135,6 +135,11 @@ else
         <SdAlert Tone="Tone.Warning">The device is showing a secure screen@(secureScreenName is { Length: > 0 } s ? $" ({s})" : ""), which you may not see. It will come back when the device leaves it.</SdAlert>
     }
 
+    @if (state == ViewState.Streaming && sessionChangeNote is { Length: > 0 })
+    {
+        <SdAlert Tone="Tone.Info">@sessionChangeNote</SdAlert>
+    }
+
     <div @ref="stage" class="sd-remote-stage" hidden="@(state != ViewState.Streaming)">
         <canvas @ref="canvas" class="sd-remote-canvas"></canvas>
     </div>
@@ -154,6 +159,7 @@ else
     private bool blockInputActive;
     private bool privacyScreenActive;
     private CaptureMetrics? metrics;
+    private string? sessionChangeNote;
     private string clipboardNote = string.Empty;
     private bool secureScreen;
     private string? secureScreenName;
@@ -297,6 +303,7 @@ else
         connection.SecureDesktopChanged += OnSecureDesktop;
         connection.BlockInputChanged += OnBlockInput;
         connection.PrivacyScreenChanged += OnPrivacyScreen;
+        connection.SessionChanged += OnSessionChanged;
         connection.Ended += reason => _ = InvokeAsync(() => End(reason));
         cts = new CancellationTokenSource();
 
@@ -353,6 +360,19 @@ else
     private void OnMetrics(CaptureMetrics received) => _ = InvokeAsync(() =>
     {
         metrics = received;
+        StateHasChanged();
+    });
+
+    private void OnSessionChanged(SessionChangeKind kind) => _ = InvokeAsync(() =>
+    {
+        sessionChangeNote = kind switch
+        {
+            SessionChangeKind.Locked => "The device locked its screen.",
+            SessionChangeKind.Unlocked => "The device unlocked its screen.",
+            SessionChangeKind.UserSwitched => "The device switched to another user.",
+            SessionChangeKind.LoggedOff => "The person at the device signed out.",
+            _ => sessionChangeNote,
+        };
         StateHasChanged();
     });
 
@@ -524,6 +544,7 @@ else
         blockInputActive = false;
         privacyScreenActive = false;
         metrics = null;
+        sessionChangeNote = null;
         self?.Dispose();
         self = null;
         cts?.Dispose();
