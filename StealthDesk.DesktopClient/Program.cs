@@ -55,6 +55,9 @@ builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputDesktop, Win
 builder.Services.AddSingleton<IPrivacyScreen>(provider =>
   OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041) ? new WindowsPrivacyScreen(provider.GetRequiredService<ILogger<WindowsPrivacyScreen>>())
   : new NoPrivacyScreen());
+builder.Services.AddSingleton<Func<ISessionNotifications>>(provider => () =>
+  OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new WindowsSessionNotifications(provider.GetRequiredService<ILogger<WindowsSessionNotifications>>())
+  : throw new PlatformNotSupportedException());
 builder.Services.AddSingleton<RemoteControlSessions>();
 builder.Services.AddSingleton<IDesktopClientEndpoint, DesktopClientEndpoint>();
 builder.Services.AddSingleton(provider => ActivatorUtilities.CreateInstance<AgentConnection>(

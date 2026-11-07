@@ -57,6 +57,11 @@ A UAC prompt, the lock screen and Ctrl+Alt+Del's own screen all run apart from t
 `device.remote-control.elevated-desktop` the session follows the device there, so it is shown and usable; without
 it, a message says a secure screen is up, and the normal view comes back once the device leaves it.
 
+## Session changes
+
+While a session is open, you're told when the device's own Windows session locks, unlocks, switches to another
+user, or signs out — beyond the secure screen message above, which only covers a lock. No permission is needed.
+
 ## What the person at the device sees
 
 They are told in a message on their screen when a session starts and ends, naming who is controlling their

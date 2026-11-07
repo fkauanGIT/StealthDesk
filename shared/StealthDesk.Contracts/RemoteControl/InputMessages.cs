@@ -89,6 +89,27 @@ public sealed record RequestClipboard;
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record SecureDesktop(bool Active, string? Screen);
 
+/// <summary>What changed about the device's Windows session.</summary>
+public enum SessionChangeKind
+{
+  /// <summary>The session locked.</summary>
+  Locked = 1,
+
+  /// <summary>The session unlocked.</summary>
+  Unlocked = 2,
+
+  /// <summary>Another user took over the session.</summary>
+  UserSwitched = 3,
+
+  /// <summary>The session's user signed out.</summary>
+  LoggedOff = 4,
+}
+
+/// <summary>The device's Windows session locked, unlocked, switched to another user, or signed out.</summary>
+/// <param name="Kind">What changed.</param>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record SessionChanged(SessionChangeKind Kind);
+
 /// <summary>Limits shared by both ends for the clipboard.</summary>
 public static class Clipboard
 {

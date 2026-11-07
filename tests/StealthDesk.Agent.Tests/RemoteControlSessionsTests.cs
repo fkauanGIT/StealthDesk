@@ -24,6 +24,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private readonly Fakes.FakeInputDesktop _inputDesktop = new();
   private readonly Fakes.NoInput _input = new();
   private readonly Fakes.FakePrivacyScreen _privacyScreen = new();
+  private readonly Fakes.FakeSessionNotifications _sessionNotifications = new();
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
@@ -347,6 +348,21 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     Assert.DoesNotContain(received, x => x.Type == StreamMessageType.SecureDesktop);
   }
 
+  [Fact]
+  public async Task ASessionChange_ReachesTheViewer()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+
+    _sessionNotifications.Raise(SessionChangeKind.Locked);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.SessionChanged)));
+    Assert.Equal(SessionChangeKind.Locked, Read<SessionChanged>(received.First(x => x.Type == StreamMessageType.SessionChanged)).Kind);
+  }
+
   private static ViewerPermissions Elevated => new(Interact: true, UseSecureScreens: true, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: false);
 
   private static ViewerPermissions Writer => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: true, BlockInput: false);
@@ -356,7 +372,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private static ViewerPermissions Blocker => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: true);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _privacyScreen, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _privacyScreen, () => _sessionNotifications, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

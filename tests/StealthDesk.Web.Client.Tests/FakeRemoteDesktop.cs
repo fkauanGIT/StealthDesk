@@ -13,6 +13,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public event Action<SecureDesktop>? SecureDesktopChanged;
     public event Action<bool>? BlockInputChanged;
     public event Action<bool>? PrivacyScreenChanged;
+    public event Action<SessionChangeKind>? SessionChanged;
     public event Action<string>? Ended;
 
     public List<string> Calls { get; } = [];
@@ -75,6 +76,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public void RaiseBlockInput(bool active) => BlockInputChanged?.Invoke(active);
 
     public void RaisePrivacyScreen(bool active) => PrivacyScreenChanged?.Invoke(active);
+
+    public void RaiseSessionChanged(SessionChangeKind kind) => SessionChanged?.Invoke(kind);
 
     public ValueTask DisposeAsync()
     {

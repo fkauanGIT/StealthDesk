@@ -258,6 +258,22 @@ public class RemoteControlPageTests : BunitContext
     page.WaitForAssertion(() => Assert.Contains("30 fps · 1.2 Mbps · 18 ms", page.Markup));
   }
 
+  [Theory]
+  [InlineData(SessionChangeKind.Locked, "locked its screen")]
+  [InlineData(SessionChangeKind.Unlocked, "unlocked its screen")]
+  [InlineData(SessionChangeKind.UserSwitched, "switched to another user")]
+  [InlineData(SessionChangeKind.LoggedOff, "signed out")]
+  public async Task ASessionChange_IsShownToTheViewer(SessionChangeKind kind, string expected)
+  {
+    await LoadAsync(_device);
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    _remote.RaiseSessionChanged(kind);
+
+    page.WaitForAssertion(() => Assert.Contains(expected, page.Markup));
+  }
+
   [Fact]
   public async Task ASecureScreen_IsShownToTheViewer_AndClearsWhenItGoesAway()
   {

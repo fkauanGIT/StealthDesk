@@ -73,6 +73,9 @@ public enum StreamMessageType
   /// displays; from the desktop client, in answer, with the overlay's actual state.
   /// </summary>
   PrivacyScreen = 20,
+
+  /// <summary><see cref="RemoteControl.SessionChanged"/>, from the desktop client: the device's Windows session changed.</summary>
+  SessionChanged = 21,
 }
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>

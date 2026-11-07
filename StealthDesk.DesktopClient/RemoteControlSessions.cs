@@ -75,6 +75,7 @@ internal sealed class RemoteControlSessions(
   IClipboard clipboard,
   IInputDesktop inputDesktop,
   IPrivacyScreen privacyScreen,
+  Func<ISessionNotifications> sessionNotifications,
   IUserNotice notice,
   TimeProvider clock,
   IHostApplicationLifetime lifetime,
@@ -138,10 +139,13 @@ internal sealed class RemoteControlSessions(
         using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         var sending = streamer.RunAsync(streaming.Token);
         var guarding = MonitorDesktopAsync(session, stream, streaming.Token);
+        using var notifications = sessionNotifications();
+        var watching = WatchSessionAsync(session, notifications, stream, streaming.Token);
         var ended = await stream.RunAsync((message, ct) => HandleAsync(session, streamer, input, stream, message, ct), lifetime.ApplicationStopping);
         await streaming.CancelAsync();
         await sending;
         await guarding;
+        await watching;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
       }
     }
@@ -222,6 +226,26 @@ internal sealed class RemoteControlSessions(
     catch (Exception ex)
     {
       logger.LogDebug(ex, "Watching the input desktop of session {SessionId} stopped.", session.Id);
+    }
+  }
+
+  // Tells the viewer about a lock, unlock, logoff or user switch of the device's own Windows session.
+  private async Task WatchSessionAsync(RemoteControlSession session, ISessionNotifications notifications, RelayStream stream, CancellationToken cancellationToken)
+  {
+    try
+    {
+      await foreach (var kind in notifications.Changes.WithCancellation(cancellationToken))
+      {
+        await stream.SendAsync(StreamMessageType.SessionChanged, new SessionChanged(kind), cancellationToken);
+      }
+    }
+    catch (OperationCanceledException)
+    {
+      // The session ended.
+    }
+    catch (Exception ex)
+    {
+      logger.LogDebug(ex, "Watching session changes of session {SessionId} stopped.", session.Id);
     }
   }
 

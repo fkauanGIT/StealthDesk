@@ -42,6 +42,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   /// <summary>The privacy screen on the device is now shown or hidden, as the device just confirmed.</summary>
   public event Action<bool>? PrivacyScreenChanged;
 
+  /// <summary>The device's own Windows session locked, unlocked, switched to another user, or signed out.</summary>
+  public event Action<SessionChangeKind>? SessionChanged;
+
   /// <summary>Done when the session ends, with why (the relay closing, the device leaving, an error).</summary>
   public event Action<string>? Ended;
 
@@ -161,6 +164,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
           break;
         case StreamMessageType.PrivacyScreen:
           PrivacyScreenChanged?.Invoke(MessagePackSerializer.Deserialize<PrivacyScreen>(message.Payload).Active);
+          break;
+        case StreamMessageType.SessionChanged:
+          SessionChanged?.Invoke(MessagePackSerializer.Deserialize<SessionChanged>(message.Payload).Kind);
           break;
         default:
           logger.LogDebug("The viewer ignored a {Type} message.", message.Type);

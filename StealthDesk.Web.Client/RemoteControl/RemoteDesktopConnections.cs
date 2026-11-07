@@ -20,6 +20,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<bool>? PrivacyScreenChanged;
 
+    event Action<SessionChangeKind>? SessionChanged;
+
     event Action<string>? Ended;
 
     Task StartAsync(CancellationToken cancellationToken);
