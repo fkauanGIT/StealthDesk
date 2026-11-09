@@ -10,6 +10,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
 
     event Action<ScreenRegions>? RegionsReceived;
 
+    event Action<VideoPacket>? VideoPacketReceived;
+
     event Action<CaptureMetrics>? MetricsReceived;
 
     event Action<string>? ClipboardTextReceived;
@@ -27,6 +29,8 @@ public interface IRemoteDesktopConnection : IAsyncDisposable
     Task StartAsync(CancellationToken cancellationToken);
 
     Task ApplyAsync(CaptureSettings settings);
+
+    Task SetCaptureModeAsync(CaptureMode mode);
 
     Task ChangeDisplayAsync(string displayId);
 

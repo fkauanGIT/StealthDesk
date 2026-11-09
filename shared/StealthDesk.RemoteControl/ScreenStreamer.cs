@@ -44,7 +44,7 @@ public delegate ScreenRegions RegionEncoder(Frame frame, IReadOnlyList<Region> r
 /// best once the bandwidth allows, with what changed meanwhile. With a maximum bandwidth set, nothing is captured
 /// while more is being sent. How it goes is sent to the viewer every second.
 /// </remarks>
-public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode, RelayStream stream, TimeProvider clock, ILogger logger)
+public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode, RelayStream stream, TimeProvider clock, ILogger logger, CaptureModeSwitch? mode = null)
 {
   private static readonly TimeSpan NoChangeDelay = TimeSpan.FromMilliseconds(10);
   private static readonly TimeSpan FailureDelay = TimeSpan.FromMilliseconds(100);
@@ -132,6 +132,12 @@ public sealed class ScreenStreamer(IScreenCapture capture, RegionEncoder encode,
     {
       try
       {
+        if (mode?.Mode == CaptureMode.Video)
+        {
+          await Task.Delay(NoChangeDelay, clock, cancellationToken);
+          continue;
+        }
+
         if (clock.GetUtcNow() >= nextMetrics)
         {
           nextMetrics = clock.GetUtcNow() + MetricsInterval;

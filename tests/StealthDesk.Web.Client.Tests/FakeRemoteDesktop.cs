@@ -8,6 +8,7 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
 {
     public event Action<DisplayList>? DisplaysChanged;
     public event Action<ScreenRegions>? RegionsReceived;
+    public event Action<VideoPacket>? VideoPacketReceived;
     public event Action<CaptureMetrics>? MetricsReceived;
     public event Action<string>? ClipboardTextReceived;
     public event Action<SecureDesktop>? SecureDesktopChanged;
@@ -49,6 +50,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
         return Task.CompletedTask;
     }
 
+    public Task SetCaptureModeAsync(CaptureMode mode) => Record($"capture-mode {mode}");
+
     public Task MovePointerAsync(double x, double y) => Record($"move {x} {y}");
 
     public Task MouseButtonAsync(int button, bool isPressed, double x, double y) => Record($"button {button} {isPressed}");
@@ -88,6 +91,8 @@ internal sealed class FakeRemoteDesktop : IRemoteDesktopConnection, IRemoteDeskt
     public void RaiseDisplays(DisplayList displays) => DisplaysChanged?.Invoke(displays);
 
     public void RaiseRegions(ScreenRegions regions) => RegionsReceived?.Invoke(regions);
+
+    public void RaiseVideoPacket(VideoPacket packet) => VideoPacketReceived?.Invoke(packet);
 
     public void RaiseMetrics(CaptureMetrics metrics) => MetricsReceived?.Invoke(metrics);
 

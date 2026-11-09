@@ -7,7 +7,8 @@ restarts it 5 seconds after it fails.
 
 The **Add device** page gives the command that installs it, for PowerShell as an administrator on the machine. It
 downloads the agent from the server (`/downloads/agent/windows`, open to anyone, since the machine has no account): a
-zip of `StealthDesk.Agent.exe` and its [desktop client](#the-desktop-client) in `DesktopClient\`. It unpacks and runs
+zip of `StealthDesk.Agent.exe` and its [desktop client](#the-desktop-client) in `DesktopClient\`, alongside `ffmpeg.exe`
+and its license, which the desktop client's video mode runs as its own process. It unpacks and runs
 it only if the zip's SHA-256 is the one the page named, deletes the download and what it unpacked either way, and
 carries the installer key but no password. Each program is a single executable with the .NET runtime inside, so the
 machine needs nothing else. Running the command again updates an installed agent in place; it keeps the device's
@@ -28,6 +29,7 @@ dotnet publish StealthDesk.DesktopClient -p:PublishProfile=Windows -o publish/de
 New-Item -ItemType Directory -Force publish/bundle/DesktopClient, StealthDesk.Web.Server/downloads/windows | Out-Null
 Copy-Item publish/agent/StealthDesk.Agent.exe publish/bundle/
 Copy-Item publish/desktop-client/StealthDesk.DesktopClient.exe publish/bundle/DesktopClient/
+# ffmpeg.exe for the video mode: put a copy next to the desktop client too, or that mode silently does nothing.
 Compress-Archive -Path publish/bundle/* -DestinationPath StealthDesk.Web.Server/downloads/windows/StealthDesk.Agent.zip -Force
 ```
 
@@ -92,6 +94,12 @@ image waits for the viewer to acknowledge enough of the ones before.
 The quality is set by the viewer, or follows the bandwidth used (80 up to 5 Mbps, 20 from 15 Mbps); images sent at a
 lower quality are sent again at the best once there is room. The viewer may also cap the bandwidth, and ask for the
 pointer to be drawn into the screen; its shape is sent whenever it changes either way.
+
+The viewer may choose video instead of regions, for fast-changing content: the desktop client then feeds a steady
+capture into `ffmpeg.exe`, run next to it in `DesktopClient\`, which encodes it as VP9/WebM; the browser plays whatever
+comes out as-is. It opens on a fresh key frame at the start, on request, and whenever the display shown changes, which
+is the only way this restarts the encoder process. Without `ffmpeg.exe` next to it (or on the machine's PATH), the
+video mode silently sends nothing; regions stay the default either way.
 
 ## Antivirus software
 

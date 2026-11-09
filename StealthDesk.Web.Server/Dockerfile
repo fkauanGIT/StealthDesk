@@ -46,10 +46,23 @@ COPY StealthDesk.DesktopClient/ StealthDesk.DesktopClient/
 COPY shared/ shared/
 RUN dotnet publish StealthDesk.Agent/StealthDesk.Agent.csproj -p:PublishProfile=Windows --output /publish/agent \
   && dotnet publish StealthDesk.DesktopClient/StealthDesk.DesktopClient.csproj -p:PublishProfile=Windows --output /publish/desktop-client
-# The two executables and nothing else that publishing leaves next to them.
+
+# The desktop client's video mode needs ffmpeg: a pinned, hash-checked build, run as its own process (never linked),
+# with its GPLv3 notice carried into the zip since it's redistributed. Bumping the version here means updating both
+# the URL and the hash.
+ARG FFMPEG_VERSION=9.0.2
+ARG FFMPEG_SHA256=60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+RUN apt-get update && apt-get install --yes --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
+  && curl -sLo /tmp/ffmpeg.zip "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-${FFMPEG_VERSION}-essentials_build.zip" \
+  && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.zip" | sha256sum --check --strict \
+  && unzip -j /tmp/ffmpeg.zip "ffmpeg-${FFMPEG_VERSION}-essentials_build/bin/ffmpeg.exe" "ffmpeg-${FFMPEG_VERSION}-essentials_build/LICENSE" -d /ffmpeg \
+  && mv /ffmpeg/LICENSE /ffmpeg/ffmpeg-LICENSE.txt
+
+# The two executables and nothing else that publishing leaves next to them, plus the ffmpeg build above.
 RUN mkdir -p /bundle/DesktopClient /agent \
   && cp /publish/agent/StealthDesk.Agent.exe /bundle/ \
   && cp /publish/desktop-client/StealthDesk.DesktopClient.exe /bundle/DesktopClient/ \
+  && cp /ffmpeg/ffmpeg.exe /ffmpeg/ffmpeg-LICENSE.txt /bundle/DesktopClient/ \
   && pwsh -NoProfile -Command "Compress-Archive -Path /bundle/* -DestinationPath /agent/StealthDesk.Agent.zip"
 
 # Run on the ASP.NET runtime alone.

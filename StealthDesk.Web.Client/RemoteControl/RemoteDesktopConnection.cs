@@ -24,6 +24,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
   /// <summary>A batch of screen regions to draw, in the shown display's pixels.</summary>
   public event Action<ScreenRegions>? RegionsReceived;
 
+  /// <summary>A chunk of the video stream, while the video mode is chosen.</summary>
+  public event Action<VideoPacket>? VideoPacketReceived;
+
   /// <summary>The pointer's shape on the device changed.</summary>
   public event Action<CursorShape>? CursorChanged;
 
@@ -68,6 +71,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
 
   /// <summary>Changes how the screen is encoded from now on.</summary>
   public Task ApplyAsync(CaptureSettings settings) => SendAsync(StreamMessageType.CaptureSettings, settings);
+
+  /// <summary>Shows the screen as still regions or as a continuous video stream from now on.</summary>
+  public Task SetCaptureModeAsync(CaptureMode mode) => SendAsync(StreamMessageType.SetCaptureMode, new SetCaptureMode(mode));
 
   public Task MovePointerAsync(double x, double y) => SendAsync(StreamMessageType.MovePointer, new MovePointer(x, y));
 
@@ -167,6 +173,9 @@ public sealed class RemoteDesktopConnection(Uri server, RemoteControlTicket tick
           break;
         case StreamMessageType.SessionChanged:
           SessionChanged?.Invoke(MessagePackSerializer.Deserialize<SessionChanged>(message.Payload).Kind);
+          break;
+        case StreamMessageType.VideoPacket:
+          VideoPacketReceived?.Invoke(MessagePackSerializer.Deserialize<VideoPacket>(message.Payload));
           break;
         default:
           logger.LogDebug("The viewer ignored a {Type} message.", message.Type);

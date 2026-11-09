@@ -289,6 +289,44 @@ public class RemoteControlPageTests : BunitContext
   }
 
   [Fact]
+  public async Task ChoosingVideo_TellsTheDevice_AndDrawnPacketsReachTheVideoElement()
+  {
+    await LoadAsync(_device);
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+
+    page.Find("select[aria-label='Capture mode']").Change("video");
+
+    page.WaitForAssertion(() => Assert.Contains("capture-mode Video", _remote.Calls));
+
+    _remote.RaiseVideoPacket(new VideoPacket([1, 2, 3], IsInit: true));
+
+    page.WaitForAssertion(() => Assert.Contains(
+      JSInterop.Invocations,
+      i => i.Identifier == "appendVideoPacket" && (bool)i.Arguments[1]! && Enumerable.SequenceEqual((byte[])i.Arguments[2]!, new byte[] { 1, 2, 3 })));
+  }
+
+  [Fact]
+  public async Task WithTwoDisplays_ChoosingVideo_DisablesSwitchingDisplays()
+  {
+    await LoadAsync(_device);
+    var page = Render<RemoteControlPage>(x => x.Add(p => p.Id, _device.Id));
+    page.WaitForAssertion(() => Assert.True(_remote.Started));
+    _remote.RaiseDisplays(new DisplayList(
+      [new DisplayInfo(@"\\.\DISPLAY1", "Main", 0, 0, 800, 600, true), new DisplayInfo(@"\\.\DISPLAY2", "Second", 800, 0, 800, 600, false)],
+      @"\\.\DISPLAY1"));
+    page.WaitForAssertion(() => Assert.False(page.Find("select[aria-label='Display']").HasAttribute("disabled")));
+
+    page.Find("select[aria-label='Capture mode']").Change("video");
+
+    page.WaitForAssertion(() => Assert.True(page.Find("select[aria-label='Display']").HasAttribute("disabled")));
+
+    page.Find("select[aria-label='Capture mode']").Change("regions");
+
+    page.WaitForAssertion(() => Assert.False(page.Find("select[aria-label='Display']").HasAttribute("disabled")));
+  }
+
+  [Fact]
   public async Task WhenTheSessionEnds_ItSaysWhy()
   {
     await LoadAsync(_device);

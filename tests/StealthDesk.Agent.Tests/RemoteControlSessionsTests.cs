@@ -28,6 +28,7 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private readonly StoppingLifetime _lifetime = new();
   private readonly ConcurrentQueue<Uri> _joined = new();
   private readonly List<IDisposable> _disposables = [];
+  private readonly ConcurrentQueue<Fakes.FakeVideoEncoder> _videoEncoders = new();
 
   private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -69,6 +70,45 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
     // The fake screen never changes: only a whole frame asked for comes, encoded as now set.
     Assert.True(await Wait.UntilAsync(() => received.Any(x =>
       x.Type == StreamMessageType.ScreenRegions && Read<ScreenRegions>(x).Regions.Single().Encoding == ImageEncoding.Png)));
+  }
+
+  [Fact]
+  public async Task ChoosingVideo_StartsTheEncoder_AndItsPacketsReachTheViewer()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ScreenRegions)));
+    var encoder = Assert.Single(_videoEncoders);
+
+    await viewer.SendAsync(StreamMessageType.SetCaptureMode, new SetCaptureMode(CaptureMode.Video), Token);
+
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.VideoPacket)));
+    Assert.True(await Wait.UntilAsync(() => encoder.Starts >= 1));
+    Assert.Equal((FakeScreen.Primary.Width, FakeScreen.Primary.Height), encoder.LastStartSize);
+  }
+
+  [Fact]
+  public async Task ChoosingVideoThenRegionsAgain_StopsSendingVideoPackets()
+  {
+    var (relay, sessions) = await ConnectedAsync();
+    sessions.Start(Request(notify: false));
+    var viewer = new RelayStream(relay, TimeProvider.System, NullLogger.Instance);
+    var received = new ConcurrentQueue<StreamEnvelope>();
+    _ = viewer.RunAsync((message, _) => { received.Enqueue(message); return Task.CompletedTask; }, _lifetime.ApplicationStopping);
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.ScreenRegions)));
+
+    await viewer.SendAsync(StreamMessageType.SetCaptureMode, new SetCaptureMode(CaptureMode.Video), Token);
+    Assert.True(await Wait.UntilAsync(() => received.Any(x => x.Type == StreamMessageType.VideoPacket)));
+
+    await viewer.SendAsync(StreamMessageType.SetCaptureMode, new SetCaptureMode(CaptureMode.Regions), Token);
+    received.Clear();
+    await Task.Delay(300, Token);
+
+    Assert.DoesNotContain(received, x => x.Type == StreamMessageType.VideoPacket);
+    Assert.Contains(received, x => x.Type == StreamMessageType.ScreenRegions);
   }
 
   [Fact]
@@ -372,7 +412,14 @@ public sealed class RemoteControlSessionsTests : IAsyncDisposable
   private static ViewerPermissions Blocker => new(Interact: true, UseSecureScreens: false, SendCtrlAltDel: false, ReadClipboard: false, WriteClipboard: false, BlockInput: true);
 
   private RemoteControlSessions Create(RelayConnector connect) =>
-    new(connect, () => new FakeScreen(), FakeScreen.Encode, _input, _clipboard, _inputDesktop, _privacyScreen, () => _sessionNotifications, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+    new(connect, () => new FakeScreen(), FakeScreen.Encode, NextVideoEncoder, _input, _clipboard, _inputDesktop, _privacyScreen, () => _sessionNotifications, _notices, TimeProvider.System, _lifetime, NullLogger<RemoteControlSessions>.Instance);
+
+  private Fakes.FakeVideoEncoder NextVideoEncoder()
+  {
+    var encoder = new Fakes.FakeVideoEncoder();
+    _videoEncoders.Enqueue(encoder);
+    return encoder;
+  }
 
   /// <summary>Sessions whose relay is the returned WebSocket: the server's end of the one the client joins with.</summary>
   private async Task<(WebSocket Relay, RemoteControlSessions Sessions)> ConnectedAsync()

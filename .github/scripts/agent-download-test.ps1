@@ -78,7 +78,7 @@ Remove-Item -Recurse -Force $expected -ErrorAction SilentlyContinue
 Expand-Archive $Bundle $expected
 $agentHash = (Get-FileHash -Algorithm SHA256 (Join-Path $expected "StealthDesk.Agent.exe")).Hash
 $clientHash = (Get-FileHash -Algorithm SHA256 (Join-Path $expected "DesktopClient\StealthDesk.DesktopClient.exe")).Hash
-Check "the zip holds the agent and the desktop client, and nothing else" (@(Get-ChildItem $expected -Recurse -File).Count -eq 2) ((Get-ChildItem $expected -Recurse -File).Name -join ", ")
+Check "the zip holds the agent, the desktop client, and ffmpeg for its video mode" (@(Get-ChildItem $expected -Recurse -File).Count -eq 4) ((Get-ChildItem $expected -Recurse -File).Name -join ", ")
 Remove-Item -Recurse -Force $expected
 Check "the server names the build's hash" ((Options).windowsAgent.sha256 -eq $build) $build
 $key = (Invoke-RestMethod "$Server/api/v1/installer-keys" -Method Post -ContentType application/json -WebSession $session `
@@ -99,7 +99,7 @@ Copy-Item $Bundle $served -Force
 Write-Host "--- The copied command installs the agent"
 $output = RunCommand $command
 Check "the service is running" ((Get-Service $service).Status -eq "Running")
-Check "the install folder holds the agent and its desktop client alone" (@(Get-ChildItem $installFolder -Recurse -File).Count -eq 2) ((Get-ChildItem $installFolder -Recurse -File).Name -join ", ")
+Check "the install folder holds the agent, its desktop client, and ffmpeg alone" (@(Get-ChildItem $installFolder -Recurse -File).Count -eq 4) ((Get-ChildItem $installFolder -Recurse -File).Name -join ", ")
 Check "the installed agent is the one in the zip the server named" ((Get-FileHash -Algorithm SHA256 $installed).Hash -eq $agentHash)
 Check "the installed desktop client is the one in the zip" ((Get-FileHash -Algorithm SHA256 $installedClient).Hash -eq $clientHash)
 Check "the download and what it unpacked were deleted" (-not (Test-Path $temporary) -and -not (Test-Path $unpacked))
