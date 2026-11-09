@@ -140,7 +140,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "The server didn't build." }
           dotnet build StealthDesk.Agent --configuration Release
           if ($LASTEXITCODE -ne 0) { throw "The agent didn't build." }
-          # The zip the server hands out, as the container image builds it: the two single-file programs alone.
+          # The zip the server hands out, as the container image builds it: the two single-file programs, plus ffmpeg
+          # for the desktop client's video mode (same pinned build and hash as StealthDesk.Web.Server/Dockerfile).
           dotnet publish StealthDesk.Agent -p:PublishProfile=Windows --output publish/agent
           if ($LASTEXITCODE -ne 0) { throw "The single-file agent didn't publish." }
           dotnet publish StealthDesk.DesktopClient -p:PublishProfile=Windows --output publish/desktop-client
@@ -148,6 +149,17 @@ jobs:
           New-Item -ItemType Directory -Force publish/bundle/DesktopClient | Out-Null
           Copy-Item publish/agent/StealthDesk.Agent.exe publish/bundle/
           Copy-Item publish/desktop-client/StealthDesk.DesktopClient.exe publish/bundle/DesktopClient/
+
+          $ffmpegVersion = "9.0.2"
+          $ffmpegSha256 = "60F467265B1E312373DBCD92200C2618A74850F98D3D078E94296BB3FA2047BA"
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$ffmpegVersion-essentials_build.zip" -OutFile ffmpeg.zip
+          $actual = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash
+          if ($actual -ne $ffmpegSha256) { throw "ffmpeg.zip's hash is $actual, expected $ffmpegSha256." }
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-extracted
+          $ffmpegFolder = Join-Path ffmpeg-extracted "ffmpeg-$ffmpegVersion-essentials_build"
+          Copy-Item (Join-Path $ffmpegFolder "bin/ffmpeg.exe") publish/bundle/DesktopClient/
+          Copy-Item (Join-Path $ffmpegFolder "LICENSE") publish/bundle/DesktopClient/ffmpeg-LICENSE.txt
+
           Compress-Archive -Path publish/bundle/* -DestinationPath publish/StealthDesk.Agent.zip
 
       # One step: a process a step starts is ended with that step on Windows runners.
