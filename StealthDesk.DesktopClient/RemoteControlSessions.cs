@@ -71,6 +71,7 @@ internal sealed class RemoteControlSessions(
   RelayConnector connect,
   Func<IScreenCapture> captures,
   RegionEncoder encode,
+  Func<IVideoEncoder> videoEncoders,
   IInputInjector injector,
   IClipboard clipboard,
   IInputDesktop inputDesktop,
@@ -134,16 +135,21 @@ internal sealed class RemoteControlSessions(
 
         var stream = new RelayStream(socket, clock, logger);
         using var capture = captures();
-        var streamer = new ScreenStreamer(capture, encode, stream, clock, logger);
+        var captureMode = new CaptureModeSwitch();
+        var streamer = new ScreenStreamer(capture, encode, stream, clock, logger, captureMode);
         var input = new RemoteInput(injector, () => streamer.Shown, session.Permissions, logger);
+        using var videoEncoder = videoEncoders();
+        var video = new VideoStreamer(capture, videoEncoder, stream, clock, () => streamer.Shown, () => streamer.Settings.ShowCursor, captureMode, logger);
         using var streaming = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         var sending = streamer.RunAsync(streaming.Token);
+        var streamingVideo = video.RunAsync(streaming.Token);
         var guarding = MonitorDesktopAsync(session, stream, streaming.Token);
         using var notifications = sessionNotifications();
         var watching = WatchSessionAsync(session, notifications, stream, streaming.Token);
-        var ended = await stream.RunAsync((message, ct) => HandleAsync(session, streamer, input, stream, message, ct), lifetime.ApplicationStopping);
+        var ended = await stream.RunAsync((message, ct) => HandleAsync(session, streamer, video, captureMode, input, stream, message, ct), lifetime.ApplicationStopping);
         await streaming.CancelAsync();
         await sending;
+        await streamingVideo;
         await guarding;
         await watching;
         logger.LogDebug("The relay stream of session {SessionId} ended: {Reason}", session.Id, ended);
@@ -249,7 +255,7 @@ internal sealed class RemoteControlSessions(
     }
   }
 
-  private async Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, RemoteInput input, RelayStream stream, StreamEnvelope message, CancellationToken cancellationToken)
+  private async Task HandleAsync(RemoteControlSession session, ScreenStreamer streamer, VideoStreamer video, CaptureModeSwitch captureMode, RemoteInput input, RelayStream stream, StreamEnvelope message, CancellationToken cancellationToken)
   {
     try
     {
@@ -265,6 +271,20 @@ internal sealed class RemoteControlSessions(
           break;
         case StreamMessageType.RequestFullFrame:
           streamer.RequestFullFrame();
+          video.RequestKeyFrame();
+          break;
+        case StreamMessageType.SetCaptureMode:
+          var requestedMode = MessagePackSerializer.Deserialize<SetCaptureMode>(message.Payload);
+          captureMode.Mode = requestedMode.Mode;
+          if (requestedMode.Mode == CaptureMode.Video)
+          {
+            video.RequestKeyFrame();
+          }
+          else
+          {
+            streamer.RequestFullFrame();
+          }
+
           break;
         case StreamMessageType.CaptureSettings:
           streamer.Apply(MessagePackSerializer.Deserialize<CaptureSettings>(message.Payload));

@@ -76,7 +76,40 @@ public enum StreamMessageType
 
   /// <summary><see cref="RemoteControl.SessionChanged"/>, from the desktop client: the device's Windows session changed.</summary>
   SessionChanged = 21,
+
+  /// <summary>
+  /// <see cref="RemoteControl.SetCaptureMode"/>, from the viewer: show still regions or a continuous video stream
+  /// from now on.
+  /// </summary>
+  SetCaptureMode = 22,
+
+  /// <summary><see cref="RemoteControl.VideoPacket"/>, from the desktop client: a chunk of the video stream.</summary>
+  VideoPacket = 23,
 }
+
+/// <summary>Whether the desktop client sends still regions or a continuous video stream.</summary>
+public enum CaptureMode
+{
+  /// <summary>Only the parts of the screen that changed, as still images; the default.</summary>
+  Regions = 0,
+
+  /// <summary>The whole screen, continuously, as a video stream; costs less bandwidth for fast-changing content.</summary>
+  Video = 1,
+}
+
+/// <summary>Show the screen as still regions or as a continuous video stream from now on, from the viewer.</summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record SetCaptureMode(CaptureMode Mode);
+
+/// <summary>
+/// A chunk of the live video stream, forwarded to the viewer exactly as the encoder produced it; the browser appends
+/// chunks to a MediaSource in the order they arrive, which reassembles them on its own. <paramref name="IsInit"/>
+/// marks the first chunk of a new stream: sent once at the start of the video mode, and again whenever a key frame
+/// was asked for or the display changed, each of which restarts the encoder from a clean key frame. The viewer must
+/// start a fresh MediaSource from a chunk marked this way, instead of appending it to the one it already has.
+/// </summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record VideoPacket(byte[] Data, bool IsInit);
 
 /// <summary>How the screen is encoded. The defaults apply until the viewer sends its own.</summary>
 /// <param name="AutoQuality">Choose the quality from the bandwidth used, instead of <see cref="Quality"/>.</param>

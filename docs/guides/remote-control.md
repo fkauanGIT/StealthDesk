@@ -36,6 +36,7 @@ the whole screen comes first.
 |---|---|---|
 | A display picker | Shows another of the device's displays, only when it has more than one | — |
 | A quality picker | Auto, high, medium or low; auto follows the connection's bandwidth | — |
+| A capture mode picker | Regions (the default) or video; video costs less bandwidth for fast-changing content, such as video playing on the device | — |
 | **Ctrl+Alt+Del** | Sends the secure attention sequence to the device's session | `device.ctrl-alt-del.send` |
 | **Send clipboard** | Reads the browser's clipboard and sets the device's | `device.clipboard.write` |
 | **Get clipboard** | Reads the device's clipboard into the browser's | `device.clipboard.read` |

@@ -49,6 +49,11 @@ builder.Services.AddSingleton<Func<IScreenCapture>>(provider => () =>
   : OperatingSystem.IsWindowsVersionAtLeast(6, 1) ? new GdiScreenCapture()
   : throw new PlatformNotSupportedException());
 builder.Services.AddSingleton<RegionEncoder>(FrameEncoder.Encode);
+builder.Services.AddSingleton<Func<IVideoEncoder>>(provider =>
+{
+  var ffmpegPath = FfmpegPath.Resolve();
+  return () => new FfmpegVideoEncoder(ffmpegPath, provider.GetRequiredService<ILogger<FfmpegVideoEncoder>>());
+});
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputInjector, WindowsInput>();
 builder.Services.AddSingleton<IClipboard, WindowsClipboard>();
 builder.Services.AddSingleton<StealthDesk.RemoteControl.Input.IInputDesktop, WindowsInputDesktop>();
