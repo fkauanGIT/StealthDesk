@@ -102,11 +102,12 @@ public enum CaptureMode
 public sealed record SetCaptureMode(CaptureMode Mode);
 
 /// <summary>
-/// A chunk of the live video stream, forwarded to the viewer exactly as the encoder produced it; the browser appends
-/// chunks to a MediaSource in the order they arrive, which reassembles them on its own. <paramref name="IsInit"/>
-/// marks the first chunk of a new stream: sent once at the start of the video mode, and again whenever a key frame
-/// was asked for or the display changed, each of which restarts the encoder from a clean key frame. The viewer must
-/// start a fresh MediaSource from a chunk marked this way, instead of appending it to the one it already has.
+/// One encoded VP9 frame of the live video stream, exactly as the encoder produced it, for the viewer's own
+/// <c>VideoDecoder</c> to decode directly (no muxed container, so no decoder-side buffering beyond the frame itself).
+/// <paramref name="IsInit"/> marks the stream's only key frame: sent once at the start of the video mode, and again
+/// whenever a key frame was asked for or the display changed, each of which restarts the encoder from a clean one.
+/// The viewer must reconfigure its decoder from a frame marked this way, instead of decoding it against state left
+/// over from before.
 /// </summary>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record VideoPacket(byte[] Data, bool IsInit);

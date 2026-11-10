@@ -8,3 +8,4 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
   own input works again as soon as the blocking is turned off or the session ends.
 - A video mode for remote control: the viewer may choose a continuous video stream instead of still regions, which
   costs less bandwidth for fast-changing content such as video playing on the device. Regions stay the default.
+  Decoded with the browser's own WebCodecs API for low latency, not a buffered media container.

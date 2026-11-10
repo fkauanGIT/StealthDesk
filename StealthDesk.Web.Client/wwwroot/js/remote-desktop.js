@@ -1,5 +1,6 @@
-// Draws the remote screen. C# holds the relay connection and the protocol; this only turns an encoded region into
-// pixels on a canvas, which is what the browser does well. One view per session id, so several could run at once.
+// Draws the remote screen. C# holds the relay connection and the protocol; this only turns an encoded region or video
+// frame into pixels on a canvas, which is what the browser does well. One view per session id, so several could run
+// at once.
 
 const views = new Map();
 
@@ -7,9 +8,8 @@ export function init(id, canvas) {
   views.set(id, { canvas, context: canvas.getContext("2d", { alpha: false }) });
 }
 
-// Sizes the canvas and, if the video mode was set up, the video element too, to the shown display's pixels; CSS then
-// scales either to fit the page. The video element also gets this from its own stream once decoded, but setting it
-// up front avoids a moment at an unrelated size (or 0) while nothing has arrived yet.
+// Sizes both canvases to the shown display's pixels; CSS then scales either to fit the page. Also feeds the video
+// canvas's size to its decoder, which needs it again on every reconfigure (see appendVideoPacket).
 export function resize(id, width, height) {
   const view = views.get(id);
   if (view) {
@@ -19,54 +19,35 @@ export function resize(id, width, height) {
 
   const video = videoViews.get(id);
   if (video) {
-    video.videoElement.width = width;
-    video.videoElement.height = height;
+    video.canvas.width = width;
+    video.canvas.height = height;
   }
 }
 
-// The video mode: a MediaSource fed chunks exactly as the encoder produced them, in order; the browser's own WebM
-// demuxer reassembles them regardless of where they were cut. A chunk marked "init" starts a fresh MediaSource,
-// since that's what a restarted encoder (a fresh key frame) also means: a new stream, not more of the old one.
+// The video mode: each packet is one already-encoded VP9 frame (see VideoPacket's doc comment), decoded with the
+// browser's own WebCodecs VideoDecoder straight onto a canvas, with no muxed container (WebM/MediaSource) and the
+// buffering that comes with one in between. A packet marked "init" is always a key frame and always means a fresh
+// encode (the start of video mode, a requested key frame, or a display change), so the decoder is reconfigured then.
 const videoViews = new Map();
 
-export function initVideo(id, videoElement) {
-  videoViews.set(id, { videoElement, sourceBuffer: null, pending: [] });
+// The server encodes 8-bit 4:2:0 VP9 at profile 0; this codec string names exactly that, and never changes.
+const VIDEO_CODEC = "vp09.00.10.08";
+
+export function initVideo(id, canvas) {
+  videoViews.set(id, { canvas, context: canvas.getContext("2d", { alpha: false }), decoder: null, nextTimestamp: 0 });
 }
 
-function resetVideo(id, view) {
-  const mediaSource = new MediaSource();
-  view.sourceBuffer = null;
-  view.pending = [];
-  view.videoElement.src = URL.createObjectURL(mediaSource);
-  mediaSource.addEventListener("sourceopen", () => {
-    try {
-      const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp9"');
-      sourceBuffer.addEventListener("updateend", () => flushVideoPending(view));
-      view.sourceBuffer = sourceBuffer;
-      flushVideoPending(view);
-    } catch (error) {
-      console.debug("The video mode couldn't start; the browser may not support it.", error);
-    }
-  }, { once: true });
-}
-
-function flushVideoPending(view) {
-  if (!view.sourceBuffer || view.sourceBuffer.updating) {
-    return;
-  }
-
-  const next = view.pending.shift();
-  if (!next) {
-    return;
-  }
-
-  try {
-    view.sourceBuffer.appendBuffer(next);
-  } catch (error) {
-    // The buffer was reset meanwhile (another init packet arrived); what's pending for it is gone too.
-    console.debug("A video chunk couldn't be appended.", error);
-    view.pending = [];
-  }
+function resetDecoder(view) {
+  view.decoder?.close();
+  view.nextTimestamp = 0;
+  view.decoder = new VideoDecoder({
+    output: (frame) => {
+      view.context.drawImage(frame, 0, 0, view.canvas.width, view.canvas.height);
+      frame.close();
+    },
+    error: (error) => console.debug("The video decoder failed; it restarts on the next key frame.", error),
+  });
+  view.decoder.configure({ codec: VIDEO_CODEC, codedWidth: view.canvas.width, codedHeight: view.canvas.height });
 }
 
 export function appendVideoPacket(id, isInit, bytes) {
@@ -76,15 +57,28 @@ export function appendVideoPacket(id, isInit, bytes) {
   }
 
   if (isInit) {
-    resetVideo(id, view);
+    resetDecoder(view);
   }
 
-  view.pending.push(bytes);
-  flushVideoPending(view);
-  view.videoElement.play().catch(() => {});
+  if (view.decoder.state !== "configured") {
+    return;
+  }
+
+  try {
+    view.decoder.decode(new EncodedVideoChunk({
+      type: isInit ? "key" : "delta",
+      timestamp: view.nextTimestamp++,
+      data: bytes,
+    }));
+  } catch (error) {
+    // The decoder closed itself after an error; it restarts on the next key frame.
+    console.debug("A video frame couldn't be decoded.", error);
+  }
 }
 
 export function disposeVideo(id) {
+  const view = videoViews.get(id);
+  view?.decoder?.close();
   videoViews.delete(id);
 }
 
@@ -104,17 +98,17 @@ export async function drawRegion(id, x, y, width, height, encoding, bytes) {
   }
 }
 
-// Sends the viewer's mouse and keyboard over whichever of the canvas (regions) or video (video mode) is shown, as
+// Sends the viewer's mouse and keyboard over whichever of the two canvases (regions or video mode) is shown, as
 // fractions of the shown display (0..1) and the browser's own key names. Only the visible one receives DOM events,
 // so both get the same listeners and the fraction is read off whichever element the event actually fired on.
 // Only attached when the viewer may control; view-only never calls this.
-export function attachInput(id, canvas, video, dotNet) {
+export function attachInput(id, canvas, videoCanvas, dotNet) {
   const view = views.get(id);
   if (!view) {
     return;
   }
 
-  const elements = [canvas, video];
+  const elements = [canvas, videoCanvas];
   for (const element of elements) {
     element.setAttribute("tabindex", "0");
   }
