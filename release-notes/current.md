@@ -23,3 +23,9 @@
 **Docs**
 - A security model page consolidating how StealthDesk handles transport, sign-in, personal access tokens and
   service account keys, authorization, agent trust, and what remote control and the terminal never record
+
+## Upgrading
+
+Nothing to do beyond the usual [upgrade](https://fkauangit.github.io/StealthDesk/guides/upgrading/): a migration
+adds the new permissions (`device.remote-control.block-input`, `device.desktop-preview.read`) and the account's
+remote control notification preference, each backfilled to a safe default for existing accounts and devices.
