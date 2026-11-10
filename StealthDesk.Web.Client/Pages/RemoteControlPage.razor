@@ -146,7 +146,7 @@ else
 
     <div @ref="stage" class="sd-remote-stage" hidden="@(state != ViewState.Streaming)">
         <canvas @ref="canvas" class="sd-remote-canvas" hidden="@(captureMode != "regions")"></canvas>
-        <video @ref="video" class="sd-remote-canvas" hidden="@(captureMode != "video")" muted playsinline></video>
+        <canvas @ref="videoCanvas" class="sd-remote-canvas" hidden="@(captureMode != "video")"></canvas>
     </div>
 }
 
@@ -181,7 +181,7 @@ else
     private IJSObjectReference? module;
     private DotNetObjectReference<RemoteControlPage>? self;
     private ElementReference canvas;
-    private ElementReference video;
+    private ElementReference videoCanvas;
     private ElementReference stage;
     private string captureMode = "regions";
     private CancellationTokenSource? cts;
@@ -215,7 +215,7 @@ else
             inited = true;
             module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/remote-desktop.js");
             await module.InvokeVoidAsync("init", viewId, canvas);
-            await module.InvokeVoidAsync("initVideo", viewId, video);
+            await module.InvokeVoidAsync("initVideo", viewId, videoCanvas);
             if (pendingSize is { } size)
             {
                 await module.InvokeVoidAsync("resize", viewId, size.Width, size.Height);
@@ -228,7 +228,7 @@ else
             if (canInteract)
             {
                 self = DotNetObjectReference.Create(this);
-                await module.InvokeVoidAsync("attachInput", viewId, canvas, video, self);
+                await module.InvokeVoidAsync("attachInput", viewId, canvas, videoCanvas, self);
             }
         }
     }
