@@ -147,16 +147,39 @@ internal sealed class FfmpegVideoEncoder(string ffmpegPath, ILogger<FfmpegVideoE
     }
   }
 
+  // Kept, not logged: ffmpeg's own progress chatter isn't an error, but its last lines are the only clue to why it
+  // failed if it ever exits on its own instead of being stopped by Start()/Dispose().
   private async Task DrainErrorAsync(Process process)
   {
+    var tail = new Queue<string>();
     try
     {
-      // Never logged: ffmpeg's own progress chatter on stderr isn't an error, and this just keeps the pipe from filling.
-      await process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+      using var reader = process.StandardError;
+      while (await reader.ReadLineAsync() is { } line)
+      {
+        tail.Enqueue(line);
+        if (tail.Count > 20)
+        {
+          tail.Dequeue();
+        }
+      }
     }
     catch (Exception ex) when (ex is IOException or ObjectDisposedException)
     {
       // The process ended.
+    }
+
+    bool stoppedByUs;
+    lock (_gate)
+    {
+      // StopProcess() clears this before killing the old process, so seeing it still point here means nothing
+      // asked this one to stop: it exited on its own, which is the one case worth surfacing its stderr for.
+      stoppedByUs = _process != process;
+    }
+
+    if (!stoppedByUs)
+    {
+      logger.LogWarning("ffmpeg exited on its own; its last lines:\n{Tail}", string.Join('\n', tail));
     }
   }
 
