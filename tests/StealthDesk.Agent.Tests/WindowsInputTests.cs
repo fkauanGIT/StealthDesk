@@ -54,6 +54,35 @@ public sealed class WindowsInputTests
     Assert.Equal("a", text?.ToLowerInvariant());
   }
 
+  [Fact]
+  public void BlockInput_UnblocksReliably_EvenCalledFromADifferentThreadThanBlockedIt()
+  {
+    Assert.SkipUnless(OperatingSystem.IsWindows(), "Uses Windows input APIs.");
+
+    var input = new WindowsInput(NullLogger<WindowsInput>.Instance);
+    try
+    {
+      // Windows only lets the thread that blocked input unblock it again; two brand new threads, one per call,
+      // reproduce the real bug (viewer blocks, then unblocks, from unrelated async continuations).
+      var blocked = CallOnANewThread(input, active: true);
+      Assert.SkipWhen(!blocked, "BlockInput itself isn't available here (no interactive desktop for it).");
+      Assert.False(CallOnANewThread(input, active: false));
+    }
+    finally
+    {
+      input.SetBlockInput(false);
+    }
+  }
+
+  private static bool CallOnANewThread(WindowsInput input, bool active)
+  {
+    var result = false;
+    var thread = new Thread(() => result = input.SetBlockInput(active));
+    thread.Start();
+    thread.Join();
+    return result;
+  }
+
   // Runs a window with its own message pump on a dedicated thread, injects, then reads the control's text back.
   private static void Run(Action<WindowsInput> inject, out string? text)
   {

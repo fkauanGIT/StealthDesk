@@ -24,6 +24,6 @@ internal sealed class NoInput : IInputInjector
   public bool SetBlockInput(bool active)
   {
     BlockInputCalls.Add(active);
-    return true;
+    return active;
   }
 }

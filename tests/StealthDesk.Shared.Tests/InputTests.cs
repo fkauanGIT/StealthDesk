@@ -172,7 +172,7 @@ public class RemoteInputTests
     public bool SetBlockInput(bool active)
     {
       Log.Add($"blockinput {(active ? "on" : "off")}");
-      return true;
+      return active;
     }
   }
 }
