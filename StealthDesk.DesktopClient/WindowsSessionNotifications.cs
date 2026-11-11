@@ -18,6 +18,7 @@ internal sealed class WindowsSessionNotifications : ISessionNotifications
   private const uint WM_CLOSE = 0x0010;
   private const uint WM_DESTROY = 0x0002;
   private const uint NOTIFY_FOR_THIS_SESSION = 0;
+  private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
 
   private const string ClassName = "StealthDeskSessionNotifications";
 
@@ -35,6 +36,9 @@ internal sealed class WindowsSessionNotifications : ISessionNotifications
   }
 
   public IAsyncEnumerable<SessionChangeKind> Changes => _changes.Reader.ReadAllAsync();
+
+  /// <summary>This instance's own window, for a test to address directly.</summary>
+  internal nint WindowHandle => _window;
 
   public void Dispose()
   {
@@ -68,9 +72,11 @@ internal sealed class WindowsSessionNotifications : ISessionNotifications
         lpfnWndProc = Procedure,
         lpszClassName = ClassName,
       };
-      if (RegisterClassEx(ref wndClass) == 0)
+      // The class is per process, not per window: an earlier session (or one still open) already registered it,
+      // which is expected here, not a failure — this instance still gets its own window from the shared class.
+      if (RegisterClassEx(ref wndClass) == 0 && Marshal.GetLastWin32Error() is var error && error != ERROR_CLASS_ALREADY_EXISTS)
       {
-        _logger.LogWarning("The session watcher's window class couldn't be registered (Windows error {Error}).", Marshal.GetLastWin32Error());
+        _logger.LogWarning("The session watcher's window class couldn't be registered (Windows error {Error}).", error);
         return;
       }
 
