@@ -1,0 +1,165 @@
+@page "/devices/{Id:guid}/files"
+@attribute [Authorize]
+@using System.Text.Json
+@inject DeviceStore Store
+@inject HttpClient Http
+
+<PageTitle>Files · @(device?.Name ?? "Device") · StealthDesk</PageTitle>
+
+<a class="sd-back" href="devices/@Id">
+    <SdIcon Name="IconName.Back" Size="16" />
+    @(device?.Name ?? "Device")
+</a>
+
+@if (lookup is null)
+{
+    <SdLoading Text="Loading device..." />
+}
+else if (device is null)
+{
+    <SdAlert>Could not load the device. Check that the server is running.</SdAlert>
+}
+else
+{
+    <header class="sd-page-header">
+        <div>
+            <h1 class="sd-page-title">Files</h1>
+            <p class="sd-muted">@device.Name</p>
+        </div>
+    </header>
+
+    @if (listing is not null)
+    {
+        <nav aria-label="Path">
+            @foreach (var (label, path) in Breadcrumbs(listing.Path))
+            {
+                <button type="button" class="sd-link-button" @onclick="() => LoadAsync(path)">@label</button>
+                <span aria-hidden="true"> / </span>
+            }
+        </nav>
+    }
+
+    @if (loading)
+    {
+        <SdLoading Text="Loading files..." />
+    }
+    else if (error is not null)
+    {
+        <SdAlert>@error</SdAlert>
+    }
+    else if (listing is { Exists: false })
+    {
+        <SdEmptyState Title="Not found">This folder doesn't exist, or isn't reachable right now.</SdEmptyState>
+    }
+    else if (listing is { Entries.Count: 0 })
+    {
+        <SdEmptyState Title="Empty">This folder has nothing in it.</SdEmptyState>
+    }
+    else if (listing is not null)
+    {
+        <div class="sd-table-wrap">
+            <table class="sd-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in listing.Entries)
+                    {
+                        <tr @key="entry.Name">
+                            <td>
+                                @if (entry.IsDirectory)
+                                {
+                                    <button type="button" class="sd-link-button" @onclick="() => LoadAsync(Combine(listing.Path, entry.Name))">
+                                        <SdIcon Name="IconName.Folder" Size="16" />
+                                        @entry.Name
+                                    </button>
+                                }
+                                else
+                                {
+                                    @entry.Name
+                                }
+                            </td>
+                            <td>@(entry.IsDirectory ? "" : FormatSize(entry.SizeBytes))</td>
+                            <td>@entry.ModifiedAt.ToLocalTime().ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private DeviceLookup? lookup;
+    private DeviceSummary? device;
+    private DirectoryListing? listing;
+    private bool loading;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        lookup = await Store.FindAsync(Id);
+        device = lookup.Device;
+        if (device is not null && listing is null)
+        {
+            await LoadAsync(string.Empty);
+        }
+    }
+
+    private async Task LoadAsync(string path)
+    {
+        loading = true;
+        error = null;
+        StateHasChanged();
+        try
+        {
+            listing = await Http.GetFromJsonAsync<DirectoryListing>(Routes.DeviceFiles(Id, path));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            error = "Could not load the files. Check that the device is online.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    // One entry per folder from the drive down to the current one; clicking one reloads at that depth.
+    private static IEnumerable<(string Label, string Path)> Breadcrumbs(string path)
+    {
+        var separator = path.Contains('\\') ? '\\' : '/';
+        var segments = path.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+        {
+            yield break;
+        }
+
+        // A drive letter on its own ("C:") isn't a path the agent can list; it needs the separator for its root.
+        var built = segments[0].EndsWith(':') ? segments[0] + separator : segments[0];
+        yield return (segments[0], built);
+        for (var i = 1; i < segments.Length; i++)
+        {
+            built = built.EndsWith(separator) ? built + segments[i] : $"{built}{separator}{segments[i]}";
+            yield return (segments[i], built);
+        }
+    }
+
+    private static string Combine(string parent, string name) =>
+        parent.EndsWith('\\') || parent.EndsWith('/') ? parent + name : parent + "\\" + name;
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        < 1024 * 1024 * 1024 => $"{bytes / 1024.0 / 1024:0.#} MB",
+        _ => $"{bytes / 1024.0 / 1024 / 1024:0.#} GB",
+    };
+}

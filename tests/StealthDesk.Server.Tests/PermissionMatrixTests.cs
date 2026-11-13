@@ -370,6 +370,10 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Get, "/api/v1/devices/{id:guid}/files", PermissionNames.DeviceFileManagerRead, (w, _) => Task.FromResult(new Call(HttpMethod.Get, Routes.DeviceFiles(w.Device, string.Empty))))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -689,5 +693,8 @@ public class PermissionMatrixTests
   {
     public override Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(new DesktopPreview([1, 2, 3, 4], ImageEncoding.Png)));
+
+    public override Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Accept(new DirectoryListing(@"C:\", true, [])));
   }
 }

@@ -62,6 +62,30 @@ public class AgentCallbacksTests
   }
 
   [Fact]
+  public async Task TheAgentsCallbacks_ListADirectory_WithWhatsInIt()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      await File.WriteAllTextAsync(Path.Combine(dataRoot, "a.txt"), "hi", Cancel);
+      Directory.CreateDirectory(Path.Combine(dataRoot, "sub"));
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().ListDirectory(dataRoot, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.True(reply.Value!.Exists);
+      Assert.Contains(reply.Value.Entries, x => x.Name == "a.txt" && !x.IsDirectory && x.SizeBytes == 2);
+      Assert.Contains(reply.Value.Entries, x => x.Name == "sub" && x.IsDirectory);
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
   public async Task AHostDisposedWithoutWaiting_EndsItsTerminals_WithoutThrowing()
   {
     var channel = new FakeChannel();

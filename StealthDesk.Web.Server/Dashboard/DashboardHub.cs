@@ -122,7 +122,8 @@ public sealed class DashboardHub(
       ReadClipboard: await MayAsync(device, PermissionNames.DeviceClipboardRead),
       WriteClipboard: await MayAsync(device, PermissionNames.DeviceClipboardWrite),
       BlockInput: await MayAsync(device, PermissionNames.DeviceRemoteControlBlockInput),
-      SeeDesktopPreview: desktopPreview.Value.EnableDesktopPreview && await MayAsync(device, PermissionNames.DeviceDesktopPreviewRead)));
+      SeeDesktopPreview: desktopPreview.Value.EnableDesktopPreview && await MayAsync(device, PermissionNames.DeviceDesktopPreviewRead),
+      BrowseFiles: await MayAsync(device, PermissionNames.DeviceFileManagerRead)));
   }
 
   /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>

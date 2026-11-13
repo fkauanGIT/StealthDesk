@@ -73,6 +73,30 @@ public static class DeviceEndpoints
       return Results.Bytes(preview.Value!.Image, preview.Value.Encoding == ImageEncoding.Png ? "image/png" : "image/jpeg");
     }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceDesktopPreviewRead);
 
+    endpoints.MapGet($"{Routes.Devices}/{{id:guid}}/files", async (
+      Guid id,
+      string? path,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceFileManagerRead))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      var listing = await agents.CallAsync(device.Id, (agent, token) => agent.ListDirectory(path ?? string.Empty, token), cancellationToken);
+      if (!listing.Accepted)
+      {
+        return Results.NotFound();
+      }
+
+      return Results.Ok(listing.Value);
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerRead);
+
     return endpoints;
   }
 

@@ -86,6 +86,23 @@ else
                 }
             </div>
         }
+        @if (canBrowseFiles)
+        {
+            <div class="sd-push sd-device-actions">
+                @if (device.IsOnline)
+                {
+                    <a class="sd-btn sd-btn--secondary" href="devices/@device.Id/files">
+                        <SdIcon Name="IconName.Folder" />
+                        Files
+                    </a>
+                }
+                else
+                {
+                    <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Folder" Disabled="true" aria-describedby="files-offline">Files</SdButton>
+                    <span id="files-offline" class="sd-muted">Available when the device is online</span>
+                }
+            </div>
+        }
     </header>
 
     @* Not conditioned on device.IsOnline, which a live push can flip back and forth: that would tear down and
@@ -212,6 +229,7 @@ else
     private bool canUseTerminal;
     private bool canSeeDesktop;
     private bool canSeeDesktopPreview;
+    private bool canBrowseFiles;
     private bool actionsChecked;
     private bool canAssignGroups;
     private bool choosingGroups;
@@ -251,6 +269,7 @@ else
         canUseTerminal = false;
         canSeeDesktop = false;
         canSeeDesktopPreview = false;
+        canBrowseFiles = false;
         await CheckActionsAsync();
 
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
@@ -344,6 +363,7 @@ else
         canUseTerminal = actions is { Accepted: true, Value.UseTerminal: true };
         canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
         canSeeDesktopPreview = actions is { Accepted: true, Value.SeeDesktopPreview: true };
+        canBrowseFiles = actions is { Accepted: true, Value.BrowseFiles: true };
     }
 
     private void OnLiveChanged() => InvokeAsync(async () =>

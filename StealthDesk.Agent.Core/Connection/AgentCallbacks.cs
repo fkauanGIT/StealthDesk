@@ -1,7 +1,9 @@
 using StealthDesk.Agent.Core.DesktopClients;
+using StealthDesk.Agent.Core.Files;
 using StealthDesk.Agent.Core.Inventory;
 using StealthDesk.Agent.Core.Terminal;
 using StealthDesk.Contracts.DesktopClients;
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.RemoteControl;
@@ -11,7 +13,7 @@ using StealthDesk.Core;
 namespace StealthDesk.Agent.Core.Connection;
 
 /// <summary>What the agent does when the server calls it.</summary>
-public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRemoteControl remoteControl) : IAgentCallbacks
+public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRemoteControl remoteControl, IFileManager files) : IAgentCallbacks
 {
   public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Accept(PortableInventory.AgentVersion));
@@ -45,6 +47,9 @@ public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRem
 
   public async Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
     Reply(await remoteControl.PreviewAsync(cancellationToken));
+
+  public Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Accept(files.ListDirectory(path)));
 
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);

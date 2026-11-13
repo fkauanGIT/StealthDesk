@@ -54,4 +54,7 @@ public interface IAgentCallbacks
 
   /// <summary>One still picture of the device's current desktop, without starting a remote control session.</summary>
   Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken);
+
+  /// <summary>A directory's immediate contents, for the file manager. The device's own drive when <paramref name="path"/> is empty.</summary>
+  Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken);
 }
