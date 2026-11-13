@@ -37,6 +37,13 @@ sends that key sequence; `device.clipboard.read` and `device.clipboard.write` mo
 `device.desktop-preview.read` shows a still picture of the desktop before a session even opens. Each is separate from
 reading the device (`device.read`) and from each other, and all are part of the **Device Superuser** preset.
 
+## File manager
+
+`device.file-manager.read` lets someone browse a device's filesystem in the [file manager](../guides/file-manager.md),
+as the agent's account: the same reach as the terminal, with no sandboxing of where it may look. It is separate from
+reading the device (`device.read`) and from the terminal and remote control permissions, and is part of the **Device
+Superuser** preset.
+
 ## Where they are checked
 
 Every API route and dashboard hub method checks its permission, and the device list, each device and live updates
