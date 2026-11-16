@@ -25,4 +25,5 @@ public enum IconName
   Settings,
   Terminal,
   Monitor,
+  Folder,
 }
