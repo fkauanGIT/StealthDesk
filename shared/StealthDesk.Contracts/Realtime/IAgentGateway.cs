@@ -17,6 +17,13 @@ public interface IAgentGateway
   /// only when the session was opened on this agent's device; anything else is dropped.
   /// </summary>
   Task SendTerminalOutput(TerminalOutput output);
+
+  /// <summary>
+  /// A file's bytes, following an accepted <see cref="IAgentCallbacks.StartFileDownload"/>, matched to it by
+  /// <paramref name="transferId"/>. Chunks for a transfer the server no longer knows about (abandoned, or never
+  /// started) are read to completion and dropped.
+  /// </summary>
+  Task SendFileChunks(Guid transferId, IAsyncEnumerable<byte[]> chunks);
 }
 
 /// <summary>
@@ -57,4 +64,12 @@ public interface IAgentCallbacks
 
   /// <summary>A directory's immediate contents, for the file manager. The device's own drive when <paramref name="path"/> is empty.</summary>
   Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Starts downloading the file at <paramref name="path"/>. The answer carries its size and name; its bytes follow
+  /// separately through <see cref="IAgentGateway.SendFileChunks"/>, matched to this call by
+  /// <paramref name="transferId"/>, which the server generates before asking. A path that isn't a file the agent
+  /// can read answers with <see cref="FileDownloadInfo.Exists"/> false, and no bytes follow.
+  /// </summary>
+  Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken);
 }

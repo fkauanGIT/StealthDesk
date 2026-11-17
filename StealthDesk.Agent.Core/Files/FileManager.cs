@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.Devices;
 
@@ -7,6 +8,12 @@ public interface IFileManager
 {
   /// <summary>A directory's immediate contents. The agent's own system drive when <paramref name="path"/> is empty.</summary>
   DirectoryListing ListDirectory(string path);
+
+  /// <summary>Whether <paramref name="path"/> is a file the agent can read, and its size and name.</summary>
+  FileDownloadInfo GetFileInfo(string path);
+
+  /// <summary>The file's bytes, read a chunk at a time rather than all into memory at once.</summary>
+  IAsyncEnumerable<byte[]> ReadFile(string path, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -44,6 +51,32 @@ public sealed class FileManager(ILogger<FileManager> logger) : IFileManager
       return new DirectoryListing(target, Exists: false, []);
     }
   }
+
+  public FileDownloadInfo GetFileInfo(string path)
+  {
+    if (!File.Exists(path))
+    {
+      // Also true for a directory: File.Exists is false for one, same as for a path that's simply gone.
+      return new FileDownloadInfo(Exists: false, FileName: string.Empty, SizeBytes: 0);
+    }
+
+    var file = new FileInfo(path);
+    return new FileDownloadInfo(Exists: true, file.Name, file.Length);
+  }
+
+  public async IAsyncEnumerable<byte[]> ReadFile(string path, [EnumeratorCancellation] CancellationToken cancellationToken)
+  {
+    await using var stream = File.OpenRead(path);
+    var buffer = new byte[ChunkSizeBytes];
+    int read;
+    while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+    {
+      // A copy: the shared buffer would be overwritten by the next read before an earlier chunk finished sending.
+      yield return buffer[..read];
+    }
+  }
+
+  private const int ChunkSizeBytes = 64 * 1024;
 
   private static string DefaultRoot() => Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
 }

@@ -178,6 +178,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<StealthDesk.Contracts.Devices.DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.Devices.DirectoryListing>(NoAnswers));
+
+    public Task<GatewayReply<StealthDesk.Contracts.Devices.FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.Devices.FileDownloadInfo>(NoAnswers));
   }
 }
 

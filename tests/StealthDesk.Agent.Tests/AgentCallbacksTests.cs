@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StealthDesk.Agent.Core;
@@ -86,6 +87,49 @@ public class AgentCallbacksTests
   }
 
   [Fact]
+  public async Task TheAgentsCallbacks_DownloadsAFile_WithItsBytes()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      var filePath = Path.Combine(dataRoot, "report.pdf");
+      var content = RandomNumberGenerator.GetBytes(200_000); // past one chunk, to prove more than one is sent
+      await File.WriteAllBytesAsync(filePath, content, Cancel);
+      var transferId = Guid.NewGuid();
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileDownload(transferId, filePath, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.True(reply.Value!.Exists);
+      Assert.Equal("report.pdf", reply.Value.FileName);
+      Assert.Equal(content.Length, reply.Value.SizeBytes);
+      await UntilAsync(channel, () => channel.FileChunks.Any(x => x.TransferId == transferId));
+      var sent = channel.FileChunks.Single(x => x.TransferId == transferId);
+      Assert.Equal(content, sent.Bytes);
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_AMissingFile_AnswersNotExists_AndSendsNothing()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileDownload(Guid.NewGuid(), Path.Combine(dataRoot, "gone.txt"), Cancel);
+
+    Assert.True(reply.Accepted, reply.Error);
+    Assert.False(reply.Value!.Exists);
+    await Task.Delay(50, Cancel); // nothing to wait on: proving an absence needs a beat, not a condition
+    Assert.Empty(channel.FileChunks);
+  }
+
+  [Fact]
   public async Task AHostDisposedWithoutWaiting_EndsItsTerminals_WithoutThrowing()
   {
     var channel = new FakeChannel();
@@ -132,6 +176,16 @@ public class AgentCallbacksTests
     while (!shown(Screen()))
     {
       Assert.True(DateTime.UtcNow < deadline, $"Waited for the terminal; it shows:\n{Screen()}");
+      await Task.Delay(20, Cancel);
+    }
+  }
+
+  private static async Task UntilAsync(FakeChannel channel, Func<bool> condition)
+  {
+    var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+    while (!condition())
+    {
+      Assert.True(DateTime.UtcNow < deadline, "Waited for the file transfer, which never arrived.");
       await Task.Delay(20, Cancel);
     }
   }

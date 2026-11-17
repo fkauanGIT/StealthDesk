@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
@@ -95,6 +96,79 @@ public static class DeviceEndpoints
       }
 
       return Results.Ok(listing.Value);
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerRead);
+
+    endpoints.MapGet($"{Routes.Devices}/{{id:guid}}/files/download", async (
+      Guid id,
+      string path,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      IFileTransfers transfers,
+      IOptions<FileManagerOptions> options,
+      StealthDeskDb db,
+      HttpContext httpContext,
+      ILoggerFactory loggerFactory,
+      CancellationToken cancellationToken) =>
+    {
+      var logger = loggerFactory.CreateLogger("StealthDesk.Web.Server.Devices.FileDownload");
+      logger.LogInformation("Download requested: device {DeviceId}, path {Path}.", id, path);
+
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceFileManagerRead))).Succeeded)
+      {
+        logger.LogInformation("Download refused: device {DeviceId} not found or not permitted.", id);
+        return Results.NotFound();
+      }
+
+      // Begun before asking the agent: its bytes can start arriving on another connection before this call returns.
+      var transferId = Guid.NewGuid();
+      using var transfer = transfers.Begin(transferId);
+      var info = await agents.CallAsync(device.Id, (agent, token) => agent.StartFileDownload(transferId, path, token), cancellationToken);
+      logger.LogInformation(
+        "Download agent reply for {TransferId}: accepted={Accepted}, exists={Exists}, size={Size}, error={Error}.",
+        transferId, info.Accepted, info.Value?.Exists, info.Value?.SizeBytes, info.Error);
+      if (!info.Accepted || !info.Value!.Exists)
+      {
+        return Results.NotFound();
+      }
+
+      if (info.Value.SizeBytes > options.Value.MaxDownloadSizeBytes)
+      {
+        return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+      }
+
+      var response = httpContext.Response;
+      response.ContentType = "application/octet-stream";
+      response.Headers.ContentDisposition =
+        new ContentDispositionHeaderValue("attachment") { FileNameStar = info.Value.FileName }.ToString();
+
+      try
+      {
+        await foreach (var chunk in transfer.ReadChunks(cancellationToken))
+        {
+          await response.Body.WriteAsync(chunk, cancellationToken);
+        }
+      }
+      catch (TimeoutException) when (!response.HasStarted)
+      {
+        logger.LogWarning("Download {TransferId} timed out waiting for the device.", transferId);
+        return Results.StatusCode(StatusCodes.Status504GatewayTimeout);
+      }
+      catch (Exception ex) when (!response.HasStarted)
+      {
+        // The agent accepted the download but failed while actually reading the file (e.g. a locked system file).
+        logger.LogWarning(ex, "Download {TransferId} failed while reading the file.", transferId);
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
+      }
+      catch (Exception ex)
+      {
+        // Headers (and maybe some bytes) already went out: nothing left to answer with but to end the connection.
+        logger.LogWarning(ex, "Download {TransferId} failed after the response had already started.", transferId);
+        throw;
+      }
+
+      return Results.Empty;
     }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerRead);
 
     return endpoints;

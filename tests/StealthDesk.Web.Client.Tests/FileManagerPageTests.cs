@@ -52,6 +52,24 @@ public class FileManagerPageTests : BunitContext
   }
 
   [Fact]
+  public void AFile_HasADownloadLink_ButAFolderDoesNot()
+  {
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
+    [
+      new FileSystemEntry("Users", IsDirectory: true, SizeBytes: 0, DateTimeOffset.UtcNow),
+      new FileSystemEntry("notes.txt", IsDirectory: false, SizeBytes: 2048, DateTimeOffset.UtcNow),
+    ]));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+
+    page.WaitForAssertion(() => Assert.Contains("notes.txt", page.Markup));
+    var links = page.FindAll("a").Where(x => x.GetAttribute("href")?.Contains("/files/download") == true).ToList();
+    Assert.Single(links);
+    Assert.Contains(Uri.EscapeDataString(@"C:\notes.txt"), links[0].GetAttribute("href"));
+  }
+
+  [Fact]
   public void AMissingFolder_SaysNotFound()
   {
     _api.RespondWith(Device());
