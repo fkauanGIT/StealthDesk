@@ -13,3 +13,11 @@ public sealed record FileSystemEntry(string Name, bool IsDirectory, long SizeByt
 /// </summary>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record DirectoryListing(string Path, bool Exists, IReadOnlyList<FileSystemEntry> Entries);
+
+/// <summary>
+/// What starting a file download answers with: its size and name, so the browser can show them before the bytes
+/// arrive. <paramref name="Exists"/> is false for a path that isn't a file the agent can read (gone, a folder, or
+/// denied), with nothing else meaningful; no bytes follow for it.
+/// </summary>
+[MessagePackObject(keyAsPropertyName: true)]
+public sealed record FileDownloadInfo(bool Exists, string FileName, long SizeBytes);

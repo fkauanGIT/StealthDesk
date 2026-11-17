@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Files;
 using StealthDesk.Agent.Core.Inventory;
@@ -9,11 +10,17 @@ using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Contracts.Terminal;
 using StealthDesk.Core;
+using StealthDesk.Realtime;
 
 namespace StealthDesk.Agent.Core.Connection;
 
 /// <summary>What the agent does when the server calls it.</summary>
-public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRemoteControl remoteControl, IFileManager files) : IAgentCallbacks
+public sealed class AgentCallbacks(
+  ITerminalSessions terminals,
+  DesktopClientRemoteControl remoteControl,
+  IFileManager files,
+  IRealtimeChannel<IAgentGateway> channel,
+  ILogger<AgentCallbacks> logger) : IAgentCallbacks
 {
   public Task<GatewayReply<string>> GetAgentVersion(CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Accept(PortableInventory.AgentVersion));
@@ -50,6 +57,30 @@ public sealed class AgentCallbacks(ITerminalSessions terminals, DesktopClientRem
 
   public Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Accept(files.ListDirectory(path)));
+
+  public Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken)
+  {
+    var info = files.GetFileInfo(path);
+    if (info.Exists)
+    {
+      // Not awaited: the bytes race the answer over a separate hub call, matched by transferId.
+      _ = SendFileAsync(transferId, path);
+    }
+
+    return Task.FromResult(GatewayReply.Accept(info));
+  }
+
+  private async Task SendFileAsync(Guid transferId, string path)
+  {
+    try
+    {
+      await channel.Server.SendFileChunks(transferId, files.ReadFile(path, CancellationToken.None));
+    }
+    catch (Exception ex)
+    {
+      logger.LogWarning(ex, "Failed to send file {Path} for transfer {TransferId}.", path, transferId);
+    }
+  }
 
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);

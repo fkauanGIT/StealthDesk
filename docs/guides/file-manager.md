@@ -20,3 +20,11 @@ grants and denies combine.
 
 It opens at the device's system drive. Choose a folder to open it; the path above the list goes back to any folder
 on the way there. A folder that no longer exists, or isn't reachable right now, says so instead of erroring.
+
+## Downloading a file
+
+Choose **Download** next to a file to save it from the device, streamed through the server rather than held in its
+memory. The same `device.file-manager.read` permission is enough; there's no separate one for downloading.
+
+A file bigger than the server's limit (`FileManager:MaxDownloadSizeBytes` in
+[server settings](../reference/server-settings.md), 2 GiB by default) can't be downloaded at all.

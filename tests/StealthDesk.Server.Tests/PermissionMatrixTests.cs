@@ -20,6 +20,7 @@ using StealthDesk.Contracts.Tenants;
 using StealthDesk.Contracts.TenantSettings;
 using StealthDesk.Contracts.UserGroups;
 using StealthDesk.Contracts.Users;
+using StealthDesk.Realtime;
 using StealthDesk.Server.Tests.Infrastructure;
 using StealthDesk.Web.Server.Dashboard;
 using StealthDesk.Web.Server.Permissions;
@@ -374,6 +375,10 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Get, "/api/v1/devices/{id:guid}/files/download", PermissionNames.DeviceFileManagerRead, (w, _) => Task.FromResult(new Call(HttpMethod.Get, Routes.DeviceFileDownload(w.Device, @"C:\report.txt"))))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -562,7 +567,9 @@ public class PermissionMatrixTests
       // Online, with an agent answering the desktop preview: the only row here whose success needs one. Joins with
       // its own key of this tenant, so the device lands here rather than in TestAgent's own default tenant.
       var key = await TestInstallerKeys.CreateAsync(server, world.Tenant);
-      var agent = await TestAgent.ConnectAsync(server, withInstallerKey: false, callbacks: new DesktopPreviewAgent());
+      var callbacks = new DesktopPreviewAgent();
+      var agent = await TestAgent.ConnectAsync(server, withInstallerKey: false, callbacks: callbacks);
+      callbacks.Channel = agent.Channel;
       Assert.True((await agent.ReportAsync(TestAgent.Report(world.Device, "MATRIX-PC") with { InstallerKey = key })).Accepted);
       world._admin = (await world.CallerAsync([.. PermissionCatalog.All.Select(x => x.Name)])).Client;
       world.Outsider = await world.CallerAsync([.. PermissionCatalog.All.Where(x => x.AllowsTenantScope).Select(x => x.Name)], world.OtherTenant);
@@ -691,10 +698,24 @@ public class PermissionMatrixTests
   /// <summary>Answers the desktop preview row's call with a small picture; refuses everything else.</summary>
   private sealed class DesktopPreviewAgent : RefusingAgent
   {
+    /// <summary>Set after the test agent connects: the callbacks exist before its channel does.</summary>
+    public IRealtimeChannel<IAgentGateway>? Channel { get; set; }
+
     public override Task<GatewayReply<DesktopPreview>> GetDesktopPreview(CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(new DesktopPreview([1, 2, 3, 4], ImageEncoding.Png)));
 
     public override Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(new DirectoryListing(@"C:\", true, [])));
+
+    public override Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken)
+    {
+      _ = Channel!.Server.SendFileChunks(transferId, Chunks());
+      return Task.FromResult(GatewayReply.Accept(new FileDownloadInfo(Exists: true, "report.txt", 3)));
+    }
+
+    private static async IAsyncEnumerable<byte[]> Chunks()
+    {
+      yield return [1, 2, 3];
+    }
   }
 }

@@ -38,4 +38,7 @@ public class RefusingAgent : IAgentCallbacks
 
   public virtual Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<DirectoryListing>(NoAnswers));
+
+  public virtual Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<FileDownloadInfo>(NoAnswers));
 }

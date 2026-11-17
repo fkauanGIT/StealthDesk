@@ -65,6 +65,22 @@ internal sealed class FakeChannel : IRealtimeChannel<IAgentGateway>, IAgentGatew
     return Task.CompletedTask;
   }
 
+  public List<(Guid TransferId, byte[] Bytes)> FileChunks { get; } = [];
+
+  public async Task SendFileChunks(Guid transferId, IAsyncEnumerable<byte[]> chunks)
+  {
+    using var buffer = new MemoryStream();
+    await foreach (var chunk in chunks)
+    {
+      buffer.Write(chunk);
+    }
+
+    lock (FileChunks)
+    {
+      FileChunks.Add((transferId, buffer.ToArray()));
+    }
+  }
+
   public int Closes { get; private set; }
 
   public Task CloseAsync()

@@ -55,6 +55,11 @@ public static class ServerSetup
       .ValidateOnStart();
     builder.Services.AddOptions<RemoteControlOptions>()
       .Bind(builder.Configuration.GetSection(RemoteControlOptions.Section));
+    builder.Services.AddOptions<FileManagerOptions>()
+      .Bind(builder.Configuration.GetSection(FileManagerOptions.Section))
+      .Validate(x => x.MaxDownloadSizeBytes > 0, $"{FileManagerOptions.Section}:{nameof(FileManagerOptions.MaxDownloadSizeBytes)} must be more than zero.")
+      .ValidateOnStart();
+    builder.Services.AddSingleton<IFileTransfers, FileTransfers>();
     builder.Services.AddSingleton<RelaySessions>();
     builder.Services.AddSingleton<IRelaySessions>(provider => provider.GetRequiredService<RelaySessions>());
     // Above the 32 KB default: a desktop preview's picture, answered over this same gateway, is usually bigger.

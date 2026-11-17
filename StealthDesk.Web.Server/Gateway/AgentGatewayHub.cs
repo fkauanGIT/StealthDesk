@@ -18,6 +18,7 @@ public sealed class AgentGatewayHub(
   IDeviceNotifier notifier,
   ITerminalRelay terminals,
   IRemoteControlSessions remoteControl,
+  IFileTransfers transfers,
   TimeProvider clock,
   ILogger<AgentGatewayHub> logger) : Hub<IAgentCallbacks>, IAgentGateway
 {
@@ -64,6 +65,32 @@ public sealed class AgentGatewayHub(
     catch (Exception ex)
     {
       logger.LogWarning(ex, "Failed to deliver output of terminal {TerminalId}.", output.TerminalId);
+    }
+  }
+
+  // No reply: the server already answered the download request with the file's size and name. An id this request
+  // doesn't know about (abandoned, or never started) is drained and dropped rather than left for the agent to block on.
+  public async Task SendFileChunks(Guid transferId, IAsyncEnumerable<byte[]> chunks)
+  {
+    var sink = transfers.Find(transferId);
+    // Also cancels a write once the HTTP side is done with the transfer (refused, aborted, or finished): without
+    // this, a chunk waiting for room in a channel nobody will ever read again blocks this call forever.
+    using var stop = sink is null ? null : CancellationTokenSource.CreateLinkedTokenSource(Context.ConnectionAborted, sink.Done);
+    try
+    {
+      await foreach (var chunk in chunks.WithCancellation(Context.ConnectionAborted))
+      {
+        if (sink is not null)
+        {
+          await sink.Writer.WriteAsync(chunk, stop!.Token);
+        }
+      }
+
+      sink?.Writer.TryComplete();
+    }
+    catch (Exception ex)
+    {
+      sink?.Writer.TryComplete(ex);
     }
   }
 
