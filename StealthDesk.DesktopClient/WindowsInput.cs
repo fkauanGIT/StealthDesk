@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.Versioning;
 using System.Security.Principal;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,7 @@ internal sealed unsafe class WindowsInput(ILogger<WindowsInput> logger) : IInput
   private const uint XButton2 = 0x0002;
 
   private readonly Lock _gate = new();
+  private readonly Lazy<BlockInputThread> _blockInput = new(() => new BlockInputThread());
 
   public void MovePointer(int x, int y)
   {
@@ -131,8 +133,40 @@ internal sealed unsafe class WindowsInput(ILogger<WindowsInput> logger) : IInput
   }
 
   // BlockInput discards hardware-generated mouse and keyboard input but leaves SendInput, used for every call above,
-  // free to keep driving the session for the viewer.
-  public bool SetBlockInput(bool active) => PInvoke.BlockInput(active);
+  // free to keep driving the session for the viewer. Windows only lets the thread that blocked input unblock it
+  // again, so every call goes through one dedicated thread kept alive for as long as this object is, instead of
+  // whatever thread pool thread happens to run the caller.
+  public bool SetBlockInput(bool active) => _blockInput.Value.Call(active);
+
+  // Returns the blocking's actual state after the call, which is active only when BlockInput itself succeeded;
+  // a failed call leaves whatever the state already was.
+  private sealed class BlockInputThread
+  {
+    private readonly BlockingCollection<(bool Active, TaskCompletionSource<bool> Result)> _calls = new();
+    private bool _isBlocked;
+
+    public BlockInputThread() => new Thread(Run) { IsBackground = true, Name = "StealthDesk-BlockInput" }.Start();
+
+    public bool Call(bool active)
+    {
+      var result = new TaskCompletionSource<bool>();
+      _calls.Add((active, result));
+      return result.Task.GetAwaiter().GetResult();
+    }
+
+    private void Run()
+    {
+      foreach (var (active, result) in _calls.GetConsumingEnumerable())
+      {
+        if (PInvoke.BlockInput(active))
+        {
+          _isBlocked = active;
+        }
+
+        result.SetResult(_isBlocked);
+      }
+    }
+  }
 
   private static INPUT MouseAt(MOUSE_EVENT_FLAGS flags, uint data) => new()
   {
