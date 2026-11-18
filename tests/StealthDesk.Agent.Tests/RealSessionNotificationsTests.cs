@@ -41,6 +41,24 @@ public sealed class RealSessionNotificationsTests : IDisposable
     Assert.Equal(SessionChangeKind.Locked, changes.Current);
   }
 
+  [Fact]
+  public async Task ASecondInstanceInTheSameProcess_StillGetsAWorkingWindow()
+  {
+    // The window class is per process, not per window: a second instance's RegisterClassEx call sees it already
+    // registered by the first (even disposed, the class itself stays registered) — that must not stop it from
+    // getting a window and a working message loop of its own.
+    _notifications.Dispose();
+
+    using var second = new WindowsSessionNotifications(NullLogger<WindowsSessionNotifications>.Instance);
+    Assert.NotEqual(0, second.WindowHandle);
+
+    var changes = second.Changes.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+    PostMessage(second.WindowHandle, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, 0);
+
+    Assert.True(await changes.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+    Assert.Equal(SessionChangeKind.Locked, changes.Current);
+  }
+
   public void Dispose() => _notifications.Dispose();
 
   [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
