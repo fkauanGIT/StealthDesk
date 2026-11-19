@@ -87,13 +87,10 @@ else
                             <td>@(entry.IsDirectory ? "" : FormatSize(entry.SizeBytes))</td>
                             <td>@entry.ModifiedAt.ToLocalTime().ToString("g")</td>
                             <td class="sd-row-actions">
-                                @if (!entry.IsDirectory)
-                                {
-                                    <a class="sd-link-button" href="@Routes.DeviceFileDownload(Id, Combine(listing.Path, entry.Name))" download>
-                                        <SdIcon Name="IconName.Download" Size="16" />
-                                        Download
-                                    </a>
-                                }
+                                <a class="sd-link-button" href="@Routes.DeviceFileDownload(Id, Combine(listing.Path, entry.Name))" download>
+                                    <SdIcon Name="IconName.Download" Size="16" />
+                                    @(entry.IsDirectory ? "Download as zip" : "Download")
+                                </a>
                             </td>
                         </tr>
                     }

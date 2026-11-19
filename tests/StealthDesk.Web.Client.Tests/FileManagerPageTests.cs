@@ -52,7 +52,7 @@ public class FileManagerPageTests : BunitContext
   }
 
   [Fact]
-  public void AFile_HasADownloadLink_ButAFolderDoesNot()
+  public void AFile_HasAPlainDownloadLink_AFolder_HasAZipOne()
   {
     _api.RespondWith(Device());
     _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
@@ -65,8 +65,13 @@ public class FileManagerPageTests : BunitContext
 
     page.WaitForAssertion(() => Assert.Contains("notes.txt", page.Markup));
     var links = page.FindAll("a").Where(x => x.GetAttribute("href")?.Contains("/files/download") == true).ToList();
-    Assert.Single(links);
-    Assert.Contains(Uri.EscapeDataString(@"C:\notes.txt"), links[0].GetAttribute("href"));
+    Assert.Equal(2, links.Count);
+
+    var fileLink = links.Single(x => x.GetAttribute("href")!.Contains(Uri.EscapeDataString(@"C:\notes.txt")));
+    Assert.Equal("Download", fileLink.TextContent.Trim());
+
+    var folderLink = links.Single(x => x.GetAttribute("href")!.Contains(Uri.EscapeDataString(@"C:\Users")));
+    Assert.Equal("Download as zip", folderLink.TextContent.Trim());
   }
 
   [Fact]

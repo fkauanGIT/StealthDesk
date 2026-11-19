@@ -66,10 +66,11 @@ public interface IAgentCallbacks
   Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken);
 
   /// <summary>
-  /// Starts downloading the file at <paramref name="path"/>. The answer carries its size and name; its bytes follow
-  /// separately through <see cref="IAgentGateway.SendFileChunks"/>, matched to this call by
-  /// <paramref name="transferId"/>, which the server generates before asking. A path that isn't a file the agent
-  /// can read answers with <see cref="FileDownloadInfo.Exists"/> false, and no bytes follow.
+  /// Starts downloading whatever is at <paramref name="path"/>: a file as-is, or a folder zipped by the agent first.
+  /// The answer carries its size and name (the folder's own name with ".zip" added); its bytes follow separately
+  /// through <see cref="IAgentGateway.SendFileChunks"/>, matched to this call by <paramref name="transferId"/>,
+  /// which the server generates before asking. A path that isn't a file or folder the agent can read, or a folder
+  /// that couldn't be zipped, answers with <see cref="FileDownloadInfo.Exists"/> false, and no bytes follow.
   /// </summary>
   Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken);
 }

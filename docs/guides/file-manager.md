@@ -28,3 +28,9 @@ memory. The same `device.file-manager.read` permission is enough; there's no sep
 
 A file bigger than the server's limit (`FileManager:MaxDownloadSizeBytes` in
 [server settings](../reference/server-settings.md), 2 GiB by default) can't be downloaded at all.
+
+## Downloading a folder as a zip
+
+Choose **Download as zip** next to a folder to save its whole contents, zipped by the device itself before any byte
+reaches the server. The zip's size counts against the same download limit as a single file; a folder that zips past
+it can't be downloaded either.
