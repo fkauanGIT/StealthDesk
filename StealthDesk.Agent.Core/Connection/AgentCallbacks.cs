@@ -60,25 +60,44 @@ public sealed class AgentCallbacks(
 
   public Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken)
   {
-    var info = files.GetFileInfo(path);
-    if (info.Exists)
+    var prepared = files.PrepareDownload(path);
+    if (prepared.Exists)
     {
       // Not awaited: the bytes race the answer over a separate hub call, matched by transferId.
-      _ = SendFileAsync(transferId, path);
+      _ = SendFileAsync(transferId, prepared);
     }
 
-    return Task.FromResult(GatewayReply.Accept(info));
+    return Task.FromResult(GatewayReply.Accept(new FileDownloadInfo(prepared.Exists, prepared.FileName, prepared.SizeBytes)));
   }
 
-  private async Task SendFileAsync(Guid transferId, string path)
+  private async Task SendFileAsync(Guid transferId, PreparedDownload prepared)
   {
     try
     {
-      await channel.Server.SendFileChunks(transferId, files.ReadFile(path, CancellationToken.None));
+      await channel.Server.SendFileChunks(transferId, files.ReadFile(prepared.SourcePath, CancellationToken.None));
     }
     catch (Exception ex)
     {
-      logger.LogWarning(ex, "Failed to send file {Path} for transfer {TransferId}.", path, transferId);
+      logger.LogWarning(ex, "Failed to send file {Path} for transfer {TransferId}.", prepared.SourcePath, transferId);
+    }
+    finally
+    {
+      if (prepared.IsTemporary)
+      {
+        TryDeleteTempFile(prepared.SourcePath);
+      }
+    }
+  }
+
+  private void TryDeleteTempFile(string path)
+  {
+    try
+    {
+      File.Delete(path);
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+    {
+      logger.LogDebug(ex, "Couldn't delete the temporary download file {Path}.", path);
     }
   }
 

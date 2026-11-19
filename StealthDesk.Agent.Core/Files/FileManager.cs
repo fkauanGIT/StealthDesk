@@ -1,16 +1,31 @@
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using StealthDesk.Contracts.Devices;
 
 namespace StealthDesk.Agent.Core.Files;
 
+/// <summary>
+/// What <see cref="IFileManager.PrepareDownload"/> resolved a path to send: a plain file as-is, or a folder zipped
+/// first into a temporary file that <paramref name="SourcePath"/> names. <paramref name="IsTemporary"/> tells the
+/// caller to delete <paramref name="SourcePath"/> once the bytes are sent; a plain file is never deleted.
+/// </summary>
+public sealed record PreparedDownload(bool Exists, string FileName, long SizeBytes, string SourcePath, bool IsTemporary)
+{
+  public static readonly PreparedDownload NotFound = new(false, string.Empty, 0, string.Empty, false);
+}
+
 public interface IFileManager
 {
   /// <summary>A directory's immediate contents. The agent's own system drive when <paramref name="path"/> is empty.</summary>
   DirectoryListing ListDirectory(string path);
 
-  /// <summary>Whether <paramref name="path"/> is a file the agent can read, and its size and name.</summary>
-  FileDownloadInfo GetFileInfo(string path);
+  /// <summary>
+  /// Resolves <paramref name="path"/> for download: a file as-is, or a folder zipped into a temporary file first
+  /// (built right away, so its real size is known before any byte is sent). Not found, or a folder that couldn't
+  /// be zipped, answers <see cref="PreparedDownload.NotFound"/>.
+  /// </summary>
+  PreparedDownload PrepareDownload(string path);
 
   /// <summary>The file's bytes, read a chunk at a time rather than all into memory at once.</summary>
   IAsyncEnumerable<byte[]> ReadFile(string path, CancellationToken cancellationToken);
@@ -52,16 +67,69 @@ public sealed class FileManager(ILogger<FileManager> logger) : IFileManager
     }
   }
 
-  public FileDownloadInfo GetFileInfo(string path)
+  public PreparedDownload PrepareDownload(string path)
   {
+    if (Directory.Exists(path))
+    {
+      return ZipDirectory(path);
+    }
+
     if (!File.Exists(path))
     {
-      // Also true for a directory: File.Exists is false for one, same as for a path that's simply gone.
-      return new FileDownloadInfo(Exists: false, FileName: string.Empty, SizeBytes: 0);
+      return PreparedDownload.NotFound;
     }
 
     var file = new FileInfo(path);
-    return new FileDownloadInfo(Exists: true, file.Name, file.Length);
+    return new PreparedDownload(true, file.Name, file.Length, path, IsTemporary: false);
+  }
+
+  private PreparedDownload ZipDirectory(string directoryPath)
+  {
+    var zipPath = Path.Combine(Path.GetTempPath(), $"stealthdesk-download-{Guid.NewGuid()}.zip");
+    try
+    {
+      using (var zipStream = File.Create(zipPath))
+      using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
+      {
+        AddDirectoryToZip(archive, directoryPath, entryPrefix: string.Empty);
+      }
+
+      var zipName = $"{new DirectoryInfo(directoryPath).Name}.zip";
+      var zipSize = new FileInfo(zipPath).Length;
+      return new PreparedDownload(true, zipName, zipSize, zipPath, IsTemporary: true);
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+    {
+      logger.LogDebug(ex, "Couldn't zip {Path}.", directoryPath);
+      TryDeleteTempZip(zipPath);
+      return PreparedDownload.NotFound;
+    }
+  }
+
+  private static void AddDirectoryToZip(ZipArchive archive, string directoryPath, string entryPrefix)
+  {
+    foreach (var filePath in Directory.EnumerateFiles(directoryPath))
+    {
+      var entryName = $"{entryPrefix}{Path.GetFileName(filePath)}";
+      archive.CreateEntryFromFile(filePath, entryName, CompressionLevel.Fastest);
+    }
+
+    foreach (var subdirectoryPath in Directory.EnumerateDirectories(directoryPath))
+    {
+      AddDirectoryToZip(archive, subdirectoryPath, $"{entryPrefix}{Path.GetFileName(subdirectoryPath)}/");
+    }
+  }
+
+  private void TryDeleteTempZip(string zipPath)
+  {
+    try
+    {
+      File.Delete(zipPath);
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+    {
+      logger.LogDebug(ex, "Couldn't delete the temporary zip {Path}.", zipPath);
+    }
   }
 
   public async IAsyncEnumerable<byte[]> ReadFile(string path, [EnumeratorCancellation] CancellationToken cancellationToken)

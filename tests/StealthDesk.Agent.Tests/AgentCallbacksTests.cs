@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -108,6 +109,43 @@ public class AgentCallbacksTests
       await UntilAsync(channel, () => channel.FileChunks.Any(x => x.TransferId == transferId));
       var sent = channel.FileChunks.Single(x => x.TransferId == transferId);
       Assert.Equal(content, sent.Bytes);
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_DownloadsAFolder_AsAZip_AndDeletesTheTempFileAfter()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      var folderPath = Path.Combine(dataRoot, "reports");
+      Directory.CreateDirectory(folderPath);
+      Directory.CreateDirectory(Path.Combine(folderPath, "sub"));
+      await File.WriteAllTextAsync(Path.Combine(folderPath, "a.txt"), "hi", Cancel);
+      await File.WriteAllTextAsync(Path.Combine(folderPath, "sub", "b.txt"), "there", Cancel);
+      var transferId = Guid.NewGuid();
+      var tempDir = Path.GetTempPath();
+      var tempZipsBefore = Directory.EnumerateFiles(tempDir, "stealthdesk-download-*.zip").ToList();
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileDownload(transferId, folderPath, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.True(reply.Value!.Exists);
+      Assert.Equal("reports.zip", reply.Value.FileName);
+      Assert.True(reply.Value.SizeBytes > 0);
+      await UntilAsync(channel, () => channel.FileChunks.Any(x => x.TransferId == transferId));
+      var sent = channel.FileChunks.Single(x => x.TransferId == transferId);
+      using var zip = new ZipArchive(new MemoryStream(sent.Bytes), ZipArchiveMode.Read);
+      Assert.Equal(["a.txt", "sub/b.txt"], zip.Entries.Select(x => x.FullName).OrderBy(x => x));
+
+      // Cleaned up rather than left behind: this is a temp file nobody else will ever read. Polled rather than
+      // checked once: the delete happens right after SendFileChunks returns, not necessarily before this line runs.
+      await UntilAsync(channel, () => Directory.EnumerateFiles(tempDir, "stealthdesk-download-*.zip").Count() == tempZipsBefore.Count);
     }
     finally
     {
