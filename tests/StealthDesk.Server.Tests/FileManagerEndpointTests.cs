@@ -146,6 +146,104 @@ public class FileManagerEndpointTests
     Assert.Equal(content, await response.Content.ReadAsByteArrayAsync(Cancel));
   }
 
+  [Fact]
+  public async Task Upload_WithoutThePermission_IsNotFound()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var deviceId = await ReportDeviceAsync(server);
+    var client = await ClientForAsync(server, "nobody3@example.com", (_, _) => Task.CompletedTask);
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\", "a.txt", overwrite: false), new ByteArrayContent([1, 2, 3]), Cancel);
+
+    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Upload_AboveTheDeclaredLimit_IsTooLarge_WithoutAskingTheDevice()
+  {
+    using var server = (await ServerHost.OnPostgresAsync()).With("FileManager:MaxUploadSizeBytes", "2");
+    // A plain RefusingAgent would answer 409 if asked: a 413 here instead proves the size was checked first.
+    await using var agent = await TestAgent.ConnectAsync(server);
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-ul1@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\", "big.bin", overwrite: false), new ByteArrayContent([1, 2, 3]), Cancel);
+
+    Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Upload_WhenTheAgentRefuses_IsConflict()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server); // a plain RefusingAgent refuses StartFileUpload
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-ul2@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\", "a.txt", overwrite: false), new ByteArrayContent([1, 2, 3]), Cancel);
+
+    Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Upload_WithThePermission_WritesTheAgentsBytes_PulledOverTheRealChannel()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var callbacks = new FileUploadAgent();
+    await using var agent = await TestAgent.ConnectAsync(server, callbacks: callbacks);
+    callbacks.Channel = agent.Channel;
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-ul3@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+    var content = RandomNumberGenerator.GetBytes(200_000); // past one chunk, to prove more than one is pulled
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\reports", "upload.bin", overwrite: false), new ByteArrayContent(content), Cancel);
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    Assert.Equal("C:\\reports", callbacks.DirectoryPath);
+    Assert.Equal("upload.bin", callbacks.FileName);
+    Assert.Equal(content, callbacks.Received);
+  }
+
+  [Fact]
+  public async Task Upload_WhenTheAgentFailsToSaveIt_IsBadGateway()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var callbacks = new FileUploadAgent { Failure = "The device couldn't save the file." };
+    await using var agent = await TestAgent.ConnectAsync(server, callbacks: callbacks);
+    callbacks.Channel = agent.Channel;
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-ul4@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\", "a.txt", overwrite: false), new ByteArrayContent([1, 2, 3]), Cancel);
+
+    Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Upload_WhenTheAgentNeverReportsBack_IsGatewayTimeout()
+  {
+    using var server = (await ServerHost.OnPostgresAsync()).With("Gateway:AgentCallTimeout", "00:00:01");
+    var callbacks = new FileUploadAgent { ReportBack = false };
+    await using var agent = await TestAgent.ConnectAsync(server, callbacks: callbacks);
+    callbacks.Channel = agent.Channel;
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-ul5@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceFileUpload(deviceId, @"C:\", "a.txt", overwrite: false), new ByteArrayContent([1, 2, 3]), Cancel);
+
+    Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+  }
+
   private static async Task<Guid> ReportDeviceAsync(ServerHost server)
   {
     await using var agent = await TestAgent.ConnectAsync(server);
@@ -201,5 +299,51 @@ public class FileManagerEndpointTests
   {
     public override Task<GatewayReply<DirectoryListing>> ListDirectory(string path, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(listing));
+  }
+
+  /// <summary>
+  /// An agent that accepts every upload, pulling its bytes over the real channel (proving the server's streaming
+  /// hub method actually works, not just the accept/refuse round trip).
+  /// </summary>
+  private sealed class FileUploadAgent : RefusingAgent
+  {
+    /// <summary>Set after the test agent connects: the callbacks exist before its channel does.</summary>
+    public IRealtimeChannel<IAgentGateway>? Channel { get; set; }
+
+    /// <summary>Non-null answers <see cref="IAgentGateway.ReportUploadResult"/> with this instead of success.</summary>
+    public string? Failure { get; set; }
+
+    /// <summary>False skips reporting back at all, as if the agent died mid-upload.</summary>
+    public bool ReportBack { get; set; } = true;
+
+    public string? DirectoryPath { get; private set; }
+
+    public string? FileName { get; private set; }
+
+    /// <summary>The bytes received, once the pull finishes.</summary>
+    public byte[]? Received { get; private set; }
+
+    public override Task<GatewayReply<Guid>> StartFileUpload(Guid transferId, string directoryPath, string fileName, bool overwrite, CancellationToken cancellationToken)
+    {
+      DirectoryPath = directoryPath;
+      FileName = fileName;
+      _ = ReceiveAsync(transferId);
+      return Task.FromResult(GatewayReply.Accept(transferId));
+    }
+
+    private async Task ReceiveAsync(Guid transferId)
+    {
+      using var buffer = new MemoryStream();
+      await foreach (var chunk in Channel!.Server.ReadUploadChunks(transferId, CancellationToken.None))
+      {
+        buffer.Write(chunk);
+      }
+
+      Received = buffer.ToArray();
+      if (ReportBack)
+      {
+        await Channel!.Server.ReportUploadResult(transferId, Failure);
+      }
+    }
   }
 }

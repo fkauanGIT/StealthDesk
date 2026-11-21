@@ -101,6 +101,48 @@ public sealed class AgentCallbacks(
     }
   }
 
+  public Task<GatewayReply<Guid>> StartFileUpload(
+    Guid transferId,
+    string directoryPath,
+    string fileName,
+    bool overwrite,
+    CancellationToken cancellationToken)
+  {
+    var prepared = files.PrepareUpload(directoryPath, fileName, overwrite);
+    if (!prepared.Accepted)
+    {
+      return Task.FromResult(GatewayReply.Refuse<Guid>(prepared.Error!));
+    }
+
+    // Not awaited: the bytes are pulled, and the final outcome reported, over separate hub calls, both matched by
+    // transferId. This answer only says the upload may begin.
+    _ = ReceiveFileAsync(transferId, prepared.TargetPath);
+    return Task.FromResult(GatewayReply.Accept(transferId));
+  }
+
+  private async Task ReceiveFileAsync(Guid transferId, string targetPath)
+  {
+    string? error = null;
+    try
+    {
+      await files.WriteFile(targetPath, channel.Server.ReadUploadChunks(transferId, CancellationToken.None), CancellationToken.None);
+    }
+    catch (Exception ex)
+    {
+      logger.LogWarning(ex, "Failed to receive upload {TransferId} into {Path}.", transferId, targetPath);
+      error = "The device couldn't save the file.";
+    }
+
+    try
+    {
+      await channel.Server.ReportUploadResult(transferId, error);
+    }
+    catch (Exception ex)
+    {
+      logger.LogWarning(ex, "Failed to report the outcome of upload {TransferId}.", transferId);
+    }
+  }
+
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);
 }

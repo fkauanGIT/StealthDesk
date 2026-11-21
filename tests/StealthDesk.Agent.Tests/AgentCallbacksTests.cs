@@ -168,6 +168,107 @@ public class AgentCallbacksTests
   }
 
   [Fact]
+  public async Task TheAgentsCallbacks_UploadsAFile_PulledFromTheServer_WithItsBytes()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      var content = RandomNumberGenerator.GetBytes(200_000); // past one chunk, to prove more than one is pulled
+      var transferId = Guid.NewGuid();
+      channel.UploadChunks = _ => Chunks(content, 3);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileUpload(transferId, dataRoot, "upload.bin", overwrite: false, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      await UntilAsync(channel, () => channel.UploadResults.Any(x => x.TransferId == transferId));
+      Assert.Null(channel.UploadResults.Single(x => x.TransferId == transferId).Error);
+      Assert.Equal(content, await File.ReadAllBytesAsync(Path.Combine(dataRoot, "upload.bin"), Cancel));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_UploadToAMissingFolder_IsRefused_AndPullsNoBytes()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileUpload(
+      Guid.NewGuid(), Path.Combine(dataRoot, "gone"), "a.txt", overwrite: false, Cancel);
+
+    Assert.False(reply.Accepted);
+    await Task.Delay(50, Cancel); // nothing to wait on: proving an absence needs a beat, not a condition
+    Assert.Empty(channel.UploadResults);
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_UploadOverAnExistingFile_WithoutOverwrite_IsRefused_AndLeavesItAlone()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      var existingPath = Path.Combine(dataRoot, "a.txt");
+      await File.WriteAllTextAsync(existingPath, "original", Cancel);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileUpload(Guid.NewGuid(), dataRoot, "a.txt", overwrite: false, Cancel);
+
+      Assert.False(reply.Accepted);
+      Assert.Equal("original", await File.ReadAllTextAsync(existingPath, Cancel));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_UploadThatFailsMidStream_ReportsTheFailure()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      var transferId = Guid.NewGuid();
+      channel.UploadChunks = _ => FailingChunks();
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().StartFileUpload(transferId, dataRoot, "broken.bin", overwrite: false, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      await UntilAsync(channel, () => channel.UploadResults.Any(x => x.TransferId == transferId));
+      Assert.NotNull(channel.UploadResults.Single(x => x.TransferId == transferId).Error);
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  private static async IAsyncEnumerable<byte[]> Chunks(byte[] content, int chunkCount)
+  {
+    var size = Math.Max(1, content.Length / chunkCount);
+    for (var offset = 0; offset < content.Length; offset += size)
+    {
+      yield return content[offset..Math.Min(offset + size, content.Length)];
+      await Task.Yield();
+    }
+  }
+
+  private static async IAsyncEnumerable<byte[]> FailingChunks()
+  {
+    yield return [1, 2, 3];
+    await Task.Yield();
+    throw new IOException("Simulated failure partway through the upload.");
+  }
+
+  [Fact]
   public async Task AHostDisposedWithoutWaiting_EndsItsTerminals_WithoutThrowing()
   {
     var channel = new FakeChannel();

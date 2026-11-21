@@ -1,8 +1,12 @@
 @page "/devices/{Id:guid}/files"
 @attribute [Authorize]
+@implements IDisposable
+@using System.Net
 @using System.Text.Json
 @inject DeviceStore Store
 @inject HttpClient Http
+@inject ILiveUpdates Live
+@inject IDeviceHub Hub
 
 <PageTitle>Files · @(device?.Name ?? "Device") · StealthDesk</PageTitle>
 
@@ -37,6 +41,21 @@ else
                 <span aria-hidden="true"> / </span>
             }
         </nav>
+    }
+
+    @if (canUpload && listing is { Exists: true })
+    {
+        <div class="sd-file-upload">
+            <InputFile OnChange="OnFileSelectedAsync" disabled="@uploading" />
+            @if (uploading)
+            {
+                <SdLoading Text="Uploading..." />
+            }
+        </div>
+        @if (uploadError is not null)
+        {
+            <SdAlert>@uploadError</SdAlert>
+        }
     }
 
     @if (loading)
@@ -109,16 +128,92 @@ else
     private DirectoryListing? listing;
     private bool loading;
     private string? error;
+    private bool actionsChecked;
+    private bool canUpload;
+    private bool uploading;
+    private string? uploadError;
+
+    protected override void OnInitialized()
+    {
+        Live.StateChanged += OnLiveChanged;
+        _ = Live.StartAsync();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
         lookup = await Store.FindAsync(Id);
         device = lookup.Device;
+        actionsChecked = false;
+        canUpload = false;
+        await CheckActionsAsync();
         if (device is not null && listing is null)
         {
             await LoadAsync(string.Empty);
         }
     }
+
+    // Asked once the live connection is up, same as every other page gating an action on device.file-manager.write.
+    private async Task CheckActionsAsync()
+    {
+        if (actionsChecked || device is null || Live.State != LiveState.Live)
+        {
+            return;
+        }
+
+        actionsChecked = true;
+        var actions = await Hub.GetDeviceActionsAsync(Id);
+        canUpload = actions is { Accepted: true, Value.UploadFiles: true };
+    }
+
+    private void OnLiveChanged() => InvokeAsync(async () =>
+    {
+        await CheckActionsAsync();
+        StateHasChanged();
+    });
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs args)
+    {
+        if (listing is not { Exists: true })
+        {
+            return;
+        }
+
+        uploading = true;
+        uploadError = null;
+        StateHasChanged();
+        try
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream(long.MaxValue);
+            using var content = new StreamContent(stream);
+            using var response = await Http.PostAsync(Routes.DeviceFileUpload(Id, listing.Path, file.Name, overwrite: false), content);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadAsync(listing.Path);
+            }
+            else
+            {
+                uploadError = response.StatusCode switch
+                {
+                    HttpStatusCode.Conflict => "A file with that name already exists.",
+                    HttpStatusCode.RequestEntityTooLarge => "The file is larger than the server allows.",
+                    HttpStatusCode.NotFound => "The device went offline, or you may not upload here.",
+                    _ => "Could not upload the file.",
+                };
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            uploadError = "Could not upload the file. Check that the device is online.";
+        }
+        finally
+        {
+            uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose() => Live.StateChanged -= OnLiveChanged;
 
     private async Task LoadAsync(string path)
     {

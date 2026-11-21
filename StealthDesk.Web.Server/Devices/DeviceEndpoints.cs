@@ -171,7 +171,96 @@ public static class DeviceEndpoints
       return Results.Empty;
     }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerRead);
 
+    endpoints.MapPost($"{Routes.Devices}/{{id:guid}}/files/upload", async (
+      Guid id,
+      string path,
+      string fileName,
+      bool overwrite,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      IFileTransfers transfers,
+      IOptions<FileManagerOptions> fileManagerOptions,
+      IOptions<GatewayOptions> gatewayOptions,
+      StealthDeskDb db,
+      HttpContext httpContext,
+      CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceFileManagerWrite))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      var maxSize = fileManagerOptions.Value.MaxUploadSizeBytes;
+      if (maxSize > 0 && httpContext.Request.ContentLength is { } declaredLength && declaredLength > maxSize)
+      {
+        return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+      }
+
+      // Begun, and fed, before asking the agent: its own bytes can start arriving on another connection before
+      // this call returns, same as a download.
+      var transferId = Guid.NewGuid();
+      using var transfer = transfers.Begin(transferId);
+      var pump = PumpUploadAsync(httpContext.Request.Body, transfer, maxSize, cancellationToken);
+
+      var accepted = await agents.CallAsync(device.Id, (agent, token) => agent.StartFileUpload(transferId, path, fileName, overwrite, token), cancellationToken);
+      if (!accepted.Accepted)
+      {
+        return Results.Problem(accepted.Error, statusCode: StatusCodes.Status409Conflict);
+      }
+
+      // Every byte is through (or the body failed) by the time this returns; what's left is for the agent to
+      // finish writing them to disk and say so.
+      await pump;
+
+      using var reportWait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+      reportWait.CancelAfter(gatewayOptions.Value.AgentCallTimeout);
+      try
+      {
+        var error = await transfer.Outcome.WaitAsync(reportWait.Token);
+        return error is null ? Results.Ok() : Results.Problem(error, statusCode: StatusCodes.Status502BadGateway);
+      }
+      catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+      {
+        return Results.StatusCode(StatusCodes.Status504GatewayTimeout);
+      }
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerWrite);
+
     return endpoints;
+  }
+
+  /// <summary>
+  /// Feeds the request body into <paramref name="transfer"/> a chunk at a time, for the agent to pull. Ends the
+  /// transfer the moment the body does (success, a size violation, or a read failure), and never blocks forever
+  /// on a refused or abandoned transfer: writing is cancelled the moment <paramref name="transfer"/> is disposed.
+  /// </summary>
+  private static async Task PumpUploadAsync(Stream body, FileTransferSink transfer, long maxSize, CancellationToken cancellationToken)
+  {
+    using var writeLimit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, transfer.Done);
+    var buffer = new byte[64 * 1024];
+    long total = 0;
+    try
+    {
+      int read;
+      while ((read = await body.ReadAsync(buffer, cancellationToken)) > 0)
+      {
+        total += read;
+        if (maxSize > 0 && total > maxSize)
+        {
+          transfer.Writer.TryComplete(new InvalidOperationException("The upload is larger than the server's transfer limit."));
+          return;
+        }
+
+        await transfer.Writer.WriteAsync(buffer[..read], writeLimit.Token);
+      }
+
+      transfer.Writer.TryComplete();
+    }
+    catch (Exception ex)
+    {
+      transfer.Writer.TryComplete(ex);
+    }
   }
 
   public static DeviceSummary ToSummary(DeviceRecord device) => new()

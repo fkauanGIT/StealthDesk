@@ -12,6 +12,7 @@ namespace StealthDesk.Contracts.Devices;
 /// <param name="BlockInput">Block the device's own mouse and keyboard during remote control.</param>
 /// <param name="SeeDesktopPreview">See a still picture of the device's current desktop, without starting remote control.</param>
 /// <param name="BrowseFiles">Browse the device's filesystem.</param>
+/// <param name="UploadFiles">Upload a file to the device's filesystem.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record DeviceActions(
   bool UseTerminal,
@@ -23,4 +24,5 @@ public sealed record DeviceActions(
   bool WriteClipboard = false,
   bool BlockInput = false,
   bool SeeDesktopPreview = false,
-  bool BrowseFiles = false);
+  bool BrowseFiles = false,
+  bool UploadFiles = false);

@@ -84,6 +84,7 @@ See [Tenant settings](../guides/tenant-settings.md) and [Installing agents](../g
 | `Relay:MaxMessageBytes` | `16777216` | The largest message an end may send through the relay; a larger one ends the session. |
 | `RemoteControl:EnableDesktopPreview` | `true` | Whether a desktop preview may be requested at all, regardless of anyone's permission. |
 | `FileManager:MaxDownloadSizeBytes` | `2147483648` | The largest file the file manager may download in one request. A bigger one refuses before any of it is sent. |
+| `FileManager:MaxUploadSizeBytes` | `2147483648` | The largest file the file manager may upload in one request. A bigger one refuses up front when the browser declares its size, or partway through otherwise. |
 | `InstallerKeys:UsageHistoryDays` | `90` | How long each key's installs are kept. Zero keeps them all. |
 | `AgentDownloads:Folder` | `downloads` | Where the agent builds the server hands out are, relative to the server's folder unless absolute; the Windows agent is `windows/StealthDesk.Agent.zip` in it, with its desktop client. The container image ships one. |
 

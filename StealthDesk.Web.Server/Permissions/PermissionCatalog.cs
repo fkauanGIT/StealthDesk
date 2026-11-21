@@ -83,6 +83,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceRemoteControlConnect, Categories.Devices, "See the desktop", "Start remote control on a device and see the desktop of a session logged on to it.", Devices),
     new(PermissionNames.DeviceDesktopPreviewRead, Categories.Devices, "See a desktop preview", "See a still picture of a device's current desktop, without starting remote control.", Devices),
     new(PermissionNames.DeviceFileManagerRead, Categories.Devices, "Browse files", "Browse a device's filesystem.", Devices),
+    new(PermissionNames.DeviceFileManagerWrite, Categories.Devices, "Upload files", "Upload a file to a device's filesystem.", Devices),
     new(PermissionNames.DeviceRemoteControlInteract, Categories.Devices, "Control the desktop", "Use a device's mouse and keyboard during remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlElevatedDesktop, Categories.Devices, "Use secure screens", "See and use UAC prompts and the lock screen during remote control.", Devices),
     new(PermissionNames.DeviceRemoteControlBlockInput, Categories.Devices, "Block input", "Block a device's own mouse and keyboard during remote control.", Devices),

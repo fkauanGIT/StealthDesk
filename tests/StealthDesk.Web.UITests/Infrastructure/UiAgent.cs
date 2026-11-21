@@ -181,6 +181,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<StealthDesk.Contracts.Devices.FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<StealthDesk.Contracts.Devices.FileDownloadInfo>(NoAnswers));
+
+    public Task<GatewayReply<Guid>> StartFileUpload(Guid transferId, string directoryPath, string fileName, bool overwrite, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
   }
 }
 
