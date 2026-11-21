@@ -94,6 +94,26 @@ public sealed class AgentGatewayHub(
     }
   }
 
+  // Pulled by the agent after it accepts a StartFileUpload call, reading what the HTTP request is feeding into the
+  // same sink from the other end. A transfer id nobody is waiting on (abandoned, or never started) yields nothing.
+  public IAsyncEnumerable<byte[]> ReadUploadChunks(Guid transferId, CancellationToken cancellationToken)
+  {
+    var sink = transfers.Find(transferId);
+    return sink is null ? EmptyChunks() : sink.ReadChunks(cancellationToken);
+  }
+
+  // No reply: the agent doesn't wait on this, it just moves on once sent.
+  public Task ReportUploadResult(Guid transferId, string? error)
+  {
+    transfers.Find(transferId)?.Complete(error);
+    return Task.CompletedTask;
+  }
+
+  private static async IAsyncEnumerable<byte[]> EmptyChunks()
+  {
+    yield break;
+  }
+
   public override async Task OnDisconnectedAsync(Exception? exception)
   {
     try

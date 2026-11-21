@@ -1,5 +1,9 @@
+using System.Net;
+using Bunit;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using StealthDesk.Contracts.Devices;
+using StealthDesk.Contracts.Messaging;
 using StealthDesk.Web.Client.Devices;
 using StealthDesk.Web.Client.Pages;
 
@@ -8,13 +12,18 @@ namespace StealthDesk.Web.Client.Tests;
 public class FileManagerPageTests : BunitContext
 {
   private readonly FakeApi _api = new();
+  private readonly FakeDeviceHub _hub = new();
+  private readonly FakeLiveUpdates _live = new();
   private readonly Guid _deviceId = Guid.NewGuid();
 
   public FileManagerPageTests()
   {
     Services.AddSingleton(_api.CreateClient());
     Services.AddSingleton<DeviceStore>();
+    Services.AddSingleton<ILiveUpdates>(_live);
+    Services.AddSingleton<IDeviceHub>(_hub);
     AddAuthorization();
+    _live.Become(LiveState.Live);
   }
 
   [Fact]
@@ -72,6 +81,39 @@ public class FileManagerPageTests : BunitContext
 
     var folderLink = links.Single(x => x.GetAttribute("href")!.Contains(Uri.EscapeDataString(@"C:\Users")));
     Assert.Equal("Download as zip", folderLink.TextContent.Trim());
+  }
+
+  [Fact]
+  public void TheUploadControl_ShowsOnlyWithThePermission()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: false));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true, []));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+
+    page.WaitForAssertion(() => Assert.Contains("Empty", page.Markup));
+    Assert.Empty(page.FindAll("input[type=file]"));
+  }
+
+  [Fact]
+  public void SelectingAFile_UploadsItToTheCurrentFolder_AndReloadsTheListing()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: true));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true, []));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+    page.WaitForAssertion(() => Assert.NotEmpty(page.FindAll("input[type=file]")));
+
+    _api.Respond(HttpStatusCode.OK);
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
+      [new FileSystemEntry("note.txt", IsDirectory: false, SizeBytes: 5, DateTimeOffset.UtcNow)]));
+
+    page.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromText("hello", "note.txt"));
+
+    page.WaitForAssertion(() => Assert.Contains("note.txt", page.Markup));
+    Assert.Contains(_api.Requests, x => x.StartsWith("POST", StringComparison.Ordinal) && x.Contains("/files/upload"));
   }
 
   [Fact]

@@ -19,6 +19,7 @@ public class PermissionMigrationTests
   private const string BeforeBlockInput = "20261029132139_AddRemoteControlPermissions";
   private const string BeforeDesktopPreview = "20261104180652_AddDeviceRemoteControlBlockInputPermission";
   private const string BeforeFileManager = "20261105174612_AddDeviceDesktopPreviewReadPermission";
+  private const string BeforeFileManagerWrite = "20261113132029_AddDeviceFileManagerReadPermission";
 
   private static readonly string[] RemoteControl =
   [
@@ -300,6 +301,49 @@ public class PermissionMigrationTests
     await MigrateAsync(server, BeforeFileManager);
 
     Assert.False(await server.WithDbAsync(db => db.PermissionAssignments.AnyAsync(x => x.Permission == PermissionNames.DeviceFileManagerRead)));
+    Assert.Equal(4, await server.WithDbAsync(db => db.PermissionAssignments.CountAsync(x => x.Permission == PermissionNames.DeviceRead && x.OwningTenantId == tenant)));
+  }
+
+  [Fact]
+  public async Task DeviceReadTheSystemGave_BringsFileManagerWrite_AndUndoingTakesItAway()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var tenant = await TestTenants.CreateAsync(server, "Tenant");
+    var creator = await TestAccounts.CreateUserAsync(server, "creator3@example.com", tenant);
+    var operatorUser = await TestAccounts.CreateUserAsync(server, "operator3@example.com", tenant);
+    var holder = await TestAccounts.CreateUserAsync(server, "holder3@example.com", tenant);
+    var group = Guid.NewGuid();
+    await MigrateAsync(server, BeforeFileManagerWrite);
+
+    await server.WithDbAsync(db =>
+    {
+      db.PermissionAssignments.AddRange(
+        Assignment(PermissionPrincipalKind.User, creator.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, operatorUser.Id, PermissionNames.DeviceRead, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceRead, tenant),
+        Assignment(PermissionPrincipalKind.User, holder.Id, PermissionNames.DeviceFileManagerWrite, tenant, createdBy: "User"),
+        Assignment(PermissionPrincipalKind.UserGroup, group, PermissionNames.DeviceRead, tenant));
+      return db.SaveChangesAsync();
+    });
+
+    await MigrateAsync(server, null);
+    var granted = await server.WithDbAsync(db => db.PermissionAssignments.AsNoTracking().Where(x => x.Permission == PermissionNames.DeviceFileManagerWrite).ToListAsync());
+
+    Assert.Equal(
+      new[] { creator.Id, group, holder.Id }.Order(),
+      granted.Select(x => x.PrincipalId).Order());
+    Assert.All(granted.Where(x => x.CreatedByKind == PermissionAssignmentRecord.System), x =>
+    {
+      Assert.Equal(PermissionEffect.Allow, x.Effect);
+      Assert.Equal(PermissionScopeKind.Tenant, x.ScopeKind);
+      Assert.Equal(tenant, x.ScopeId);
+      Assert.True(x.IsEnabled);
+    });
+    Assert.Equal("User", Assert.Single(granted, x => x.PrincipalId == holder.Id).CreatedByKind);
+
+    await MigrateAsync(server, BeforeFileManagerWrite);
+
+    Assert.False(await server.WithDbAsync(db => db.PermissionAssignments.AnyAsync(x => x.Permission == PermissionNames.DeviceFileManagerWrite)));
     Assert.Equal(4, await server.WithDbAsync(db => db.PermissionAssignments.CountAsync(x => x.Permission == PermissionNames.DeviceRead && x.OwningTenantId == tenant)));
   }
 

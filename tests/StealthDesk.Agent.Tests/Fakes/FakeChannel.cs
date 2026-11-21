@@ -81,6 +81,28 @@ internal sealed class FakeChannel : IRealtimeChannel<IAgentGateway>, IAgentGatew
     }
   }
 
+  /// <summary>What the server answers a <see cref="ReadUploadChunks"/> call with; a test sets this per transfer.</summary>
+  public Func<Guid, IAsyncEnumerable<byte[]>> UploadChunks { get; set; } = _ => EmptyChunks();
+
+  public IAsyncEnumerable<byte[]> ReadUploadChunks(Guid transferId, CancellationToken cancellationToken) => UploadChunks(transferId);
+
+  public List<(Guid TransferId, string? Error)> UploadResults { get; } = [];
+
+  public Task ReportUploadResult(Guid transferId, string? error)
+  {
+    lock (UploadResults)
+    {
+      UploadResults.Add((transferId, error));
+    }
+
+    return Task.CompletedTask;
+  }
+
+  private static async IAsyncEnumerable<byte[]> EmptyChunks()
+  {
+    yield break;
+  }
+
   public int Closes { get; private set; }
 
   public Task CloseAsync()

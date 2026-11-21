@@ -24,6 +24,19 @@ public interface IAgentGateway
   /// started) are read to completion and dropped.
   /// </summary>
   Task SendFileChunks(Guid transferId, IAsyncEnumerable<byte[]> chunks);
+
+  /// <summary>
+  /// Streams the bytes of an upload the server began, following an accepted
+  /// <see cref="IAgentCallbacks.StartFileUpload"/>, matched to it by <paramref name="transferId"/>. A transfer id
+  /// the server no longer knows about (abandoned, or never started) yields nothing.
+  /// </summary>
+  IAsyncEnumerable<byte[]> ReadUploadChunks(Guid transferId, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// How an upload finished once the agent was done writing it, matched by <paramref name="transferId"/>: null for
+  /// success, a message for failure. There is no separate confirmation call for success: this is it.
+  /// </summary>
+  Task ReportUploadResult(Guid transferId, string? error);
 }
 
 /// <summary>
@@ -73,4 +86,19 @@ public interface IAgentCallbacks
   /// that couldn't be zipped, answers with <see cref="FileDownloadInfo.Exists"/> false, and no bytes follow.
   /// </summary>
   Task<GatewayReply<FileDownloadInfo>> StartFileDownload(Guid transferId, string path, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Starts receiving an upload into <paramref name="directoryPath"/> as <paramref name="fileName"/>. Answered
+  /// right away, before any byte arrives: refused if the directory doesn't exist, or the file already does and
+  /// <paramref name="overwrite"/> is false. Once accepted, the agent pulls the bytes itself through
+  /// <see cref="IAgentGateway.ReadUploadChunks"/> and reports how it went through
+  /// <see cref="IAgentGateway.ReportUploadResult"/>, both matched by <paramref name="transferId"/>, which the
+  /// server generates before asking.
+  /// </summary>
+  Task<GatewayReply<Guid>> StartFileUpload(
+    Guid transferId,
+    string directoryPath,
+    string fileName,
+    bool overwrite,
+    CancellationToken cancellationToken);
 }

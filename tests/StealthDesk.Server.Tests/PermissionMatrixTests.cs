@@ -307,9 +307,12 @@ public class PermissionMatrixTests
     Hidden,
   }
 
-  private sealed record Call(HttpMethod Method, string Path, object? Body = null, Guid? Shows = null)
+  private sealed record Call(HttpMethod Method, string Path, object? Body = null, Guid? Shows = null, byte[]? RawBody = null)
   {
-    public HttpRequestMessage ToRequest() => new(Method, Path) { Content = Body is null ? null : JsonContent.Create(Body, Body.GetType()) };
+    public HttpRequestMessage ToRequest() => new(Method, Path)
+    {
+      Content = RawBody is not null ? new ByteArrayContent(RawBody) : Body is null ? null : JsonContent.Create(Body, Body.GetType()),
+    };
 
     public string Text => Path + (Body is null ? string.Empty : JsonSerializer.Serialize(Body, Body.GetType()));
   }
@@ -376,6 +379,11 @@ public class PermissionMatrixTests
       Refusal = Refusal.NotFound,
     },
     new(HttpMethod.Get, "/api/v1/devices/{id:guid}/files/download", PermissionNames.DeviceFileManagerRead, (w, _) => Task.FromResult(new Call(HttpMethod.Get, Routes.DeviceFileDownload(w.Device, @"C:\report.txt"))))
+    {
+      Refusal = Refusal.NotFound,
+    },
+    new(HttpMethod.Post, "/api/v1/devices/{id:guid}/files/upload", PermissionNames.DeviceFileManagerWrite,
+      (w, _) => Task.FromResult(new Call(HttpMethod.Post, Routes.DeviceFileUpload(w.Device, @"C:\", "report.txt", overwrite: true), RawBody: [1, 2, 3])))
     {
       Refusal = Refusal.NotFound,
     },
@@ -716,6 +724,21 @@ public class PermissionMatrixTests
     private static async IAsyncEnumerable<byte[]> Chunks()
     {
       yield return [1, 2, 3];
+    }
+
+    public override Task<GatewayReply<Guid>> StartFileUpload(Guid transferId, string directoryPath, string fileName, bool overwrite, CancellationToken cancellationToken)
+    {
+      _ = DrainAsync(transferId);
+      return Task.FromResult(GatewayReply.Accept(transferId));
+    }
+
+    private async Task DrainAsync(Guid transferId)
+    {
+      await foreach (var _ in Channel!.Server.ReadUploadChunks(transferId, CancellationToken.None))
+      {
+      }
+
+      await Channel!.Server.ReportUploadResult(transferId, null);
     }
   }
 }

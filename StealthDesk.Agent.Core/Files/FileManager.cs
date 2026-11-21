@@ -15,6 +15,17 @@ public sealed record PreparedDownload(bool Exists, string FileName, long SizeByt
   public static readonly PreparedDownload NotFound = new(false, string.Empty, 0, string.Empty, false);
 }
 
+/// <summary>
+/// What <see cref="IFileManager.PrepareUpload"/> resolved an upload to: a path to write to, or a reason it can't
+/// proceed (the destination folder doesn't exist, or the file is already there and overwriting wasn't allowed).
+/// </summary>
+public sealed record PreparedUpload(bool Accepted, string TargetPath, string? Error)
+{
+  public static PreparedUpload Refuse(string error) => new(false, string.Empty, error);
+
+  public static PreparedUpload Accept(string targetPath) => new(true, targetPath, null);
+}
+
 public interface IFileManager
 {
   /// <summary>A directory's immediate contents. The agent's own system drive when <paramref name="path"/> is empty.</summary>
@@ -29,6 +40,15 @@ public interface IFileManager
 
   /// <summary>The file's bytes, read a chunk at a time rather than all into memory at once.</summary>
   IAsyncEnumerable<byte[]> ReadFile(string path, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Resolves where an upload named <paramref name="fileName"/> should land inside <paramref name="directoryPath"/>.
+  /// Doesn't touch the disk: a plain existence check, same as every other guard in this class.
+  /// </summary>
+  PreparedUpload PrepareUpload(string directoryPath, string fileName, bool overwrite);
+
+  /// <summary>Writes <paramref name="chunks"/> to <paramref name="path"/>, replacing whatever was there.</summary>
+  Task WriteFile(string path, IAsyncEnumerable<byte[]> chunks, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -141,6 +161,33 @@ public sealed class FileManager(ILogger<FileManager> logger) : IFileManager
     {
       // A copy: the shared buffer would be overwritten by the next read before an earlier chunk finished sending.
       yield return buffer[..read];
+    }
+  }
+
+  public PreparedUpload PrepareUpload(string directoryPath, string fileName, bool overwrite)
+  {
+    if (!Directory.Exists(directoryPath))
+    {
+      return PreparedUpload.Refuse("The destination folder doesn't exist.");
+    }
+
+    // The permission to write anywhere the agent's own account can is the only gate, same as reading: a fileName
+    // that climbs out of directoryPath lands wherever that account could already reach some other way.
+    var targetPath = Path.Combine(directoryPath, fileName);
+    if (File.Exists(targetPath) && !overwrite)
+    {
+      return PreparedUpload.Refuse("A file with that name already exists.");
+    }
+
+    return PreparedUpload.Accept(targetPath);
+  }
+
+  public async Task WriteFile(string path, IAsyncEnumerable<byte[]> chunks, CancellationToken cancellationToken)
+  {
+    await using var stream = File.Create(path);
+    await foreach (var chunk in chunks.WithCancellation(cancellationToken))
+    {
+      await stream.WriteAsync(chunk, cancellationToken);
     }
   }
 
