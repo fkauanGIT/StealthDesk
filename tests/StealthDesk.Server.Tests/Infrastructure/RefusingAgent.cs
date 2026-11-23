@@ -44,4 +44,7 @@ public class RefusingAgent : IAgentCallbacks
 
   public virtual Task<GatewayReply<Guid>> StartFileUpload(Guid transferId, string directoryPath, string fileName, bool overwrite, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+  public virtual Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<string>(NoAnswers));
 }

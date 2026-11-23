@@ -51,6 +51,7 @@ else
             {
                 <SdLoading Text="Uploading..." />
             }
+            <SdButton Variant="ButtonVariant.Secondary" OnClick="() => creatingDirectory = true">New folder</SdButton>
         </div>
         @if (uploadError is not null)
         {
@@ -117,6 +118,21 @@ else
             </table>
         </div>
     }
+
+    <SdDialog Open="creatingDirectory" Title="New folder" OnClose="CloseNewFolderDialog">
+        <ChildContent>
+            <label for="new-folder-name" class="sd-visually-hidden">Folder name</label>
+            <input id="new-folder-name" @bind="newFolderName" @bind:event="oninput" placeholder="Folder name" disabled="@creatingDirectoryBusy" />
+            @if (newFolderError is not null)
+            {
+                <SdAlert>@newFolderError</SdAlert>
+            }
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="CloseNewFolderDialog">Cancel</SdButton>
+            <SdButton Disabled="@(creatingDirectoryBusy || string.IsNullOrWhiteSpace(newFolderName))" OnClick="CreateDirectoryAsync">Create</SdButton>
+        </Footer>
+    </SdDialog>
 }
 
 @code {
@@ -132,6 +148,10 @@ else
     private bool canUpload;
     private bool uploading;
     private string? uploadError;
+    private bool creatingDirectory;
+    private bool creatingDirectoryBusy;
+    private string newFolderName = string.Empty;
+    private string? newFolderError;
 
     protected override void OnInitialized()
     {
@@ -209,6 +229,52 @@ else
         finally
         {
             uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseNewFolderDialog()
+    {
+        creatingDirectory = false;
+        newFolderName = string.Empty;
+        newFolderError = null;
+    }
+
+    private async Task CreateDirectoryAsync()
+    {
+        if (listing is not { Exists: true } || string.IsNullOrWhiteSpace(newFolderName))
+        {
+            return;
+        }
+
+        creatingDirectoryBusy = true;
+        newFolderError = null;
+        StateHasChanged();
+        try
+        {
+            using var response = await Http.PostAsync(Routes.DeviceCreateDirectory(Id, listing.Path, newFolderName), content: null);
+            if (response.IsSuccessStatusCode)
+            {
+                CloseNewFolderDialog();
+                await LoadAsync(listing.Path);
+            }
+            else
+            {
+                newFolderError = response.StatusCode switch
+                {
+                    HttpStatusCode.Conflict => "Something with that name already exists, or the folder couldn't be created.",
+                    HttpStatusCode.NotFound => "The device went offline, or you may not create folders here.",
+                    _ => "Could not create the folder.",
+                };
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            newFolderError = "Could not create the folder. Check that the device is online.";
+        }
+        finally
+        {
+            creatingDirectoryBusy = false;
             StateHasChanged();
         }
     }

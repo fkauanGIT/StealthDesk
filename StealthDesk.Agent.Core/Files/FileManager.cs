@@ -26,6 +26,14 @@ public sealed record PreparedUpload(bool Accepted, string TargetPath, string? Er
   public static PreparedUpload Accept(string targetPath) => new(true, targetPath, null);
 }
 
+/// <summary>What <see cref="IFileManager.CreateDirectory"/> did: the new directory's full path, or why it refused.</summary>
+public sealed record CreateDirectoryResult(bool Accepted, string TargetPath, string? Error)
+{
+  public static CreateDirectoryResult Refuse(string error) => new(false, string.Empty, error);
+
+  public static CreateDirectoryResult Accept(string targetPath) => new(true, targetPath, null);
+}
+
 public interface IFileManager
 {
   /// <summary>A directory's immediate contents. The agent's own system drive when <paramref name="path"/> is empty.</summary>
@@ -49,6 +57,9 @@ public interface IFileManager
 
   /// <summary>Writes <paramref name="chunks"/> to <paramref name="path"/>, replacing whatever was there.</summary>
   Task WriteFile(string path, IAsyncEnumerable<byte[]> chunks, CancellationToken cancellationToken);
+
+  /// <summary>Creates an empty directory named <paramref name="name"/> inside <paramref name="directoryPath"/>.</summary>
+  CreateDirectoryResult CreateDirectory(string directoryPath, string name);
 }
 
 /// <summary>
@@ -189,6 +200,32 @@ public sealed class FileManager(ILogger<FileManager> logger) : IFileManager
     {
       await stream.WriteAsync(chunk, cancellationToken);
     }
+  }
+
+  public CreateDirectoryResult CreateDirectory(string directoryPath, string name)
+  {
+    if (!Directory.Exists(directoryPath))
+    {
+      return CreateDirectoryResult.Refuse("The destination folder doesn't exist.");
+    }
+
+    var targetPath = Path.Combine(directoryPath, name);
+    if (Directory.Exists(targetPath) || File.Exists(targetPath))
+    {
+      return CreateDirectoryResult.Refuse("Something with that name already exists.");
+    }
+
+    try
+    {
+      Directory.CreateDirectory(targetPath);
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+    {
+      logger.LogDebug(ex, "Couldn't create directory {Path}.", targetPath);
+      return CreateDirectoryResult.Refuse("The device couldn't create the folder.");
+    }
+
+    return CreateDirectoryResult.Accept(targetPath);
   }
 
   private const int ChunkSizeBytes = 64 * 1024;

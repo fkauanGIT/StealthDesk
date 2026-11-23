@@ -40,3 +40,8 @@ it can't be downloaded either.
 Choose a file to upload it into the folder currently open, under the `device.file-manager.write` permission. It's
 refused if a file of that name is already there — there's no option to overwrite one yet — and if it's bigger than
 the server's upload limit (`FileManager:MaxUploadSizeBytes`, 2 GiB by default).
+
+## Creating a folder
+
+Choose **New folder** and name it to create an empty folder inside the one currently open, under the same
+`device.file-manager.write` permission as uploading. Refused if something with that name is already there.

@@ -184,6 +184,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<Guid>> StartFileUpload(Guid transferId, string directoryPath, string fileName, bool overwrite, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<Guid>(NoAnswers));
+
+    public Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<string>(NoAnswers));
   }
 }
 
