@@ -117,6 +117,41 @@ public class FileManagerPageTests : BunitContext
   }
 
   [Fact]
+  public void TheNewFolderButton_ShowsOnlyWithTheUploadPermission()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: false));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true, []));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+
+    page.WaitForAssertion(() => Assert.Contains("Empty", page.Markup));
+    Assert.DoesNotContain("New folder", page.Markup);
+  }
+
+  [Fact]
+  public void CreatingANewFolder_PostsItsName_AndReloadsTheListing()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: true));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true, []));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+    page.WaitForAssertion(() => Assert.Contains("New folder", page.Markup));
+    page.FindAll("button").Single(x => x.TextContent.Trim() == "New folder").Click();
+
+    page.Find("#new-folder-name").Input("Reports");
+    _api.Respond(HttpStatusCode.OK);
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
+      [new FileSystemEntry("Reports", IsDirectory: true, SizeBytes: 0, DateTimeOffset.UtcNow)]));
+    page.FindAll("button").Single(x => x.TextContent.Trim() == "Create").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("Reports", page.Markup));
+    Assert.Contains(_api.Requests, x =>
+      x.StartsWith("POST", StringComparison.Ordinal) && x.Contains("/files/directories") && x.Contains(Uri.EscapeDataString("Reports")));
+  }
+
+  [Fact]
   public void AMissingFolder_SaysNotFound()
   {
     _api.RespondWith(Device());

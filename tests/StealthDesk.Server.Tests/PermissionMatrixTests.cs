@@ -387,6 +387,11 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Post, "/api/v1/devices/{id:guid}/files/directories", PermissionNames.DeviceFileManagerWrite,
+      (w, _) => Task.FromResult(new Call(HttpMethod.Post, Routes.DeviceCreateDirectory(w.Device, @"C:\", "New folder"))))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -740,5 +745,8 @@ public class PermissionMatrixTests
 
       await Channel!.Server.ReportUploadResult(transferId, null);
     }
+
+    public override Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Accept(System.IO.Path.Combine(directoryPath, name)));
   }
 }

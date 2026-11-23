@@ -143,6 +143,12 @@ public sealed class AgentCallbacks(
     }
   }
 
+  public Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken)
+  {
+    var result = files.CreateDirectory(directoryPath, name);
+    return Task.FromResult(result.Accepted ? GatewayReply.Accept(result.TargetPath) : GatewayReply.Refuse<string>(result.Error!));
+  }
+
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);
 }

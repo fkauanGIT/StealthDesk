@@ -244,6 +244,51 @@ public class FileManagerEndpointTests
     Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
   }
 
+  [Fact]
+  public async Task CreateDirectory_WithoutThePermission_IsNotFound()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var deviceId = await ReportDeviceAsync(server);
+    var client = await ClientForAsync(server, "nobody4@example.com", (_, _) => Task.CompletedTask);
+
+    var response = await client.PostAsync(Routes.DeviceCreateDirectory(deviceId, @"C:\", "New folder"), content: null, Cancel);
+
+    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task CreateDirectory_WhenTheAgentRefuses_IsConflict()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server); // a plain RefusingAgent refuses CreateDirectory
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-mkdir1@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceCreateDirectory(deviceId, @"C:\", "New folder"), content: null, Cancel);
+
+    Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task CreateDirectory_WithThePermission_AsksTheAgent_WithTheGivenPathAndName()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var callbacks = new CreateDirectoryAgent(@"C:\reports\New folder");
+    await using var agent = await TestAgent.ConnectAsync(server, callbacks: callbacks);
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-mkdir2@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.PostAsync(Routes.DeviceCreateDirectory(deviceId, @"C:\reports", "New folder"), content: null, Cancel);
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    Assert.Equal(@"C:\reports", callbacks.DirectoryPath);
+    Assert.Equal("New folder", callbacks.Name);
+  }
+
   private static async Task<Guid> ReportDeviceAsync(ServerHost server)
   {
     await using var agent = await TestAgent.ConnectAsync(server);
@@ -344,6 +389,21 @@ public class FileManagerEndpointTests
       {
         await Channel!.Server.ReportUploadResult(transferId, Failure);
       }
+    }
+  }
+
+  /// <summary>An agent that accepts a directory creation, answering with the given full path.</summary>
+  private sealed class CreateDirectoryAgent(string targetPath) : RefusingAgent
+  {
+    public string? DirectoryPath { get; private set; }
+
+    public string? Name { get; private set; }
+
+    public override Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken)
+    {
+      DirectoryPath = directoryPath;
+      Name = name;
+      return Task.FromResult(GatewayReply.Accept(targetPath));
     }
   }
 }

@@ -251,6 +251,59 @@ public class AgentCallbacksTests
     }
   }
 
+  [Fact]
+  public async Task TheAgentsCallbacks_CreatesADirectory_InsideAnExistingFolder()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().CreateDirectory(dataRoot, "new folder", Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.Equal(Path.Combine(dataRoot, "new folder"), reply.Value);
+      Assert.True(Directory.Exists(reply.Value));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_CreatesADirectory_InAMissingParent_IsRefused()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().CreateDirectory(Path.Combine(dataRoot, "gone"), "new folder", Cancel);
+
+    Assert.False(reply.Accepted);
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_CreatesADirectory_OverSomethingThatAlreadyExists_IsRefused()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      await File.WriteAllTextAsync(Path.Combine(dataRoot, "taken"), "already here", Cancel);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().CreateDirectory(dataRoot, "taken", Cancel);
+
+      Assert.False(reply.Accepted);
+      Assert.Equal("already here", await File.ReadAllTextAsync(Path.Combine(dataRoot, "taken"), Cancel));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
   private static async IAsyncEnumerable<byte[]> Chunks(byte[] content, int chunkCount)
   {
     var size = Math.Max(1, content.Length / chunkCount);

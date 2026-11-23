@@ -101,4 +101,11 @@ public interface IAgentCallbacks
     string fileName,
     bool overwrite,
     CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Creates an empty directory named <paramref name="name"/> inside <paramref name="directoryPath"/>. Refused if
+  /// the parent doesn't exist, or something with that name is already there. Answered with the new directory's
+  /// full path on success.
+  /// </summary>
+  Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken);
 }
