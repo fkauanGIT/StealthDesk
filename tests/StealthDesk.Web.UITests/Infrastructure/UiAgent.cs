@@ -187,6 +187,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<string>(NoAnswers));
+
+    public Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
   }
 }
 

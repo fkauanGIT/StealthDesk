@@ -289,6 +289,50 @@ public class FileManagerEndpointTests
     Assert.Equal("New folder", callbacks.Name);
   }
 
+  [Fact]
+  public async Task Delete_WithoutThePermission_IsNotFound()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var deviceId = await ReportDeviceAsync(server);
+    var client = await ClientForAsync(server, "nobody5@example.com", (_, _) => Task.CompletedTask);
+
+    var response = await client.DeleteAsync(Routes.DeviceDeleteFile(deviceId, @"C:\report.txt"), Cancel);
+
+    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Delete_WhenTheAgentRefuses_IsConflict()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    await using var agent = await TestAgent.ConnectAsync(server); // a plain RefusingAgent refuses DeleteEntry
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-rm1@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.DeleteAsync(Routes.DeviceDeleteFile(deviceId, @"C:\report.txt"), Cancel);
+
+    Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Delete_WithThePermission_AsksTheAgent_WithTheGivenPath()
+  {
+    using var server = await ServerHost.OnPostgresAsync();
+    var callbacks = new DeleteEntryAgent();
+    await using var agent = await TestAgent.ConnectAsync(server, callbacks: callbacks);
+    var deviceId = Guid.NewGuid();
+    Assert.True((await agent.ReportAsync(TestAgent.Report(deviceId))).Accepted);
+    var client = await ClientForAsync(server, "tech-rm2@example.com", (server, user) =>
+      TestPermissions.AssignAsync(server, user, PermissionNames.DeviceFileManagerWrite, PermissionScopeKind.Tenant, user.TenantId));
+
+    var response = await client.DeleteAsync(Routes.DeviceDeleteFile(deviceId, @"C:\reports\report.txt"), Cancel);
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    Assert.Equal(@"C:\reports\report.txt", callbacks.Path);
+  }
+
   private static async Task<Guid> ReportDeviceAsync(ServerHost server)
   {
     await using var agent = await TestAgent.ConnectAsync(server);
@@ -404,6 +448,18 @@ public class FileManagerEndpointTests
       DirectoryPath = directoryPath;
       Name = name;
       return Task.FromResult(GatewayReply.Accept(targetPath));
+    }
+  }
+
+  /// <summary>An agent that accepts a delete, recording the path it was asked to delete.</summary>
+  private sealed class DeleteEntryAgent : RefusingAgent
+  {
+    public string? Path { get; private set; }
+
+    public override Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken)
+    {
+      Path = path;
+      return Task.FromResult(GatewayReply.Accept(true));
     }
   }
 }

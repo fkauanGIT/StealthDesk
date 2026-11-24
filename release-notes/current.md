@@ -9,3 +9,5 @@ tagging, give it the version, which has to match the tag and Directory.Build.pro
 - Upload a file to the device's current folder, under a new `device.file-manager.write` permission. Streamed to the
   agent in chunks rather than buffered whole, under a separate `FileManager:MaxUploadSizeBytes` limit
 - Create a new, empty folder inside the one currently open, under the same `device.file-manager.write` permission
+- Delete a file or folder (with its contents), under the same `device.file-manager.write` permission, with a
+  confirmation first

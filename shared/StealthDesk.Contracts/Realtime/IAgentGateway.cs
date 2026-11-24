@@ -108,4 +108,7 @@ public interface IAgentCallbacks
   /// full path on success.
   /// </summary>
   Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken);
+
+  /// <summary>Deletes whatever is at <paramref name="path"/>: a file, or a directory with all of its contents.</summary>
+  Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken);
 }

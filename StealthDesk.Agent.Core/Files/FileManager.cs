@@ -34,6 +34,14 @@ public sealed record CreateDirectoryResult(bool Accepted, string TargetPath, str
   public static CreateDirectoryResult Accept(string targetPath) => new(true, targetPath, null);
 }
 
+/// <summary>What <see cref="IFileManager.DeleteEntry"/> did, or why it refused.</summary>
+public sealed record DeleteResult(bool Accepted, string? Error)
+{
+  public static readonly DeleteResult Ok = new(true, null);
+
+  public static DeleteResult Refuse(string error) => new(false, error);
+}
+
 public interface IFileManager
 {
   /// <summary>A directory's immediate contents. The agent's own system drive when <paramref name="path"/> is empty.</summary>
@@ -60,6 +68,9 @@ public interface IFileManager
 
   /// <summary>Creates an empty directory named <paramref name="name"/> inside <paramref name="directoryPath"/>.</summary>
   CreateDirectoryResult CreateDirectory(string directoryPath, string name);
+
+  /// <summary>Deletes whatever is at <paramref name="path"/>: a file, or a directory with all of its contents.</summary>
+  DeleteResult DeleteEntry(string path);
 }
 
 /// <summary>
@@ -226,6 +237,31 @@ public sealed class FileManager(ILogger<FileManager> logger) : IFileManager
     }
 
     return CreateDirectoryResult.Accept(targetPath);
+  }
+
+  public DeleteResult DeleteEntry(string path)
+  {
+    try
+    {
+      if (Directory.Exists(path))
+      {
+        Directory.Delete(path, recursive: true);
+        return DeleteResult.Ok;
+      }
+
+      if (File.Exists(path))
+      {
+        File.Delete(path);
+        return DeleteResult.Ok;
+      }
+    }
+    catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+    {
+      logger.LogDebug(ex, "Couldn't delete {Path}.", path);
+      return DeleteResult.Refuse("The device couldn't delete it.");
+    }
+
+    return DeleteResult.Refuse("Not found.");
   }
 
   private const int ChunkSizeBytes = 64 * 1024;

@@ -18,6 +18,8 @@ public static class Routes
     $"{Device(id)}/files/upload?path={Uri.EscapeDataString(directoryPath)}&fileName={Uri.EscapeDataString(fileName)}&overwrite={overwrite}";
   public static string DeviceCreateDirectory(Guid id, string directoryPath, string name) =>
     $"{Device(id)}/files/directories?path={Uri.EscapeDataString(directoryPath)}&name={Uri.EscapeDataString(name)}";
+  public static string DeviceDeleteFile(Guid id, string path) =>
+    $"{Device(id)}/files?path={Uri.EscapeDataString(path)}";
   public const string ServerVersion = "/api/internal/version/server";
 
   /// <summary>A tenant's authorization change log (<c>?tenantId=</c>), and the server's own entries.</summary>

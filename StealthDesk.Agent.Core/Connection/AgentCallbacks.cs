@@ -149,6 +149,12 @@ public sealed class AgentCallbacks(
     return Task.FromResult(result.Accepted ? GatewayReply.Accept(result.TargetPath) : GatewayReply.Refuse<string>(result.Error!));
   }
 
+  public Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken)
+  {
+    var result = files.DeleteEntry(path);
+    return Task.FromResult(result.Accepted ? GatewayReply.Accept(true) : GatewayReply.Refuse<bool>(result.Error!));
+  }
+
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);
 }

@@ -392,6 +392,11 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Delete, "/api/v1/devices/{id:guid}/files", PermissionNames.DeviceFileManagerWrite,
+      (w, _) => Task.FromResult(new Call(HttpMethod.Delete, Routes.DeviceDeleteFile(w.Device, @"C:\report.txt"))))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -748,5 +753,8 @@ public class PermissionMatrixTests
 
     public override Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(System.IO.Path.Combine(directoryPath, name)));
+
+    public override Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Accept(true));
   }
 }
