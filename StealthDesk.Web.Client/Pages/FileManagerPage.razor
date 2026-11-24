@@ -84,7 +84,7 @@ else
                         <th>Name</th>
                         <th>Size</th>
                         <th>Modified</th>
-                        <th><span class="sd-visually-hidden">Download</span></th>
+                        <th><span class="sd-visually-hidden">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -111,6 +111,10 @@ else
                                     <SdIcon Name="IconName.Download" Size="16" />
                                     @(entry.IsDirectory ? "Download as zip" : "Download")
                                 </a>
+                                @if (canUpload)
+                                {
+                                    <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = entry">Delete</SdButton>
+                                }
                             </td>
                         </tr>
                     }
@@ -133,6 +137,23 @@ else
             <SdButton Disabled="@(creatingDirectoryBusy || string.IsNullOrWhiteSpace(newFolderName))" OnClick="CreateDirectoryAsync">Create</SdButton>
         </Footer>
     </SdDialog>
+
+    <SdDialog Open="deleting is not null" Title="Delete this?" OnClose="() => deleting = null">
+        <ChildContent>
+            <p class="sd-muted">
+                "@deleting?.Name" is deleted for good@(deleting is { IsDirectory: true } ? ", along with everything inside it" : "").
+                This can't be undone.
+            </p>
+            @if (deleteError is not null)
+            {
+                <SdAlert>@deleteError</SdAlert>
+            }
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => deleting = null">Cancel</SdButton>
+            <SdButton Variant="ButtonVariant.Danger" Disabled="deletingBusy" OnClick="DeleteAsync">Delete</SdButton>
+        </Footer>
+    </SdDialog>
 }
 
 @code {
@@ -152,6 +173,9 @@ else
     private bool creatingDirectoryBusy;
     private string newFolderName = string.Empty;
     private string? newFolderError;
+    private FileSystemEntry? deleting;
+    private bool deletingBusy;
+    private string? deleteError;
 
     protected override void OnInitialized()
     {
@@ -275,6 +299,44 @@ else
         finally
         {
             creatingDirectoryBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is not { } entry || listing is not { Exists: true })
+        {
+            return;
+        }
+
+        deletingBusy = true;
+        deleteError = null;
+        StateHasChanged();
+        try
+        {
+            using var response = await Http.DeleteAsync(Routes.DeviceDeleteFile(Id, Combine(listing.Path, entry.Name)));
+            if (response.IsSuccessStatusCode)
+            {
+                deleting = null;
+                await LoadAsync(listing.Path);
+            }
+            else
+            {
+                deleteError = response.StatusCode switch
+                {
+                    HttpStatusCode.NotFound => "The device went offline, or you may not delete here.",
+                    _ => "Could not delete it.",
+                };
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            deleteError = "Could not delete it. Check that the device is online.";
+        }
+        finally
+        {
+            deletingBusy = false;
             StateHasChanged();
         }
     }

@@ -45,3 +45,8 @@ the server's upload limit (`FileManager:MaxUploadSizeBytes`, 2 GiB by default).
 
 Choose **New folder** and name it to create an empty folder inside the one currently open, under the same
 `device.file-manager.write` permission as uploading. Refused if something with that name is already there.
+
+## Deleting a file or folder
+
+Choose **Delete** next to an entry, under the same `device.file-manager.write` permission as uploading. A folder is
+deleted with everything inside it. It asks for confirmation first: there's no undoing it.

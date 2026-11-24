@@ -47,4 +47,7 @@ public class RefusingAgent : IAgentCallbacks
 
   public virtual Task<GatewayReply<string>> CreateDirectory(string directoryPath, string name, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<string>(NoAnswers));
+
+  public virtual Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
 }

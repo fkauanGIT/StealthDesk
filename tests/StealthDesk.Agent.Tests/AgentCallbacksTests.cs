@@ -304,6 +304,61 @@ public class AgentCallbacksTests
     }
   }
 
+  [Fact]
+  public async Task TheAgentsCallbacks_DeletesAFile()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      Directory.CreateDirectory(dataRoot);
+      var filePath = Path.Combine(dataRoot, "gone.txt");
+      await File.WriteAllTextAsync(filePath, "bye", Cancel);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().DeleteEntry(filePath, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.False(File.Exists(filePath));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_DeletesADirectory_WithEverythingInsideIt()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+    try
+    {
+      var folderPath = Path.Combine(dataRoot, "folder");
+      Directory.CreateDirectory(folderPath);
+      await File.WriteAllTextAsync(Path.Combine(folderPath, "inside.txt"), "content", Cancel);
+
+      var reply = await services.GetRequiredService<IAgentCallbacks>().DeleteEntry(folderPath, Cancel);
+
+      Assert.True(reply.Accepted, reply.Error);
+      Assert.False(Directory.Exists(folderPath));
+    }
+    finally
+    {
+      TryDelete(dataRoot);
+    }
+  }
+
+  [Fact]
+  public async Task TheAgentsCallbacks_DeletesSomethingMissing_IsRefused()
+  {
+    var channel = new FakeChannel();
+    await using var services = Build(channel, out var dataRoot);
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().DeleteEntry(Path.Combine(dataRoot, "gone.txt"), Cancel);
+
+    Assert.False(reply.Accepted);
+  }
+
   private static async IAsyncEnumerable<byte[]> Chunks(byte[] content, int chunkCount)
   {
     var size = Math.Max(1, content.Length / chunkCount);

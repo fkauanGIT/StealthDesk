@@ -252,6 +252,30 @@ public static class DeviceEndpoints
       return Results.Ok();
     }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerWrite);
 
+    endpoints.MapDelete($"{Routes.Devices}/{{id:guid}}/files", async (
+      Guid id,
+      string path,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceFileManagerWrite))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      var deleted = await agents.CallAsync(device.Id, (agent, token) => agent.DeleteEntry(path, token), cancellationToken);
+      if (!deleted.Accepted)
+      {
+        return Results.Problem(deleted.Error, statusCode: StatusCodes.Status409Conflict);
+      }
+
+      return Results.Ok();
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerWrite);
+
     return endpoints;
   }
 

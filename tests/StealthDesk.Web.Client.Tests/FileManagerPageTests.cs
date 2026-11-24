@@ -152,6 +152,48 @@ public class FileManagerPageTests : BunitContext
   }
 
   [Fact]
+  public void TheDeleteButton_ShowsOnlyWithTheUploadPermission()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: false));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
+      [new FileSystemEntry("notes.txt", IsDirectory: false, SizeBytes: 5, DateTimeOffset.UtcNow)]));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+
+    page.WaitForAssertion(() => Assert.Contains("notes.txt", page.Markup));
+    Assert.DoesNotContain("Delete", page.Markup);
+  }
+
+  [Fact]
+  public void DeletingAnEntry_AsksForConfirmation_AndOnlyDeletesWhenConfirmed()
+  {
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, BrowseFiles: true, UploadFiles: true));
+    _api.RespondWith(Device());
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true,
+      [new FileSystemEntry("notes.txt", IsDirectory: false, SizeBytes: 5, DateTimeOffset.UtcNow)]));
+
+    var page = Render<FileManagerPage>(x => x.Add(p => p.Id, _deviceId));
+    page.WaitForAssertion(() => Assert.Contains("notes.txt", page.Markup));
+    page.FindAll("button").Single(x => x.TextContent.Trim() == "Delete").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("Delete this?", page.Markup));
+    page.Find(".sd-dialog").QuerySelectorAll("button").Single(x => x.TextContent.Trim() == "Cancel").Click();
+    page.WaitForAssertion(() => Assert.DoesNotContain("Delete this?", page.Markup));
+    Assert.DoesNotContain(_api.Requests, x => x.StartsWith("DELETE", StringComparison.Ordinal));
+
+    page.FindAll("button").Single(x => x.TextContent.Trim() == "Delete").Click();
+    page.WaitForAssertion(() => Assert.Contains("Delete this?", page.Markup));
+    _api.Respond(HttpStatusCode.OK);
+    _api.RespondWith(new DirectoryListing(@"C:\", Exists: true, []));
+    page.Find(".sd-dialog").QuerySelectorAll("button").Single(x => x.TextContent.Trim() == "Delete").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("Empty", page.Markup));
+    Assert.Contains(_api.Requests, x =>
+      x.StartsWith("DELETE", StringComparison.Ordinal) && x.Contains(Uri.EscapeDataString(@"C:\notes.txt")));
+  }
+
+  [Fact]
   public void AMissingFolder_SaysNotFound()
   {
     _api.RespondWith(Device());
