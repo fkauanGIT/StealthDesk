@@ -1,7 +1,6 @@
-# vX.Y.Z — Name
+# v1.1.0 — Remote file manager
 
-What the next release brings, written as each change lands. The heading becomes the release's title: before
-tagging, give it the version, which has to match the tag and Directory.Build.props.
+## What's in it
 
 **File manager**
 - Download a whole folder from the file manager as a zip, built on the device before any byte reaches the server.
