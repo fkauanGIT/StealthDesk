@@ -125,7 +125,8 @@ public sealed class DashboardHub(
       SeeDesktopPreview: desktopPreview.Value.EnableDesktopPreview && await MayAsync(device, PermissionNames.DeviceDesktopPreviewRead),
       BrowseFiles: await MayAsync(device, PermissionNames.DeviceFileManagerRead),
       UploadFiles: await MayAsync(device, PermissionNames.DeviceFileManagerWrite),
-      ManagePower: await MayAsync(device, PermissionNames.DevicePowerManage)));
+      ManagePower: await MayAsync(device, PermissionNames.DevicePowerManage),
+      SendWake: await MayAsync(device, PermissionNames.DeviceWakeSend)));
   }
 
   /// <summary>Starts recording a visit to the device's remote features, ending any visit of this connection before.</summary>

@@ -6,6 +6,7 @@ using StealthDesk.Agent.Core;
 using StealthDesk.Agent.Core.Inventory;
 using StealthDesk.Agent.Core.Power;
 using StealthDesk.Agent.Core.Settings;
+using StealthDesk.Agent.Core.Wake;
 using StealthDesk.Agent.Tests.Fakes;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Realtime;
@@ -54,6 +55,31 @@ public class AgentCallbacksTests
 
     Assert.False(reply.Accepted);
     Assert.Equal("The device couldn't start the power change.", reply.Error);
+  }
+
+  [Fact]
+  public async Task TheServersWakeCall_ReachesThePlatforms_WakeSender()
+  {
+    await using var services = Build(new FakeChannel(), out _);
+    var wake = (FakeWakeSender)services.GetRequiredService<IWakeSender>();
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().SendWakePacket("00155D012345", Cancel);
+
+    Assert.True(reply.Accepted, reply.Error);
+    Assert.Equal(["00155D012345"], wake.Calls);
+  }
+
+  [Fact]
+  public async Task TheServersWakeCall_IsRefused_WhenThePlatformCouldNotSendIt()
+  {
+    await using var services = Build(new FakeChannel(), out _);
+    var wake = (FakeWakeSender)services.GetRequiredService<IWakeSender>();
+    wake.NextResult = Outcome.Failure<bool>("The device couldn't send the wake packet.");
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().SendWakePacket("00155D012345", Cancel);
+
+    Assert.False(reply.Accepted);
+    Assert.Equal("The device couldn't send the wake packet.", reply.Error);
   }
 
   [Fact]
@@ -434,6 +460,7 @@ public class AgentCallbacksTests
     builder.Services.AddSingleton<IAgentPaths>(new AgentPaths("tests", isDebugBuild: true, dataRoot));
     builder.Services.AddSingleton<IRealtimeChannel<IAgentGateway>>(channel);
     builder.Services.AddSingleton<IPowerControl, FakePowerControl>();
+    builder.Services.AddSingleton<IWakeSender, FakeWakeSender>();
     return builder.Services.BuildServiceProvider();
   }
 

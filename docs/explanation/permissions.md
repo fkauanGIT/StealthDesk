@@ -50,6 +50,12 @@ terminal and remote control permissions, and are part of the **Device Superuser*
 separate from reading the device (`device.read`) and from the terminal, remote control and file manager
 permissions, and is part of the **Device Superuser** preset.
 
+## Waking a device
+
+`device.wake.send` lets someone [wake an offline device](../guides/wake-on-lan.md) over the network. Checked
+against the target device, even while it's offline; it is separate from `device.power.manage` and from reading the
+device, and is part of the **Device Superuser** preset.
+
 ## Where they are checked
 
 Every API route and dashboard hub method checks its permission, and the device list, each device and live updates

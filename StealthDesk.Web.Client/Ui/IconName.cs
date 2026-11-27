@@ -27,4 +27,5 @@ public enum IconName
   Monitor,
   Folder,
   Power,
+  Wake,
 }

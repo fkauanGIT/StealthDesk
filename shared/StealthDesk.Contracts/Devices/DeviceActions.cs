@@ -14,6 +14,7 @@ namespace StealthDesk.Contracts.Devices;
 /// <param name="BrowseFiles">Browse the device's filesystem.</param>
 /// <param name="UploadFiles">Upload a file to the device's filesystem.</param>
 /// <param name="ManagePower">Restart or shut down the device.</param>
+/// <param name="SendWake">Wake the device over the network when it's offline.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record DeviceActions(
   bool UseTerminal,
@@ -27,4 +28,5 @@ public sealed record DeviceActions(
   bool SeeDesktopPreview = false,
   bool BrowseFiles = false,
   bool UploadFiles = false,
-  bool ManagePower = false);
+  bool ManagePower = false,
+  bool SendWake = false);

@@ -101,6 +101,7 @@ public class DeviceActionsTests
     [PermissionNames.DeviceDesktopPreviewRead] = x => x.SeeDesktopPreview,
     [PermissionNames.DeviceFileManagerRead] = x => x.BrowseFiles,
     [PermissionNames.DevicePowerManage] = x => x.ManagePower,
+    [PermissionNames.DeviceWakeSend] = x => x.SendWake,
   };
 
   public static TheoryData<string> RemoteControlPermissions => [.. RemoteControlActions.Keys];

@@ -21,6 +21,7 @@ public static class Routes
   public static string DeviceDeleteFile(Guid id, string path) =>
     $"{Device(id)}/files?path={Uri.EscapeDataString(path)}";
   public static string DevicePower(Guid id, Devices.PowerAction action) => $"{Device(id)}/power?action={action}";
+  public static string DeviceWake(Guid id) => $"{Device(id)}/wake";
   public const string ServerVersion = "/api/internal/version/server";
 
   /// <summary>A tenant's authorization change log (<c>?tenantId=</c>), and the server's own entries.</summary>

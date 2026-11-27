@@ -260,6 +260,89 @@ public class DeviceDetailsTests : BunitContext
     page.WaitForAssertion(() => Assert.Contains("you may not manage its power", page.Markup));
   }
 
+  [Fact]
+  public void WithThePermissionOfflineAndAKnownMac_TheWakeButton_IsShown()
+  {
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Wake"));
+  }
+
+  [Fact]
+  public void WithoutThePermission_TheWakeButton_IsNotShown()
+  {
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: false));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() == "Wake");
+  }
+
+  [Fact]
+  public void WithThePermission_ButOnline_TheWakeButton_IsNotShown()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() == "Wake");
+  }
+
+  [Fact]
+  public void WithThePermissionOffline_ButNoKnownMac_TheWakeButton_IsNotShown()
+  {
+    var device = Detailed() with { IsOnline = false, MacAddresses = [] };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() == "Wake");
+  }
+
+  [Fact]
+  public void ClickingWake_SendsTheCommand_AndShowsConfirmation()
+  {
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Wake"));
+
+    _api.Respond(HttpStatusCode.OK);
+    Button(page, "Wake").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("Wake packet sent", page.Markup));
+    Assert.Equal($"POST /api/v1/devices/{device.Id}/wake", _api.Requests[1]);
+  }
+
+  [Fact]
+  public void WhenTheServerRefusesTheWakeCommand_ShowsAnError()
+  {
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, SendWake: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Wake"));
+
+    _api.Respond(HttpStatusCode.Conflict);
+    Button(page, "Wake").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("No device on the same network is online", page.Markup));
+    Assert.DoesNotContain("Wake packet sent", page.Markup);
+  }
+
   private static AngleSharp.Dom.IElement Button(IRenderedComponent<DeviceDetails> page, string text) =>
     page.FindAll("button").First(x => x.TextContent.Trim() == text);
 

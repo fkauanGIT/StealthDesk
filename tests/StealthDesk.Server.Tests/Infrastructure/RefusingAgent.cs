@@ -53,4 +53,7 @@ public class RefusingAgent : IAgentCallbacks
 
   public virtual Task<GatewayReply<bool>> ChangePowerState(PowerAction action, CancellationToken cancellationToken) =>
     Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
+
+  public virtual Task<GatewayReply<bool>> SendWakePacket(string macAddress, CancellationToken cancellationToken) =>
+    Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
 }

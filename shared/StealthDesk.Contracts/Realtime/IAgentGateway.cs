@@ -114,4 +114,10 @@ public interface IAgentCallbacks
 
   /// <summary>Restarts or shuts down the device. Answered before the machine actually goes, if it does at all.</summary>
   Task<GatewayReply<bool>> ChangePowerState(PowerAction action, CancellationToken cancellationToken);
+
+  /// <summary>
+  /// Broadcasts a Wake-on-LAN magic packet for <paramref name="macAddress"/> onto this agent's own network, to
+  /// wake another device that shares it. Not the target's own agent: that one is offline, which is why it was asked.
+  /// </summary>
+  Task<GatewayReply<bool>> SendWakePacket(string macAddress, CancellationToken cancellationToken);
 }

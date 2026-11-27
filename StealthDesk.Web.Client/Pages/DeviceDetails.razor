@@ -112,6 +112,12 @@ else
                 <SdButton Variant="ButtonVariant.Danger" Icon="IconName.Power" OnClick="() => RequestPower(PowerAction.Shutdown)">Shutdown</SdButton>
             </div>
         }
+        @if (canSendWake && !device.IsOnline && device.MacAddresses.Count > 0)
+        {
+            <div class="sd-push sd-device-actions">
+                <SdButton Variant="ButtonVariant.Secondary" Icon="IconName.Wake" Disabled="sendingWake" OnClick="SendWakeAsync">Wake</SdButton>
+            </div>
+        }
     </header>
 
     @* Not conditioned on device.IsOnline, which a live push can flip back and forth: that would tear down and
@@ -132,6 +138,16 @@ else
     @if (powerError is not null)
     {
         <SdAlert>@powerError</SdAlert>
+    }
+
+    @if (wakeError is not null)
+    {
+        <SdAlert>@wakeError</SdAlert>
+    }
+
+    @if (wakeSent)
+    {
+        <SdAlert Tone="Tone.Info">Wake packet sent. It can take a minute for the device to come online.</SdAlert>
     }
 
     <SdDialog Open="pendingPower is not null" Title="@(pendingPower == PowerAction.Restart ? "Restart device" : "Shut down device")" OnClose="() => pendingPower = null">
@@ -255,6 +271,7 @@ else
     private bool canSeeDesktopPreview;
     private bool canBrowseFiles;
     private bool canManagePower;
+    private bool canSendWake;
     private bool actionsChecked;
     private bool canAssignGroups;
     private bool choosingGroups;
@@ -264,6 +281,9 @@ else
     private PowerAction? pendingPower;
     private bool sendingPower;
     private string? powerError;
+    private bool sendingWake;
+    private bool wakeSent;
+    private string? wakeError;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
@@ -299,6 +319,7 @@ else
         canSeeDesktopPreview = false;
         canBrowseFiles = false;
         canManagePower = false;
+        canSendWake = false;
         await CheckActionsAsync();
 
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
@@ -394,6 +415,7 @@ else
         canSeeDesktopPreview = actions is { Accepted: true, Value.SeeDesktopPreview: true };
         canBrowseFiles = actions is { Accepted: true, Value.BrowseFiles: true };
         canManagePower = actions is { Accepted: true, Value.ManagePower: true };
+        canSendWake = actions is { Accepted: true, Value.SendWake: true };
     }
 
     private void RequestPower(PowerAction action)
@@ -432,6 +454,36 @@ else
         finally
         {
             sendingPower = false;
+        }
+    }
+
+    private async Task SendWakeAsync()
+    {
+        wakeError = null;
+        wakeSent = false;
+        sendingWake = true;
+        StateHasChanged();
+        try
+        {
+            using var response = await Http.PostAsync(Routes.DeviceWake(Id), content: null);
+            if (response.IsSuccessStatusCode)
+            {
+                wakeSent = true;
+            }
+            else
+            {
+                wakeError = response.StatusCode == HttpStatusCode.NotFound
+                    ? "The device may have come online, or you may not have permission to wake it."
+                    : "No device on the same network is online to send the wake packet.";
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            wakeError = "Could not send the command.";
+        }
+        finally
+        {
+            sendingWake = false;
         }
     }
 
