@@ -1,9 +1,11 @@
 @page "/devices/{Id:guid}"
+@using System.Net
 @attribute [Authorize]
 @implements IDisposable
 @inject DeviceStore Store
 @inject ILiveUpdates Live
 @inject IDeviceHub Hub
+@inject HttpClient Http
 
 <PageTitle>@(device?.Name ?? "Device") · StealthDesk</PageTitle>
 
@@ -103,6 +105,13 @@ else
                 }
             </div>
         }
+        @if (canManagePower && device.IsOnline)
+        {
+            <div class="sd-push sd-device-actions">
+                <SdButton Variant="ButtonVariant.Danger" Icon="IconName.Power" OnClick="() => RequestPower(PowerAction.Restart)">Restart</SdButton>
+                <SdButton Variant="ButtonVariant.Danger" Icon="IconName.Power" OnClick="() => RequestPower(PowerAction.Shutdown)">Shutdown</SdButton>
+            </div>
+        }
     </header>
 
     @* Not conditioned on device.IsOnline, which a live push can flip back and forth: that would tear down and
@@ -119,6 +128,21 @@ else
     {
         <SdAlert>@groupsError</SdAlert>
     }
+
+    @if (powerError is not null)
+    {
+        <SdAlert>@powerError</SdAlert>
+    }
+
+    <SdDialog Open="pendingPower is not null" Title="@(pendingPower == PowerAction.Restart ? "Restart device" : "Shut down device")" OnClose="() => pendingPower = null">
+        <ChildContent>
+            <p class="sd-muted">Are you sure you want to @(pendingPower == PowerAction.Restart ? "restart" : "shut down") @device.Name?</p>
+        </ChildContent>
+        <Footer>
+            <SdButton Variant="ButtonVariant.Ghost" OnClick="() => pendingPower = null">Cancel</SdButton>
+            <SdButton Variant="ButtonVariant.Danger" Disabled="sendingPower" OnClick="SendPowerAsync">@(pendingPower == PowerAction.Restart ? "Restart" : "Shut down")</SdButton>
+        </Footer>
+    </SdDialog>
 
     <SdDialog Open="choosingGroups" Title="Groups" OnClose="() => choosingGroups = false">
         <ChildContent>
@@ -230,12 +254,16 @@ else
     private bool canSeeDesktop;
     private bool canSeeDesktopPreview;
     private bool canBrowseFiles;
+    private bool canManagePower;
     private bool actionsChecked;
     private bool canAssignGroups;
     private bool choosingGroups;
     private bool savingGroups;
     private string? groupsError;
     private Guid tenantId;
+    private PowerAction? pendingPower;
+    private bool sendingPower;
+    private string? powerError;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationState { get; set; }
@@ -270,6 +298,7 @@ else
         canSeeDesktop = false;
         canSeeDesktopPreview = false;
         canBrowseFiles = false;
+        canManagePower = false;
         await CheckActionsAsync();
 
         var user = AuthenticationState is null ? null : (await AuthenticationState).User;
@@ -364,6 +393,46 @@ else
         canSeeDesktop = actions is { Accepted: true, Value.SeeDesktop: true };
         canSeeDesktopPreview = actions is { Accepted: true, Value.SeeDesktopPreview: true };
         canBrowseFiles = actions is { Accepted: true, Value.BrowseFiles: true };
+        canManagePower = actions is { Accepted: true, Value.ManagePower: true };
+    }
+
+    private void RequestPower(PowerAction action)
+    {
+        powerError = null;
+        pendingPower = action;
+    }
+
+    private async Task SendPowerAsync()
+    {
+        if (pendingPower is not { } action)
+        {
+            return;
+        }
+
+        sendingPower = true;
+        StateHasChanged();
+        try
+        {
+            using var response = await Http.PostAsync(Routes.DevicePower(Id, action), content: null);
+            if (response.IsSuccessStatusCode)
+            {
+                pendingPower = null;
+            }
+            else
+            {
+                powerError = response.StatusCode == HttpStatusCode.NotFound
+                    ? "The device went offline, or you may not manage its power."
+                    : "Could not send the command.";
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            powerError = "Could not send the command. Check that the device is online.";
+        }
+        finally
+        {
+            sendingPower = false;
+        }
     }
 
     private void OnLiveChanged() => InvokeAsync(async () =>

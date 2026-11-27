@@ -68,6 +68,7 @@ nav:
       - Using the terminal: guides/terminal.md
       - Using remote control: guides/remote-control.md
       - Using the file manager: guides/file-manager.md
+      - Restarting and shutting down a device: guides/power-management.md
       - Backing up and restoring: guides/backup-and-restore.md
       - Upgrading and rolling back: guides/upgrading.md
       - Accounts and sign-in: guides/accounts.md

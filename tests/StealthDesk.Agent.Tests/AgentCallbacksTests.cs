@@ -4,10 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StealthDesk.Agent.Core;
 using StealthDesk.Agent.Core.Inventory;
+using StealthDesk.Agent.Core.Power;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Tests.Fakes;
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Contracts.Terminal;
+using StealthDesk.Core;
 using StealthDesk.Realtime;
 
 namespace StealthDesk.Agent.Tests;
@@ -26,6 +29,31 @@ public class AgentCallbacksTests
 
     Assert.True(reply.Accepted, reply.Error);
     Assert.Equal(PortableInventory.AgentVersion, reply.Value);
+  }
+
+  [Fact]
+  public async Task TheServersPowerCall_ReachesThePlatforms_PowerControl()
+  {
+    await using var services = Build(new FakeChannel(), out _);
+    var power = (FakePowerControl)services.GetRequiredService<IPowerControl>();
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().ChangePowerState(PowerAction.Restart, Cancel);
+
+    Assert.True(reply.Accepted, reply.Error);
+    Assert.Equal([PowerAction.Restart], power.Calls);
+  }
+
+  [Fact]
+  public async Task TheServersPowerCall_IsRefused_WhenThePlatformCouldNotChangeIt()
+  {
+    await using var services = Build(new FakeChannel(), out _);
+    var power = (FakePowerControl)services.GetRequiredService<IPowerControl>();
+    power.NextResult = Outcome.Failure<bool>("The device couldn't start the power change.");
+
+    var reply = await services.GetRequiredService<IAgentCallbacks>().ChangePowerState(PowerAction.Shutdown, Cancel);
+
+    Assert.False(reply.Accepted);
+    Assert.Equal("The device couldn't start the power change.", reply.Error);
   }
 
   [Fact]
@@ -405,6 +433,7 @@ public class AgentCallbacksTests
     builder.AddStealthDeskAgent(new AgentStartup("tests", new Uri("http://localhost:5099"), UseSettingsFile: false));
     builder.Services.AddSingleton<IAgentPaths>(new AgentPaths("tests", isDebugBuild: true, dataRoot));
     builder.Services.AddSingleton<IRealtimeChannel<IAgentGateway>>(channel);
+    builder.Services.AddSingleton<IPowerControl, FakePowerControl>();
     return builder.Services.BuildServiceProvider();
   }
 

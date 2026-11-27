@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Permissions;
 using StealthDesk.Contracts.RemoteControl;
 using StealthDesk.Web.Server.Gateway;
@@ -275,6 +276,30 @@ public static class DeviceEndpoints
 
       return Results.Ok();
     }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceFileManagerWrite);
+
+    endpoints.MapPost($"{Routes.Devices}/{{id:guid}}/power", async (
+      Guid id,
+      PowerAction action,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DevicePowerManage))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      var changed = await agents.CallAsync(device.Id, (agent, token) => agent.ChangePowerState(action, token), cancellationToken);
+      if (!changed.Accepted)
+      {
+        return Results.Problem(changed.Error, statusCode: StatusCodes.Status409Conflict);
+      }
+
+      return Results.Ok();
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DevicePowerManage);
 
     return endpoints;
   }

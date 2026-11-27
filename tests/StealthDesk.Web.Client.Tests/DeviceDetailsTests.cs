@@ -166,6 +166,103 @@ public class DeviceDetailsTests : BunitContext
     Assert.Equal("Online", page.Find(".device-status").TextContent);
   }
 
+  [Fact]
+  public void WithThePermissionAndOnline_ThePowerButtons_AreShown()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Restart"));
+    Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Shutdown");
+  }
+
+  [Fact]
+  public void WithoutThePermission_ThePowerButtons_AreNotShown()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: false));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() is "Restart" or "Shutdown");
+  }
+
+  [Fact]
+  public void WithThePermission_ButOffline_ThePowerButtons_AreNotShown()
+  {
+    var device = Detailed() with { IsOnline = false };
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: true));
+
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+
+    page.WaitForAssertion(() => Assert.Equal("FRONT-DESK", page.Find("h1").TextContent));
+    Assert.DoesNotContain(page.FindAll("button"), x => x.TextContent.Trim() is "Restart" or "Shutdown");
+  }
+
+  [Fact]
+  public void RestartingTheDevice_AsksForConfirmation_ThenSendsTheCommand()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Restart"));
+
+    Button(page, "Restart").Click();
+
+    Assert.Contains("Restart device", page.Markup);
+    Assert.Single(_api.Requests); // only the device's own load so far
+
+    _api.Respond(HttpStatusCode.OK);
+    page.FindAll(".sd-dialog button").Single(x => x.TextContent.Trim() == "Restart").Click();
+
+    page.WaitForAssertion(() => Assert.DoesNotContain("Restart device", page.Markup));
+    Assert.Equal($"POST /api/v1/devices/{device.Id}/power?action=Restart", _api.Requests[1]);
+  }
+
+  [Fact]
+  public void CancelingThePowerDialog_SendsNothing()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Shutdown"));
+
+    Button(page, "Shutdown").Click();
+    Assert.Contains("Shut down device", page.Markup);
+
+    page.FindAll(".sd-dialog button").Single(x => x.TextContent.Trim() == "Cancel").Click();
+
+    Assert.DoesNotContain("Shut down device", page.Markup);
+    Assert.Single(_api.Requests); // only the device's own load; nothing was sent
+  }
+
+  [Fact]
+  public void WhenTheServerRefusesThePowerCommand_ShowsAnError()
+  {
+    var device = Detailed();
+    _api.RespondWith(device);
+    _hub.Actions = GatewayReply.Accept(new DeviceActions(UseTerminal: false, ManagePower: true));
+    var page = Render<DeviceDetails>(x => x.Add(p => p.Id, device.Id));
+    page.WaitForAssertion(() => Assert.Contains(page.FindAll("button"), x => x.TextContent.Trim() == "Shutdown"));
+    Button(page, "Shutdown").Click();
+
+    _api.Respond(HttpStatusCode.NotFound);
+    page.FindAll(".sd-dialog button").Single(x => x.TextContent.Trim() == "Shut down").Click();
+
+    page.WaitForAssertion(() => Assert.Contains("you may not manage its power", page.Markup));
+  }
+
+  private static AngleSharp.Dom.IElement Button(IRenderedComponent<DeviceDetails> page, string text) =>
+    page.FindAll("button").First(x => x.TextContent.Trim() == text);
+
   private static DeviceSummary Detailed() => SampleDevices.Sample("FRONT-DESK") with
   {
     DnsName = "front-desk.corp.local",

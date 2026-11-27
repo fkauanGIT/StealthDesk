@@ -84,6 +84,7 @@ public static class PermissionPresets
       PermissionNames.DeviceCtrlAltDelSend,
       PermissionNames.DeviceClipboardRead,
       PermissionNames.DeviceClipboardWrite,
+      PermissionNames.DevicePowerManage,
     ],
     [AgentInstaller] =
     [

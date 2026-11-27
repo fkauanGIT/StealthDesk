@@ -160,6 +160,7 @@ internal static class AgentCommandLine
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
     builder.AddStealthDeskAgent(startup);
     builder.Services.AddWindowsInventory();
+    builder.Services.AddWindowsPowerControl();
     if (serveDesktopClients)
     {
       builder.Services.AddWindowsDesktopClientPipe();

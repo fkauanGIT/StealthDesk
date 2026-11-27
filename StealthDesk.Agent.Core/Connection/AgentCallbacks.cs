@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Files;
 using StealthDesk.Agent.Core.Inventory;
+using StealthDesk.Agent.Core.Power;
 using StealthDesk.Agent.Core.Terminal;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.Devices;
@@ -19,6 +20,7 @@ public sealed class AgentCallbacks(
   ITerminalSessions terminals,
   DesktopClientRemoteControl remoteControl,
   IFileManager files,
+  IPowerControl power,
   IRealtimeChannel<IAgentGateway> channel,
   ILogger<AgentCallbacks> logger) : IAgentCallbacks
 {
@@ -154,6 +156,9 @@ public sealed class AgentCallbacks(
     var result = files.DeleteEntry(path);
     return Task.FromResult(result.Accepted ? GatewayReply.Accept(true) : GatewayReply.Refuse<bool>(result.Error!));
   }
+
+  public async Task<GatewayReply<bool>> ChangePowerState(PowerAction action, CancellationToken cancellationToken) =>
+    Reply(await power.ChangeState(action));
 
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);

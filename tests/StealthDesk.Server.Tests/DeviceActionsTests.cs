@@ -100,6 +100,7 @@ public class DeviceActionsTests
     [PermissionNames.DeviceClipboardWrite] = x => x.WriteClipboard,
     [PermissionNames.DeviceDesktopPreviewRead] = x => x.SeeDesktopPreview,
     [PermissionNames.DeviceFileManagerRead] = x => x.BrowseFiles,
+    [PermissionNames.DevicePowerManage] = x => x.ManagePower,
   };
 
   public static TheoryData<string> RemoteControlPermissions => [.. RemoteControlActions.Keys];
