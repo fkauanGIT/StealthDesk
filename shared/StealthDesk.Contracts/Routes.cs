@@ -20,6 +20,7 @@ public static class Routes
     $"{Device(id)}/files/directories?path={Uri.EscapeDataString(directoryPath)}&name={Uri.EscapeDataString(name)}";
   public static string DeviceDeleteFile(Guid id, string path) =>
     $"{Device(id)}/files?path={Uri.EscapeDataString(path)}";
+  public static string DevicePower(Guid id, Devices.PowerAction action) => $"{Device(id)}/power?action={action}";
   public const string ServerVersion = "/api/internal/version/server";
 
   /// <summary>A tenant's authorization change log (<c>?tenantId=</c>), and the server's own entries.</summary>

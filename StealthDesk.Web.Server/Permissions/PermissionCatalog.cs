@@ -90,6 +90,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceCtrlAltDelSend, Categories.Devices, "Send Ctrl+Alt+Del", "Send Ctrl+Alt+Del to a device during remote control.", Devices),
     new(PermissionNames.DeviceClipboardRead, Categories.Devices, "Read the clipboard", "Get text from a device's clipboard during remote control.", Devices),
     new(PermissionNames.DeviceClipboardWrite, Categories.Devices, "Write the clipboard", "Put text on a device's clipboard during remote control.", Devices),
+    new(PermissionNames.DevicePowerManage, Categories.Devices, "Manage power", "Restart or shut down a device.", Devices),
 
     new(PermissionNames.PersonalAccessTokenSelfRead, Categories.PersonalAccessTokens, "Read own tokens", "View your own personal access tokens.", TenantOnly),
     new(PermissionNames.PersonalAccessTokenSelfWrite, Categories.PersonalAccessTokens, "Manage own tokens", "Create and revoke your own personal access tokens.", TenantOnly),

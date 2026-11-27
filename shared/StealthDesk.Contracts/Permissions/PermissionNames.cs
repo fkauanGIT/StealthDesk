@@ -43,6 +43,7 @@ public static class PermissionNames
   public const string DeviceFileManagerRead = "device.file-manager.read";
   public const string DeviceFileManagerWrite = "device.file-manager.write";
   public const string DeviceGroupAssignDevices = "device-group.assign-devices";
+  public const string DevicePowerManage = "device.power.manage";
   public const string DeviceRead = "device.read";
   public const string DeviceRemoteControlBlockInput = "device.remote-control.block-input";
   public const string DeviceRemoteControlConnect = "device.remote-control.connect";

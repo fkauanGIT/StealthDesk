@@ -13,6 +13,7 @@ namespace StealthDesk.Contracts.Devices;
 /// <param name="SeeDesktopPreview">See a still picture of the device's current desktop, without starting remote control.</param>
 /// <param name="BrowseFiles">Browse the device's filesystem.</param>
 /// <param name="UploadFiles">Upload a file to the device's filesystem.</param>
+/// <param name="ManagePower">Restart or shut down the device.</param>
 [MessagePackObject(keyAsPropertyName: true)]
 public sealed record DeviceActions(
   bool UseTerminal,
@@ -25,4 +26,5 @@ public sealed record DeviceActions(
   bool BlockInput = false,
   bool SeeDesktopPreview = false,
   bool BrowseFiles = false,
-  bool UploadFiles = false);
+  bool UploadFiles = false,
+  bool ManagePower = false);

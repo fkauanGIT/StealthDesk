@@ -39,6 +39,7 @@ public class WindowsTests
     var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = Environments.Development });
     builder.AddStealthDeskAgent(new AgentStartup("tests", new Uri("http://localhost:5099"), UseSettingsFile: false));
     builder.Services.AddWindowsInventory();
+    builder.Services.AddWindowsPowerControl();
     var registrations = builder.Services.Where(x => !x.ServiceType.IsGenericTypeDefinition).ToList();
 
     // Development validates the whole graph on Build; resolving each one also catches factory mistakes.

@@ -32,8 +32,9 @@ public sealed record AgentStartup(
 public static class AgentHostSetup
 {
   /// <summary>
-  /// Registers everything the agent needs except the platform inventory
-  /// (<see cref="Inventory.IDeviceInventory"/> and <see cref="Inventory.ICpuLoad"/>).
+  /// Registers everything the agent needs except what the platform supplies its own way: inventory
+  /// (<see cref="Inventory.IDeviceInventory"/> and <see cref="Inventory.ICpuLoad"/>) and
+  /// <see cref="Power.IPowerControl"/>.
   /// </summary>
   public static HostApplicationBuilder AddStealthDeskAgent(this HostApplicationBuilder builder, AgentStartup startup)
   {

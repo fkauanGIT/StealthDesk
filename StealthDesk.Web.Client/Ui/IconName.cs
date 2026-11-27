@@ -26,4 +26,5 @@ public enum IconName
   Terminal,
   Monitor,
   Folder,
+  Power,
 }

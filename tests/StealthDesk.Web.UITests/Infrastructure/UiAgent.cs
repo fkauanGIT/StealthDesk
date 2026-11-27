@@ -190,6 +190,9 @@ public sealed class UiAgent : IAsyncDisposable
 
     public Task<GatewayReply<bool>> DeleteEntry(string path, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
+
+    public Task<GatewayReply<bool>> ChangePowerState(StealthDesk.Contracts.Devices.PowerAction action, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Refuse<bool>(NoAnswers));
   }
 }
 

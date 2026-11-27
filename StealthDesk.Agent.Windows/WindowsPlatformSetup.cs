@@ -5,6 +5,7 @@ using StealthDesk.Agent.Core;
 using StealthDesk.Agent.Core.DesktopClients;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Core.Inventory;
+using StealthDesk.Agent.Core.Power;
 using StealthDesk.Agent.Windows.DesktopClients;
 using StealthDesk.Branding;
 using StealthDesk.Contracts.Agents;
@@ -22,6 +23,14 @@ public static class WindowsPlatformSetup
     services.AddSingleton<ICpuLoad>(provider => provider.GetRequiredService<WindowsCpuLoad>());
     services.AddHostedService(provider => provider.GetRequiredService<WindowsCpuLoad>());
     services.AddSingleton<IDeviceInventory, WindowsInventory>();
+    return services;
+  }
+
+  /// <summary>Restarts or shuts down the machine via <c>shutdown.exe</c>.</summary>
+  [SupportedOSPlatform("windows")]
+  public static IServiceCollection AddWindowsPowerControl(this IServiceCollection services)
+  {
+    services.AddSingleton<IPowerControl, WindowsPowerControl>();
     return services;
   }
 
