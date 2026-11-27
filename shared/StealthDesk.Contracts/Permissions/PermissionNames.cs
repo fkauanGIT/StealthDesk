@@ -50,6 +50,7 @@ public static class PermissionNames
   public const string DeviceRemoteControlElevatedDesktop = "device.remote-control.elevated-desktop";
   public const string DeviceRemoteControlInteract = "device.remote-control.interact";
   public const string DeviceTerminalUse = "device.terminal.use";
+  public const string DeviceWakeSend = "device.wake.send";
 
   // Credentials and agents.
   public const string AgentInstall = "agent.install";

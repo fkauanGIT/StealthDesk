@@ -4,6 +4,7 @@ using StealthDesk.Agent.Core.Files;
 using StealthDesk.Agent.Core.Inventory;
 using StealthDesk.Agent.Core.Power;
 using StealthDesk.Agent.Core.Terminal;
+using StealthDesk.Agent.Core.Wake;
 using StealthDesk.Contracts.DesktopClients;
 using StealthDesk.Contracts.Devices;
 using StealthDesk.Contracts.Messaging;
@@ -21,6 +22,7 @@ public sealed class AgentCallbacks(
   DesktopClientRemoteControl remoteControl,
   IFileManager files,
   IPowerControl power,
+  IWakeSender wake,
   IRealtimeChannel<IAgentGateway> channel,
   ILogger<AgentCallbacks> logger) : IAgentCallbacks
 {
@@ -159,6 +161,9 @@ public sealed class AgentCallbacks(
 
   public async Task<GatewayReply<bool>> ChangePowerState(PowerAction action, CancellationToken cancellationToken) =>
     Reply(await power.ChangeState(action));
+
+  public async Task<GatewayReply<bool>> SendWakePacket(string macAddress, CancellationToken cancellationToken) =>
+    Reply(await wake.SendMagicPacket(macAddress));
 
   private static GatewayReply<T> Reply<T>(Outcome<T> outcome) =>
     outcome.Succeeded ? GatewayReply.Accept(outcome.Value!) : GatewayReply.Refuse<T>(outcome.Error);

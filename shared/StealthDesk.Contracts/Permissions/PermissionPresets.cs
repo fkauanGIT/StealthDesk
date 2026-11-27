@@ -85,6 +85,7 @@ public static class PermissionPresets
       PermissionNames.DeviceClipboardRead,
       PermissionNames.DeviceClipboardWrite,
       PermissionNames.DevicePowerManage,
+      PermissionNames.DeviceWakeSend,
     ],
     [AgentInstaller] =
     [

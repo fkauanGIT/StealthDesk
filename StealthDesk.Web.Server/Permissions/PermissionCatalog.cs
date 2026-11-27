@@ -91,6 +91,7 @@ public static class PermissionCatalog
     new(PermissionNames.DeviceClipboardRead, Categories.Devices, "Read the clipboard", "Get text from a device's clipboard during remote control.", Devices),
     new(PermissionNames.DeviceClipboardWrite, Categories.Devices, "Write the clipboard", "Put text on a device's clipboard during remote control.", Devices),
     new(PermissionNames.DevicePowerManage, Categories.Devices, "Manage power", "Restart or shut down a device.", Devices),
+    new(PermissionNames.DeviceWakeSend, Categories.Devices, "Wake over the network", "Wake an offline device over the network (Wake-on-LAN).", Devices),
 
     new(PermissionNames.PersonalAccessTokenSelfRead, Categories.PersonalAccessTokens, "Read own tokens", "View your own personal access tokens.", TenantOnly),
     new(PermissionNames.PersonalAccessTokenSelfWrite, Categories.PersonalAccessTokens, "Manage own tokens", "Create and revoke your own personal access tokens.", TenantOnly),

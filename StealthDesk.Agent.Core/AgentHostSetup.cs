@@ -7,6 +7,7 @@ using StealthDesk.Agent.Core.Files;
 using StealthDesk.Agent.Core.Heartbeat;
 using StealthDesk.Agent.Core.Settings;
 using StealthDesk.Agent.Core.Terminal;
+using StealthDesk.Agent.Core.Wake;
 using StealthDesk.Contracts.Realtime;
 using StealthDesk.Core;
 using StealthDesk.Core.Security;
@@ -85,6 +86,7 @@ public static class AgentHostSetup
     services.AddSingleton<DesktopClientConnections>();
     services.AddSingleton<DesktopClientRemoteControl>();
     services.AddSingleton<IFileManager, FileManager>();
+    services.AddSingleton<IWakeSender, WakeSender>();
 
     services.AddSingleton(new Backoff(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(3), TimeSpan.FromSeconds(15)));
     services.AddSingleton<HeartbeatService>();

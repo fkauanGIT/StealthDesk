@@ -402,6 +402,11 @@ public class PermissionMatrixTests
     {
       Refusal = Refusal.NotFound,
     },
+    new(HttpMethod.Post, "/api/v1/devices/{id:guid}/wake", PermissionNames.DeviceWakeSend,
+      async (w, _) => new Call(HttpMethod.Post, Routes.DeviceWake(await w.WakeTargetAsync())))
+    {
+      Refusal = Refusal.NotFound,
+    },
 
     // Device groups.
     Get("/api/v1/device-groups", PermissionNames.TenantDeviceGroupsRead, (w, _) => Path(w.InTenant(Routes.DeviceGroups))),
@@ -651,6 +656,30 @@ public class PermissionMatrixTests
     public CreatePermissionAssignmentRequest GrantRequest(Guid principal) =>
       new(PermissionPrincipalKind.User, principal, PermissionNames.TenantUsersRead, PermissionEffect.Allow, PermissionScopeKind.Tenant, Tenant);
 
+    // An offline device with a MAC address, sharing the online device's public address: what the wake row needs to
+    // succeed, set up directly rather than leaning on a real connection's remote address.
+    public async Task<Guid> WakeTargetAsync()
+    {
+      const string sharedIp = "203.0.113.9";
+      var target = Guid.NewGuid();
+      await Server.WithDbAsync(async db =>
+      {
+        var online = await db.Devices.FirstAsync(x => x.Id == Device);
+        online.PublicIpV4 = sharedIp;
+        db.Devices.Add(new DeviceRecord
+        {
+          Id = target,
+          TenantId = Tenant,
+          Name = "WAKE-TARGET",
+          MacAddresses = ["AABBCCDDEEFF"],
+          PublicIpV4 = sharedIp,
+        });
+        return await db.SaveChangesAsync();
+      });
+
+      return Remember(target);
+    }
+
     public async Task<Guid> DeviceGroupAsync(bool withDevice = false)
     {
       var group = await CreateAsync(InTenant(Routes.DeviceGroups), new DeviceGroupRequest(Unique("Group")));
@@ -763,6 +792,9 @@ public class PermissionMatrixTests
       Task.FromResult(GatewayReply.Accept(true));
 
     public override Task<GatewayReply<bool>> ChangePowerState(PowerAction action, CancellationToken cancellationToken) =>
+      Task.FromResult(GatewayReply.Accept(true));
+
+    public override Task<GatewayReply<bool>> SendWakePacket(string macAddress, CancellationToken cancellationToken) =>
       Task.FromResult(GatewayReply.Accept(true));
   }
 }

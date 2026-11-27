@@ -301,6 +301,60 @@ public static class DeviceEndpoints
       return Results.Ok();
     }).RequireAuthorization().ChecksPermission(PermissionNames.DevicePowerManage);
 
+    endpoints.MapPost($"{Routes.Devices}/{{id:guid}}/wake", async (
+      Guid id,
+      ClaimsPrincipal user,
+      IAuthorizationService authorization,
+      IAgentCalls agents,
+      StealthDeskDb db,
+      CancellationToken cancellationToken) =>
+    {
+      var device = await db.Devices.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+      if (device is null || !(await authorization.AuthorizeAsync(user, device, PermissionPolicies.For(PermissionNames.DeviceWakeSend))).Succeeded)
+      {
+        return Results.NotFound();
+      }
+
+      if (device.MacAddresses.Length == 0)
+      {
+        return Results.Problem("The device has no known MAC address.", statusCode: StatusCodes.Status409Conflict);
+      }
+
+      if (device.PublicIpV4.Length == 0)
+      {
+        return Results.Problem("The device's public address isn't known.", statusCode: StatusCodes.Status409Conflict);
+      }
+
+      // The target is offline, so some other online device sharing its public address is asked to broadcast the
+      // packet onto the network instead; one of them should be on the same local network as the target.
+      var neighbors = await db.Devices.AsNoTracking()
+        .Where(x => x.TenantId == device.TenantId && x.Id != device.Id && x.IsOnline && x.PublicIpV4 == device.PublicIpV4)
+        .Select(x => x.Id)
+        .ToListAsync(cancellationToken);
+
+      if (neighbors.Count == 0)
+      {
+        return Results.Problem("No other device is online on the same network to send the wake packet.", statusCode: StatusCodes.Status409Conflict);
+      }
+
+      var sent = false;
+      foreach (var neighborId in neighbors)
+      {
+        foreach (var macAddress in device.MacAddresses)
+        {
+          var result = await agents.CallAsync(neighborId, (agent, token) => agent.SendWakePacket(macAddress, token), cancellationToken);
+          sent |= result.Accepted;
+        }
+      }
+
+      if (!sent)
+      {
+        return Results.Problem("No online device on the same network could send the wake packet.", statusCode: StatusCodes.Status409Conflict);
+      }
+
+      return Results.Ok();
+    }).RequireAuthorization().ChecksPermission(PermissionNames.DeviceWakeSend);
+
     return endpoints;
   }
 
