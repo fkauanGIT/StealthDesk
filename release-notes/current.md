@@ -1,7 +1,4 @@
-# v1.2 — Power management
-
-What the next release brings, written as each change lands. The heading becomes the release's title: before
-tagging, give it the version, which has to match the tag and Directory.Build.props.
+# v1.2.0 — Power management
 
 ## What's in it
 
